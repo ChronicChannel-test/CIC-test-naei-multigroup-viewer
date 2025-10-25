@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NAEI Multi-Group Pollutant Viewer - Help & Documentation</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+  
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { 
+      font-family: system-ui, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      color: #000; 
+      background: #fff;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    h1 { 
+      color: #2196F3; 
+      border-bottom: 3px solid #2196F3; 
+      padding-bottom: 10px;
+      margin-top: 0;
+    }
+    
+    h2 { 
+      color: #1976D2; 
+      margin-top: 40px; 
+      margin-bottom: 15px;
+    }
+    
+    h3 { 
+      color: #0D47A1; 
+      margin-top: 30px; 
+      margin-bottom: 10px;
+    }
+    
+    .back-button {
+      display: inline-block;
+      background: #2196F3;
+      color: white;
+      padding: 10px 20px;
+      text-decoration: none;
+      border-radius: 6px;
+      margin-bottom: 30px;
+      font-weight: 600;
+    }
+    
+    .back-button:hover {
+      background: #1976D2;
+    }
+    
+    .feature-highlight {
+      background: #E3F2FD;
+      border-left: 4px solid #2196F3;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 0 6px 6px 0;
+    }
+    
+    .share-example {
+      background: #F5F5F5;
+      border: 1px solid #DDD;
+      padding: 15px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 14px;
+      margin: 10px 0;
+      overflow-x: auto;
+    }
+    
+    ul, ol {
+      margin: 10px 0;
+      padding-left: 25px;
+    }
+    
+    li {
+      margin: 5px 0;
+    }
+    
+    code {
+      background: #F5F5F5;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: monospace;
+    }
+    
+    .emoji {
+      font-size: 1.2em;
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="supabase-test/" class="back-button">← Back to NAEI Viewer</a>
+    
+    <h1>🔬 NAEI Multi-Group Pollutant Viewer</h1>
+    <h2>Complete User Guide & Documentation</h2>
+    
+    <p>This comprehensive guide covers all features of the UK National Atmospheric Emissions Inventory (NAEI) Multi-Group Pollutant Viewer, including data visualization, sharing, and export capabilities.</p>
+
+    <h2>🚀 Getting Started</h2>
+    
+    <h3>1️⃣ Select Your Pollutant</h3>
+    <p>
+      Use the <strong>Pollutant</strong> dropdown to choose from available air pollutants including:
+    </p>
+    <ul>
+      <li><strong>PM2.5</strong> - Fine particulate matter (default selection)</li>
+      <li><strong>PM10</strong> - Coarse particulate matter</li>
+      <li><strong>NOx</strong> - Nitrogen oxides</li>
+      <li><strong>SO2</strong> - Sulfur dioxide</li>
+      <li><strong>NH3</strong> - Ammonia</li>
+      <li>And many more...</li>
+    </ul>
+
+    <h3>2️⃣ Choose Your Groups</h3>
+    <p>
+      Groups represent different emission sources or categories. You can:
+    </p>
+    <ul>
+      <li><strong>Select multiple groups</strong> to compare emission sources</li>
+      <li><strong>Add more groups</strong> using the <span class="emoji">+</span> "Add Group" button</li>
+      <li><strong>Remove groups</strong> using the <span class="emoji">−</span> "Remove Group" button</li>
+      <li><strong>Reorder groups</strong> by dragging the ⠿ handle</li>
+    </ul>
+    
+    <div class="feature-highlight">
+      <strong>💡 Pro Tip:</strong> Start with "All" to see total emissions, then add specific groups like "Road Transport" or "Power Stations" for detailed comparisons.
+    </div>
+
+    <h3>3️⃣ Set Your Time Period</h3>
+    <p>
+      Choose your analysis period using the year dropdowns:
+    </p>
+    <ul>
+      <li><strong>Start Year:</strong> Defaults to 1970 (earliest available data)</li>
+      <li><strong>End Year:</strong> Defaults to 2023 (latest available data)</li>
+      <li><strong>Custom ranges:</strong> Select any period within 1970-2023</li>
+    </ul>
+    <p>
+      The chart will automatically refresh to show data for the chosen range.
+    </p>
+
+    <h2>📊 Understanding Your Chart</h2>
+
+    <h3>4️⃣ Interactive Visualization</h3>
+    <p>
+      Once you've configured your selections, the interactive line chart appears with:
+    </p>
+    <ul>
+      <li><strong>Hover functionality:</strong> Point to any data point to see exact emission values</li>
+      <li><strong>Y-axis scaling:</strong> Shows total emissions with appropriate units (e.g., kilotonnes)</li>
+      <li><strong>Color coding:</strong> Each group has a unique color for easy identification</li>
+      <li><strong>Trend analysis:</strong> Observe emission changes over time</li>
+    </ul>
+
+    <h3>5️⃣ Legend Controls</h3>
+    <p>
+      Above the chart, the custom legend provides interactive controls:
+    </p>
+    <ul>
+      <li><strong>Click group names</strong> to hide/show lines on the chart</li>
+      <li><strong>Faded items</strong> indicate hidden or unavailable data</li>
+      <li><strong>"(No data available)"</strong> groups are shown for reference but contain no plotted values</li>
+    </ul>
+
+    <h3>6️⃣ Line Smoothing Options</h3>
+    <p>
+      Control how your data is displayed:
+    </p>
+    <ul>
+      <li><strong>🚫 Disable Smoothing:</strong> Switch to straight (angular) lines</li>
+      <li><strong>✅ Enable Smoothing:</strong> Return to smooth, curved lines (default)</li>
+    </ul>
+
+    <h2>🔗 Sharing Your Charts</h2>
+    
+    <div class="feature-highlight">
+      <strong>🆕 New Feature!</strong> Share specific chart configurations with colleagues, include them in reports, or save them for future reference.
+    </div>
+
+    <h3>7️⃣ Generate Shareable URLs</h3>
+    <p>
+      The <strong>"🔗 Share Chart"</strong> button creates custom URLs that preserve your exact configuration:
+    </p>
+    <ul>
+      <li><strong>Pollutant selection</strong> - Specific pollutant ID</li>
+      <li><strong>Group selections</strong> - All selected group IDs</li>
+      <li><strong>Year range</strong> - Your chosen start and end years</li>
+    </ul>
+
+    <div class="share-example">
+Example shareable URL:
+https://chronic-illness-channel.github.io/naei-multigroup-viewer/supabase-test/?pollutant_id=15&group_ids=1,38,42&start_year=2010&end_year=2023
+    </div>
+
+    <h3>8️⃣ Share Dialog Options</h3>
+    <p>
+      When you click "🔗 Share Chart", you get multiple sharing options:
+    </p>
+    
+    <h4>📋 Copy URL</h4>
+    <ul>
+      <li>One-click copying to clipboard</li>
+      <li>Paste into emails, documents, or messages</li>
+      <li>Works across all platforms and devices</li>
+    </ul>
+
+    <h4>📧 Email Sharing</h4>
+    <ul>
+      <li>Pre-filled email template with professional formatting</li>
+      <li>Detailed group listing and year range information</li>
+      <li>Optional chart image inclusion (see below)</li>
+      <li>Chronic Illness Channel attribution and YouTube link</li>
+    </ul>
+
+    <h4>🖼️ Chart Image Sharing</h4>
+    <p>
+      Check <strong>"📋 Copy chart image to clipboard for pasting into email"</strong> to include a complete chart image:
+    </p>
+    <ul>
+      <li><strong>Professional quality:</strong> Includes title, legend, and CIC logo</li>
+      <li><strong>Complete branding:</strong> Copyright notice and YouTube channel link</li>
+      <li><strong>Easy integration:</strong> Paste directly into emails or documents</li>
+      <li><strong>High resolution:</strong> Suitable for reports and presentations</li>
+    </ul>
+
+    <div class="feature-highlight">
+      <strong>📧 Email Template Example:</strong><br>
+      Subject: <em>NAEI Emissions Data: PM2.5 (2010-2023)</em><br><br>
+      The email includes a numbered list of your selected groups, year range details, and clear instructions for using both the interactive link and chart image.
+    </div>
+
+    <h2>💾 Data Export Options</h2>
+
+    <h3>9️⃣ Chart Image Download</h3>
+    <p>
+      <strong>"⬇️ Download Chart as PNG"</strong> creates publication-ready images including:
+    </p>
+    <ul>
+      <li>Complete chart with title and custom legend</li>
+      <li>Pollutant name and emission units</li>
+      <li>Professional footer with copyright and licensing</li>
+      <li>Chronic Illness Channel attribution and YouTube link</li>
+      <li>High-resolution output suitable for reports</li>
+    </ul>
+
+    <h3>🔟 Data Export Formats</h3>
+    <p>
+      Export your data for further analysis in two formats:
+    </p>
+    
+    <h4>📄 CSV Export</h4>
+    <ul>
+      <li><strong>"📄 Download Data – CSV"</strong> for spreadsheet compatibility</li>
+      <li>Text-based format readable by Excel, Google Sheets, R, Python</li>
+      <li>Includes metadata header and timestamp footer</li>
+    </ul>
+
+    <h4>📊 Excel Export</h4>
+    <ul>
+      <li><strong>"📊 Download Data – Excel"</strong> for formatted workbooks</li>
+      <li>Native .xlsx format with proper formatting</li>
+      <li>Ready for immediate use in Microsoft Excel</li>
+    </ul>
+
+    <p>
+      Both export formats include:
+    </p>
+    <ul>
+      <li>Pollutant name and emission unit in header</li>
+      <li>Groups as rows, years as columns</li>
+      <li>Download timestamp in footer</li>
+      <li>Clean, analysis-ready data structure</li>
+    </ul>
+
+    <h2>📘 Understanding Group Information</h2>
+
+    <h3>1️⃣1️⃣ Group Details</h3>
+    <p>
+      Use <strong>"📘 See Group Info"</strong> to understand how groups are constructed:
+    </p>
+    <ul>
+      <li><strong>Source Names:</strong> Specific emission source categories</li>
+      <li><strong>Fuel Types:</strong> Energy sources or fuel categories</li>
+      <li><strong>"All Sources" / "All Fuel Types":</strong> Indicates comprehensive inclusion</li>
+    </ul>
+    <p>
+      This transparency helps you understand exactly what data each group represents.
+    </p>
+
+    <h2>🔧 Technical Features</h2>
+
+    <h3>📱 Mobile Optimization</h3>
+    <ul>
+      <li>Responsive design works on all screen sizes</li>
+      <li>Touch-friendly controls for mobile devices</li>
+      <li>Optimized layout prevents UI overlap issues</li>
+    </ul>
+
+    <h3>🔄 Real-time Updates</h3>
+    <ul>
+      <li>Charts refresh automatically when selections change</li>
+      <li>Smooth transitions and loading indicators</li>
+      <li>Efficient data loading from Supabase backend</li>
+    </ul>
+
+    <h3>📊 Analytics & Privacy</h3>
+    <ul>
+      <li>Usage analytics help improve the tool</li>
+      <li>GDPR-compliant data collection</li>
+      <li>Privacy-friendly country detection</li>
+      <li>No personal data storage</li>
+    </ul>
+
+    <h2>⚖️ Data Licensing & Attribution</h2>
+
+    <h3>1️⃣2️⃣ Official Data Source</h3>
+    <p>
+      All emissions data comes from the official UK National Atmospheric Emissions Inventory (NAEI):
+    </p>
+    <ul>
+      <li><strong>Copyright:</strong> © Crown copyright (Defra & DESNZ)</li>
+      <li><strong>License:</strong> Open Government Licence (OGL)</li>
+      <li><strong>Source:</strong> <a href="https://naei.energysecurity.gov.uk" target="_blank">naei.energysecurity.gov.uk</a></li>
+    </ul>
+
+    <h3>🎬 Tool Attribution</h3>
+    <p>
+      This visualization tool was created by the Chronic Illness Channel:
+    </p>
+    <ul>
+      <li><strong>YouTube Channel:</strong> <a href="http://youtube.com/@chronicillnesschannel" target="_blank">youtube.com/@chronicillnesschannel</a></li>
+      <li><strong>Purpose:</strong> Making environmental data accessible and understandable</li>
+      <li><strong>Open Source:</strong> Available on GitHub for transparency and community contribution</li>
+    </ul>
+
+    <h2>❓ Troubleshooting & Support</h2>
+
+    <h3>Common Issues</h3>
+    <ul>
+      <li><strong>Chart not loading:</strong> Check internet connection and refresh page</li>
+      <li><strong>Share button not working:</strong> Ensure pollutant and groups are selected</li>
+      <li><strong>Image not copying:</strong> Try using "Download Chart as PNG" as alternative</li>
+      <li><strong>Data export fails:</strong> Check that you have selected valid data range</li>
+    </ul>
+
+    <h3>Browser Compatibility</h3>
+    <ul>
+      <li><strong>Recommended:</strong> Chrome, Firefox, Safari, Edge (latest versions)</li>
+      <li><strong>Clipboard features:</strong> Require modern browsers with Clipboard API</li>
+      <li><strong>Mobile:</strong> Works on iOS Safari and Android Chrome</li>
+    </ul>
+
+    <div class="feature-highlight">
+      <strong>📧 Need Help?</strong> Visit our YouTube channel for tutorials and updates, or check the GitHub repository for technical documentation.
+    </div>
+
+    <hr style="margin: 50px 0; border: 1px solid #E0E0E0;">
+    
+    <p style="text-align: center; color: #666; font-size: 14px;">
+      <strong>NAEI Multi-Group Pollutant Viewer</strong><br>
+      Created by <a href="http://youtube.com/@chronicillnesschannel" target="_blank">Chronic Illness Channel</a><br>
+      Data © Crown copyright (Defra & DESNZ) - Open Government Licence (OGL)
+    </p>
+
+    <div style="text-align: center; margin-top: 30px;">
+      <a href="supabase-test/" class="back-button">🔬 Launch NAEI Viewer</a>
+    </div>
+  </div>
+</body>
+</html>
