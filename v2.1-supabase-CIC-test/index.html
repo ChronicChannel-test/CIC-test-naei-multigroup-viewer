@@ -211,27 +211,61 @@
     <div class="title-row">
   <h2 class="main-title"><span class="title-part title-part-1">NAEI Multi-Group</span> <span class="title-part title-part-2">Pollutant Viewer</span></h2>
       <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" style="cursor:pointer;">
-        <img id="cicLogo" src="CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
-      <div style="display: flex; flex-direction: column; align-items: center;">
-        <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" style="cursor:pointer;">
-          <img id="cicLogo" src="CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
-        </a>
-        <div style="display: flex; gap: 10px; margin-top: 10px; justify-content: center;">
-          <a href="https://youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener">
-            <img src="youtube-logo-6.svg" alt="YouTube" style="height:32px;">
-          </a>
-          <a href="https://bsky.app/profile/chronicchannel.bsky.social" target="_blank" rel="noopener">
-            <img src="Bluesky_Logo.svg" alt="Bluesky" style="height:32px;">
-          </a>
-          <a href="https://twitter.com/@Chronic_Channel" target="_blank" rel="noopener">
-            <img src="Twitter dead bird with X.svg" alt="Twitter/X" style="height:32px;">
-          </a>
-          <a href="https://facebook.com/ChronicIllnessChannel" target="_blank" rel="noopener">
-            <img src="facebook.svg" alt="Facebook" style="height:32px;">
-          </a>
-        </div>
-      </div>
+  <div class="sidebar-socials">
+    <img id="cicLogo" src="CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
+    <div class="sidebar-icons">
+      <a href="https://youtube.com/@ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
+        <img src="youtube-logo-text.svg" alt="YouTube">
       </a>
+      <a href="https://bsky.app/profile/chronicchannel.bsky.social" class="sidebar-link" target="_blank" rel="noopener">
+        <img src="Bluesky_logo_text.svg" alt="Bluesky">
+      </a>
+      <a href="https://twitter.com/@Chronic_Channel" class="sidebar-link" target="_blank" rel="noopener">
+        <img src="Twitter dead bird with X - with text.svg" alt="Twitter/X">
+      </a>
+      <a href="https://facebook.com/ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
+        <img src="facebook_logo_text.svg" alt="Facebook">
+      </a>
+    </div>
+  </div>
+<style>
+  .sidebar-socials {
+    position: fixed;
+    top: 50%;
+    right: 32px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 100;
+  }
+  .sidebar-icons {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-top: 16px;
+  }
+  .sidebar-link {
+    display: block;
+    width: 40px; /* Only logo visible */
+    height: 40px;
+    overflow: hidden;
+    transition: width 0.3s;
+    position: relative;
+  }
+  .sidebar-link img {
+    display: block;
+    height: 40px;
+    width: 160px; /* Full SVG width: logo + text */
+    transition: transform 0.3s;
+  }
+  .sidebar-link:hover {
+    width: 160px; /* Reveal text */
+  }
+  .sidebar-link:hover img {
+    transform: translateX(-40px); /* Slide logo left to reveal text */
+  }
+</style>
     </div>
 <details class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
   <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
