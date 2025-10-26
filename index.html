@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NAEI Multi-Group Pollutant Viewer</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+
+  <!-- Social preview / link preview meta tags -->
+  <meta name="description" content="NAEI Multi-Group Pollutant Viewer">
+  <!-- Open Graph (Facebook, LinkedIn, Slack, etc.) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="NAEI Multi-Group Pollutant Viewer">
+  <meta property="og:description" content="Compare emissions from grouped NAEI sources across years. Interactive charts, CSV/XLSX export and downloadable images.">
+  <meta property="og:url" content="https://github.com/Chronic-Illness-Channel/naei-multigroup-viewer">
+  <meta property="og:image" content="https://raw.githubusercontent.com/Chronic-Illness-Channel/naei-multigroup-viewer/4edd238fc210f2019c4d6b9101bee18172148270/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
+  <meta property="og:image:width" content="1120">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="NAEI Multi-Group Pollutant Viewer">
+  <meta name="twitter:description" content="Compare emissions from grouped NAEI sources across years.">
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/Chronic-Illness-Channel/naei-multigroup-viewer/4edd238fc210f2019c4d6b9101bee18172148270/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
+  <meta name="twitter:site" content="@Chronic_Channel">
+  <meta name="twitter:creator" content="@Chronic_Channel">
+  <!-- Legacy image hint -->
+  <link rel="image_src" href="https://raw.githubusercontent.com/Chronic-Illness-Channel/naei-multigroup-viewer/4edd238fc210f2019c4d6b9101bee18172148270/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
+
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 20px; color: #000; background:#fff; }
+    label { font-weight:600; margin-right:6px; }
+    .title-row {
+      position: relative;
+      margin-bottom: 0;
+    }
+  #cicLogo {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 110px;
+    height: auto;
+    max-width: none;
+  }
+	
+    h2 { margin-bottom:8px; width: 100%; display: block; }
+
+    /* Main title styling - keep desktop behaviour similar to V1 */
+    .main-title {
+      margin: 0 0 20px 0;
+      padding-right: 140px;
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.3;
+      white-space: normal;
+      overflow-wrap: normal;
+      text-align: left;
+    }
+
+    .main-title .title-part {
+      display: inline;
+      white-space: nowrap;
+    }
+    
+    /* Mobile styles */
+    @media (max-width: 768px) {
+      body {
+        margin: 15px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      body {
+        margin: 15px;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .main-title {
+        padding-right: 0;
+      }
+
+      .main-title .title-part-2 {
+        display: block;
+      }
+    }
+	
+    select, button { margin:6px; padding:6px 10px; border-radius:6px; border:1px solid #ccc; }
+    
+    /* Ensure buttons match v1 styling exactly - force override */
+    #downloadBtn, #toggleSmoothBtn, #downloadCSVBtn, #downloadXLSXBtn, #shareBtn, .add-btn, .remove-btn {
+      background: #EFEFEF !important;
+      cursor: pointer !important;
+      margin: 6px !important;
+      padding: 6px 10px !important;
+      border-radius: 6px !important;
+      border: 1px solid #ccc !important;
+      font-family: system-ui, sans-serif !important;
+      color: inherit !important;
+    }
+    
+    #downloadBtn:hover, #toggleSmoothBtn:hover, #downloadCSVBtn:hover, #downloadXLSXBtn:hover, #shareBtn:hover, .add-btn:hover, .remove-btn:hover {
+      background: #E0E0E0 !important;
+    }
+    
+    /* Ensure select dropdowns match v1 styling exactly */
+    select, #pollutantSelect, #startYear, #endYear, #groupContainer select {
+      margin: 6px !important;
+      padding: 6px 10px !important;
+      border-radius: 6px !important;
+      border: 1px solid #ccc !important;
+      background: #fff !important;
+      font-family: system-ui, sans-serif !important;
+      color: inherit !important;
+    }
+    
+    #groupContainer { margin-top:10px; }
+    .groupRow { display:flex; align-items:center; gap:8px; margin:4px 0; }
+    .groupRow.dragging { opacity:0.5; }
+    .dragHandle { cursor:grab; user-select:none; padding:4px 6px; background:#f0f0f0; border-radius:6px; }
+    #chartTitle { font-weight:700; font-size:18px; margin-top:8px; margin-bottom:6px; text-align:center; }
+  #chart_div { width:100%; height:60vh; margin-top:0; opacity:0; transition:opacity .35s ease; min-height:40vh; border:1px solid #eee; border-radius:6px; padding:6px; box-sizing:border-box; }
+    #chart_div.visible { opacity:1; }
+    button { background:#EFEFEF; cursor:pointer; }
+    button:hover { background:#E0E0E0; }
+    button:disabled { background:#EEE; color:#666; cursor:not-allowed; }
+    .add-btn, .remove-btn { display:inline-flex; align-items:center; gap:6px; }
+    .remove-icon { display:inline-block; width:18px; height:18px; border-radius:50%; background:#d33; color:#fff; text-align:center; line-height:18px; font-weight:bold; }
+    .add-btn .add-icon { color:#4CAF50; font-weight:bold; font-size:2em; }
+    .add-btn:hover .add-icon { color:#45a049; }
+    #loadingOverlay { position:fixed; top:0; left:0; width:100%; height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(255,255,255,0.98); z-index:9999; transition:opacity .35s ease; }
+    .spinner { width:72px; height:72px; border-radius:50%; background: conic-gradient(#E6194B 0deg 120deg,#F58231 120deg 240deg,#FFE119 240deg 360deg); animation:spin 1.25s linear infinite; box-shadow:0 0 12px rgba(0,0,0,0.08); }
+    @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
+    .loading-text { margin-top:12px; color:#333; font-weight:600; }
+  #mainContent { display:none; opacity:0; transition:opacity .4s ease; }
+    #mainContent.loaded { opacity:1; }
+    /* Fix cursor for clickable summary elements */
+    details summary { cursor: pointer; user-select: none; }
+    details summary::-webkit-details-marker { cursor: pointer; }
+    /* Prevent text cursor only on non-text UI elements */
+    .chart-container, #chart_div { cursor: default; user-select: none; }
+    /* Ensure interactive elements have pointer cursor */
+    button, .add-btn, .remove-btn, .dragHandle { cursor: pointer; user-select: none; }
+    /* Use pointer cursor for interactive form elements */
+    input, textarea, select { cursor: pointer; }
+	/* --- Legend dot alignment fix --- */
+	#customLegend {
+	  margin-top: 10px;
+	  display: flex;
+	  flex-wrap: wrap;
+	  justify-content: center;
+	  align-items: center;
+	  font-family: system-ui, sans-serif;
+	  gap: 10px; /* space between legend items */
+	}
+
+	#customLegend span {
+	  display: inline-flex;
+	  align-items: center;     /* centers dot + text vertically */
+	  gap: 4px;                /* tighter gap between dot and text */
+	  margin: 4px 8px;         /* small spacing between items */
+	  cursor: pointer;
+	  font-weight: 600;
+	  line-height: 1;
+	}
+
+	#customLegend span > span {
+	  width: 10px;             /* smaller dot */
+	  height: 10px;
+	  border-radius: 50%;
+	  flex-shrink: 0;
+	  transform: translateY(1px); /* tiny vertical optical fix */
+	}
+	
+	/* --- Footer centering fix --- */
+	footer {
+	  width: 100%;
+	  text-align: center;
+	  font-size: 12px;
+	  color: #555;
+	  margin-top: 8px;
+	  line-height: 1.4;
+	  font-family: system-ui, sans-serif;
+	}
+
+	footer a {
+	  color: #3366cc;
+	  text-decoration: none;
+	}
+
+	footer a:hover {
+	  text-decoration: underline;
+	}
+
+  /* Sidebar social icons - simplified: no hover reveal/slide, just icons */
+  .sidebar-socials {
+    position: fixed;
+    top: 50%;
+    right: 32px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 100;
+  }
+  .sidebar-icons {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    margin-top: 16px;
+  }
+  .sidebar-link {
+    display: block;
+    width: 48px;
+    height: 48px;
+    overflow: hidden;
+    position: relative;
+    text-decoration: none;
+  }
+  /* keep icons static and aligned; no transform or width changes on hover */
+  .sidebar-link img {
+    display: block;
+    height: 48px;
+    width: 48px;
+    object-fit: contain;
+    transition: none;
+  }
+  .sidebar-link:focus,
+  .sidebar-link:hover {
+    /* keep only the browser's default focus/hover behaviour (outline for accessibility) */
+    outline: none;
+    text-decoration: none;
+  }
+  
+  </style>
+</head>
+
+<body>
+  <div id="loadingOverlay">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="loading-text">Loading data, please wait…</div>
+  </div>
+
+  <div id="mainContent" aria-hidden="true">
+    <div class="title-row">
+  <h2 class="main-title"><span class="title-part title-part-1">NAEI Multi-Group</span> <span class="title-part title-part-2">Pollutant Viewer</span></h2>
+      <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" style="cursor:pointer;">
+  <div class="sidebar-socials">
+    <img id="cicLogo" src="CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
+    <div class="sidebar-icons">
+      <a href="https://youtube.com/@ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
+        <img src="youtube-logo-6.vsg" alt="YouTube">
+      </a>
+      <a href="https://bsky.app/profile/chronicchannel.bsky.social" class="sidebar-link" target="_blank" rel="noopener">
+        <img src="Bluesky_Logo.svg" alt="Bluesky">
+      </a>
+      <a href="https://twitter.com/@Chronic_Channel" class="sidebar-link" target="_blank" rel="noopener">
+        <img src="Twitter dead bird with X.svg" alt="Twitter/X">
+      </a>
+      <a href="https://facebook.com/ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
+        <img src="facebook.svg" alt="Facebook">
+      </a>
+    </div>
+  </div>
+</a>
+    </div>
+... (TRUNCATED FOR CALL) ...
+  </div>
+</body>
+</html>
