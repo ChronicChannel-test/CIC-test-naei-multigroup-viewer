@@ -231,9 +231,9 @@
 <style>
   .sidebar-socials {
     position: fixed;
-    top: 50%;
+    top: 32px;
     right: 32px;
-    transform: translateY(-50%);
+    transform: none;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -242,28 +242,20 @@
   .sidebar-icons {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    margin-top: 16px;
+    gap: 4px;
+    margin-top: 112px;
   }
   .sidebar-link {
     display: block;
-    width: 40px; /* Only logo visible */
+    width: 40px;
     height: 40px;
-    overflow: hidden;
-    transition: width 0.3s;
     position: relative;
+    margin-bottom: 16px;
   }
   .sidebar-link img {
     display: block;
     height: 40px;
-    width: 160px; /* Full SVG width: logo + text */
-    transition: transform 0.3s;
-  }
-  .sidebar-link:hover {
-    width: 160px; /* Reveal text */
-  }
-  .sidebar-link:hover img {
-    transform: translateX(-40px); /* Slide logo left to reveal text */
+    width: 40px;
   }
 </style>
     </div>
