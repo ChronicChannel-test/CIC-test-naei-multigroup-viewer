@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -139,8 +138,6 @@
     @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
     .loading-text { margin-top:12px; color:#333; font-weight:600; }
   #mainContent { display:none; opacity:0; transition:opacity .4s ease; }
-  #mainContentTop { padding-right: 260px; }
-  #mainContentBottom { padding-right: 0; }
     #mainContent.loaded { opacity:1; }
     /* Fix cursor for clickable summary elements */
     details summary { cursor: pointer; user-select: none; }
@@ -149,26 +146,6 @@
     .chart-container, #chart_div { cursor: default; user-select: none; }
     /* Ensure interactive elements have pointer cursor */
     button, .add-btn, .remove-btn, .dragHandle { cursor: pointer; user-select: none; }
-  .button-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  justify-content: flex-start;
-  align-items: center;
-  margin-bottom: 12px;
-  width: calc(100% - 260px) !important;
-  margin-right: 260px !important;
-  }
-  @media (max-width:700px){
-  #mainContentTop {
-    padding-right: 0 !important;
-  }
-    .button-row {
-  width: 100% !important;
-  margin-right: 0 !important;
-    }
-  }
-  
     /* Use pointer cursor for interactive form elements */
     input, textarea, select { cursor: pointer; }
 	/* --- Legend dot alignment fix --- */
@@ -231,64 +208,13 @@
   </div>
 
   <div id="mainContent" aria-hidden="true">
-    <div id="mainContentTop">
-      <div class="title-row">
-        <h2 class="main-title"><span class="title-part title-part-1">NAEI Multi-Group</span> <span class="title-part title-part-2">Pollutant Viewer</span></h2>
-        <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" style="cursor:pointer;">
-          <div class="sidebar-socials">
-            <img id="cicLogo" src="CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
-            <div class="sidebar-icons">
-              <a href="https://youtube.com/@ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
-                <img src="youtube-logo-6.svg" alt="YouTube">
-              </a>
-              <a href="https://bsky.app/profile/chronicchannel.bsky.social" class="sidebar-link" target="_blank" rel="noopener">
-                <img src="Bluesky_Logo.svg" alt="Bluesky">
-              </a>
-              <a href="https://twitter.com/@Chronic_Channel" class="sidebar-link" target="_blank" rel="noopener">
-                <img src="Twitter dead bird with X.svg" alt="Twitter/X">
-              </a>
-              <a href="https://facebook.com/ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
-                <img src="facebook.svg" alt="Facebook">
-              </a>
-            </div>
-          </div>
-        </a>
-      </div>
-      <!-- Everything above the chart (dropdowns, buttons, group info, etc.) -->
-<style>
-  .sidebar-socials {
-    position: fixed;
-    top: 32px;
-    right: 32px;
-    width: 80px;
-    transform: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    z-index: 100;
-  }
-  .sidebar-icons {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 112px;
-  }
-  .sidebar-link {
-    display: block;
-    width: 80px;
-    height: 40px;
-    position: relative;
-    margin-bottom: 16px;
-  }
-  .sidebar-link img {
-    display: block;
-    height: 40px;
-    width: 80px;
-    object-fit: contain;
-  }
-</style>
+    <div class="title-row">
+  <h2 class="main-title"><span class="title-part title-part-1">NAEI Multi-Group</span> <span class="title-part title-part-2">Pollutant Viewer</span></h2>
+      <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" style="cursor:pointer;">
+        <img id="cicLogo" src="CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
+      </a>
     </div>
-  <details class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
+<details class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
   <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
     📘 Quick Start Guide
   </summary>
@@ -406,12 +332,14 @@
 </p>
 </details>
 
-      <div class="button-row">
-        <label for="pollutantSelect">Pollutant:</label>
-        <select id="pollutantSelect" name="pollutantSelect"><option value="">Select pollutant</option></select>
-      </div>
-      <div id="groupContainer"></div>
-      <details class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
+    <div>
+      <label for="pollutantSelect">Pollutant:</label>
+  <select id="pollutantSelect" name="pollutantSelect"><option value="">Select pollutant</option></select>
+    </div>
+
+    <div id="groupContainer"></div>
+
+<details class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
   <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
     📘 See Group Info
   </summary>
@@ -421,15 +349,12 @@
   </div>
 </details>
 
-      <div>
-        <label for="startYear">Start Year:</label>
-        <select id="startYear" name="startYear"></select>
-        <label for="endYear">End Year:</label>
-        <select id="endYear" name="endYear"></select>
-      </div>
-    </div>
-    <div id="mainContentBottom">
-      <!-- Everything below: chart, legend, etc. -->
+    <div>
+      <label for="startYear">Start Year:</label>
+  <select id="startYear" name="startYear"></select>
+
+      <label for="endYear">End Year:</label>
+  <select id="endYear" name="endYear"></select>
 
       <button id="downloadBtn">⬇️ Download Chart as PNG</button>
 	  <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
@@ -439,10 +364,9 @@
 	  
     </div>
 
-      <div id="chartTitle" aria-hidden="true"></div>
-      <div id="customLegend" aria-hidden="true"></div>
-      <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
-    </div>
+    <div id="chartTitle" aria-hidden="true"></div>
+    <div id="customLegend" aria-hidden="true"></div>
+    <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
 <footer>
   © Crown 2025 copyright Defra &amp; DESNZ via 
   <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener">naei.energysecurity.gov.uk</a> 
@@ -451,7 +375,7 @@
   <strong>YouTube Channel:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener">www.youtube.com/@ChronicIllnessChannel</a>
   <br>
   <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-    Version: v2.1 test (Supabase) • Build: 2025.10.25
+    Version: v2.0 (Supabase) • Build: 2025.10.23
   </span>
 </footer>
 
@@ -1448,7 +1372,7 @@ async function init(){
     
     // Track page load
     trackAnalytics('page_load', {
-      version: 'v2.1 test (Supabase)',
+      version: 'v2.0 (Supabase)',
       load_time: Date.now(),
       screen_resolution: screen.width + 'x' + screen.height,
       viewport: window.innerWidth + 'x' + window.innerHeight
