@@ -2266,7 +2266,8 @@ async function loadGroupInfo() {
           sourcesHTML = validSources.length ? validSources.join('\n') : 'All Sources';
         }
 
-      const activitiesText = g.activities.length ? g.activities.join('\n') : 'All Fuel Types';
+  const validActivities = g.activities.filter(a => a != null && a !== '' && a !== 'NULL');
+  const activitiesText = validActivities.length ? validActivities.join('\n') : 'All Fuel Types';
 
       html += `
         <tr style="border:1px solid #444;">
