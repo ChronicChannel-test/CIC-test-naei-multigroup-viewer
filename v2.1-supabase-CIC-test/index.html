@@ -41,7 +41,7 @@
       margin-bottom: 0;
     }
   #cicLogo {
-    position: absolute;
+  position: absolute;
     top: 0;
     right: 0;
     width: 110px;
@@ -139,7 +139,7 @@
     @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
     .loading-text { margin-top:12px; color:#333; font-weight:600; }
   #mainContent { display:none; opacity:0; transition:opacity .4s ease; }
-  #mainContentTop { padding-right: 260px; }
+  #mainContentTop { padding-right: 1200px; }
   #mainContentBottom { padding-right: 0; }
     #mainContent.loaded { opacity:1; }
     /* Fix cursor for clickable summary elements */
@@ -156,8 +156,6 @@
   justify-content: flex-start;
   align-items: center;
   margin-bottom: 12px;
-  width: calc(100% - 260px) !important;
-  margin-right: 260px !important;
   }
   @media (max-width:700px){
   #mainContentTop {
@@ -257,7 +255,7 @@
       <!-- Everything above the chart (dropdowns, buttons, group info, etc.) -->
 <style>
   .sidebar-socials {
-    position: fixed;
+  position: absolute;
     top: 32px;
     right: 32px;
     width: 80px;
@@ -277,7 +275,7 @@
     display: block;
     width: 80px;
     height: 40px;
-    position: relative;
+  position: relative;
     margin-bottom: 16px;
   }
   .sidebar-link img {
@@ -422,24 +420,18 @@
 </details>
 
       <div>
+      <div class="year-download-row">
         <label for="startYear">Start Year:</label>
         <select id="startYear" name="startYear"></select>
         <label for="endYear">End Year:</label>
         <select id="endYear" name="endYear"></select>
+        <button id="downloadBtn">⬇️ Download Chart as PNG</button>
+        <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
+        <button id="downloadCSVBtn">📄 Download Data - CSV</button>
+        <button id="downloadXLSXBtn">📊 Download Data - Excel</button>
+        <button id="shareBtn">🔗 Share Chart</button>
       </div>
-    </div>
-    <div id="mainContentBottom">
-      <!-- Everything below: chart, legend, etc. -->
 
-      <button id="downloadBtn">⬇️ Download Chart as PNG</button>
-	  <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
-	  <button id="downloadCSVBtn">📄 Download Data - CSV</button>
-	  <button id="downloadXLSXBtn">📊 Download Data - Excel</button>
-	  <button id="shareBtn">🔗 Share Chart</button>
-	  
-    </div>
-
-      <div id="chartTitle" aria-hidden="true"></div>
       <div id="customLegend" aria-hidden="true"></div>
       <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
     </div>
@@ -2371,6 +2363,18 @@ async function loadGroupInfo() {
 }
 document.addEventListener('DOMContentLoaded', () => google.charts.setOnLoadCallback(init));
 </script>
+<style>
+/* --- STRONGER FIX A: Move & de‐prioritise social sidebar --- */
+.sidebar-socials {
+  position: absolute !important;
+  top: 140px !important;     /* push further down */
+  right: 20px !important;     /* slight margin from edge */
+  z-index: 5 !important;      /* far below most UI elements */
+  /* optional: slightly reduce size to avoid visual intrusion */
+  width: auto;                /* ensure default width */
+}
+</style>
+
 </body>
 </html>
 </html>
