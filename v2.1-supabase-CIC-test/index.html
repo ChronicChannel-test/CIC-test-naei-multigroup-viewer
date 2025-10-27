@@ -41,12 +41,36 @@
       margin-bottom: 0;
     }
   #cicLogo {
-  position: absolute;
+    width: 110px;
+    height: auto;
+    display: block;
+  }
+  .sidebar-socials {
+    position: absolute;
     top: 0;
     right: 0;
     width: 110px;
-    height: auto;
-    max-width: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 100;
+  }
+  .sidebar-icons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .sidebar-link {
+    display: block;
+    width: 40px;
+    height: 40px;
+  }
+  .sidebar-link img {
+    display: block;
+    height: 40px;
+    width: 40px;
+    object-fit: contain;
   }
 	
     h2 { margin-bottom:8px; width: 100%; display: block; }
@@ -125,7 +149,29 @@
     .groupRow.dragging { opacity:0.5; }
     .dragHandle { cursor:grab; user-select:none; padding:4px 6px; background:#f0f0f0; border-radius:6px; }
     #chartTitle { font-weight:700; font-size:18px; margin-top:8px; margin-bottom:6px; text-align:center; }
-  #chart_div { width:100%; height:60vh; margin-top:0; opacity:0; transition:opacity .35s ease; min-height:40vh; border:1px solid #eee; border-radius:6px; padding:6px; box-sizing:border-box; }
+  .chart-wrapper {
+    width: calc(100% - 140px);
+    padding: 8px;
+    margin: 0;
+    margin-right: auto;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-sizing: border-box;
+    background-color: #fff;
+    overflow: hidden;
+  }
+  #chart_div { 
+    width: 100%; 
+    height: 60vh; 
+    margin-top: 0; 
+    opacity: 0; 
+    transition: opacity .35s ease; 
+    min-height: 40vh; 
+    border: none;
+    border-radius: 0; 
+    padding: 0; 
+    box-sizing: border-box;
+  }
     #chart_div.visible { opacity:1; }
     button { background:#EFEFEF; cursor:pointer; }
     button:hover { background:#E0E0E0; }
@@ -139,7 +185,7 @@
     @keyframes spin { from { transform:rotate(0deg); } to { transform:rotate(360deg); } }
     .loading-text { margin-top:12px; color:#333; font-weight:600; }
   #mainContent { display:none; opacity:0; transition:opacity .4s ease; }
-  #mainContentTop { padding-right: 1200px; }
+  #mainContentTop { padding-right: 0; }
   #mainContentBottom { padding-right: 0; }
     #mainContent.loaded { opacity:1; }
     /* Fix cursor for clickable summary elements */
@@ -156,6 +202,57 @@
   justify-content: flex-start;
   align-items: center;
   margin-bottom: 12px;
+  padding-right: 130px;
+  }
+  .year-download-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding-right: 130px;
+  }
+  @media (max-width: 620px) {
+    .title-row {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+    }
+    .sidebar-socials {
+      position: static;
+      width: 100%;
+      flex-direction: row;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+    #cicLogo {
+      width: 90px;
+    }
+    .sidebar-icons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 0;
+      width: auto;
+    }
+    .sidebar-link {
+      width: 35px;
+      height: 35px;
+      margin-bottom: 0;
+    }
+    .sidebar-link img {
+      width: 35px;
+      height: 35px;
+    }
+    .main-title {
+      padding-right: 0;
+      width: 100%;
+    }
+    .chart-wrapper {
+      width: 100%;
+      max-width: 100%;
+    }
   }
   @media (max-width:700px){
   #mainContentTop {
@@ -231,60 +328,28 @@
   <div id="mainContent" aria-hidden="true">
     <div id="mainContentTop">
       <div class="title-row">
-        <h2 class="main-title"><span class="title-part title-part-1">NAEI Multi-Group</span> <span class="title-part title-part-2">Pollutant Viewer</span></h2>
-        <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" style="cursor:pointer;">
-          <div class="sidebar-socials">
+        <div class="sidebar-socials">
+          <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" style="cursor:pointer;">
             <img id="cicLogo" src="CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
-            <div class="sidebar-icons">
-              <a href="https://youtube.com/@ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
-                <img src="youtube-logo-6.svg" alt="YouTube">
-              </a>
-              <a href="https://bsky.app/profile/chronicchannel.bsky.social" class="sidebar-link" target="_blank" rel="noopener">
-                <img src="Bluesky_Logo.svg" alt="Bluesky">
-              </a>
-              <a href="https://twitter.com/@Chronic_Channel" class="sidebar-link" target="_blank" rel="noopener">
-                <img src="Twitter dead bird with X.svg" alt="Twitter/X">
-              </a>
-              <a href="https://facebook.com/ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
-                <img src="facebook.svg" alt="Facebook">
-              </a>
-            </div>
+          </a>
+          <div class="sidebar-icons">
+            <a href="https://youtube.com/@ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
+              <img src="youtube-logo-6.svg" alt="YouTube">
+            </a>
+            <a href="https://bsky.app/profile/chronicchannel.bsky.social" class="sidebar-link" target="_blank" rel="noopener">
+              <img src="Bluesky_Logo.svg" alt="Bluesky">
+            </a>
+            <a href="https://twitter.com/@Chronic_Channel" class="sidebar-link" target="_blank" rel="noopener">
+              <img src="Twitter dead bird with X.svg" alt="Twitter/X">
+            </a>
+            <a href="https://facebook.com/ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
+              <img src="facebook.svg" alt="Facebook">
+            </a>
           </div>
-        </a>
+        </div>
+        <h2 class="main-title"><span class="title-part title-part-1">NAEI Multi-Group</span> <span class="title-part title-part-2">Pollutant Viewer</span></h2>
       </div>
       <!-- Everything above the chart (dropdowns, buttons, group info, etc.) -->
-<style>
-  .sidebar-socials {
-  position: absolute;
-    top: 32px;
-    right: 32px;
-    width: 80px;
-    transform: none;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    z-index: 100;
-  }
-  .sidebar-icons {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-top: 112px;
-  }
-  .sidebar-link {
-    display: block;
-    width: 80px;
-    height: 40px;
-  position: relative;
-    margin-bottom: 16px;
-  }
-  .sidebar-link img {
-    display: block;
-    height: 40px;
-    width: 80px;
-    object-fit: contain;
-  }
-</style>
     </div>
   <details class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
   <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
@@ -418,8 +483,9 @@
     <p>Loading group information...</p>
   </div>
 </details>
+    </div>
 
-      <div>
+    <div id="mainContentBottom">
       <div class="year-download-row">
         <label for="startYear">Start Year:</label>
         <select id="startYear" name="startYear"></select>
@@ -432,8 +498,10 @@
         <button id="shareBtn">🔗 Share Chart</button>
       </div>
 
-      <div id="customLegend" aria-hidden="true"></div>
-      <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
+      <div class="chart-wrapper">
+        <div id="customLegend" aria-hidden="true"></div>
+        <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
+      </div>
     </div>
 <footer>
   © Crown 2025 copyright Defra &amp; DESNZ via 
@@ -443,7 +511,7 @@
   <strong>YouTube Channel:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener">www.youtube.com/@ChronicIllnessChannel</a>
   <br>
   <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-    Version: v2.1 test (Supabase) • Build: 2025.10.25
+    Version: v2.1 test (Supabase) • Build: 2025.10.27
   </span>
 </footer>
 
@@ -870,36 +938,28 @@ function refreshButtons() {
 }
 
 function calculateYearTicks(years, chartWidth) {
+  // Deterministic tick selection: evenly sample years to avoid overlap and shifting
   if (!years || !years.length) return [];
 
   const uniqueYears = [...new Set(years.map(y => String(y)))];
-  if (!uniqueYears.length) return [];
+  if (uniqueYears.length <= 1) return uniqueYears;
 
-  const firstYear = uniqueYears[0];
+  // For small number of years, show all
+  if (uniqueYears.length <= 10) return uniqueYears;
+
+  const minSpacing = 60; // px between labels
+  const maxLabels = Math.max(2, Math.floor(chartWidth / minSpacing));
+
+  if (uniqueYears.length <= maxLabels) return uniqueYears;
+
+  const step = Math.ceil(uniqueYears.length / maxLabels);
+  const result = uniqueYears.filter((y, idx) => idx % step === 0);
+
+  // Always include last year
   const lastYear = uniqueYears[uniqueYears.length - 1];
+  if (result[result.length - 1] !== lastYear) result.push(lastYear);
 
-  if (uniqueYears.length <= 2) {
-    return uniqueYears.map(y => y);
-  }
-
-  const maxTicks = chartWidth < 480 ? 4 : chartWidth < 720 ? 6 : 10;
-  if (uniqueYears.length <= maxTicks) {
-    return uniqueYears.map(y => y);
-  }
-
-  const middleYears = uniqueYears.slice(1, -1);
-  const step = Math.max(1, Math.ceil(middleYears.length / (maxTicks - 2)));
-  const ticks = [firstYear];
-
-  for (let i = 0; i < middleYears.length; i += step) {
-    ticks.push(middleYears[i]);
-  }
-
-  if (ticks[ticks.length - 1] !== lastYear) {
-    ticks.push(lastYear);
-  }
-
-  return ticks.map(y => y);
+  return result;
 }
 
 /* ---------------- Drag and drop handlers ---------------- */
@@ -1010,8 +1070,10 @@ function updateChart(){
     legend: 'none',
     hAxis: {
       title: 'Year',
-      textStyle: { fontSize: 12 },
-      titleTextStyle: { fontSize: 13, bold: true }
+      textStyle: { color: 'transparent' }, // Hide Google Charts labels
+      titleTextStyle: { fontSize: 13, bold: true },
+      gridlines: { color: '#e0e0e0' },
+      baselineColor: '#666'
     },
     vAxis: {
       title: `Emissions${unit ? " (" + unit + ")" : ""}`,
@@ -1026,9 +1088,8 @@ function updateChart(){
     chartArea: {
       top: 20,
       left: leftMargin,
-      right: 20,
+      right: 10,
       bottom: 60,
-      width: '85%',
       height: '70%'
     }
   };
@@ -1043,37 +1104,16 @@ function updateChart(){
   options.width = safeWidth;
   options.height = safeHeight;
 
-  let yearTicks = calculateYearTicks(years, safeWidth);
-  // Always include the first and last year in the ticks
-  if (years.length && yearTicks.length) {
-    if (yearTicks[0] !== years[0]) yearTicks.unshift(years[0]);
-    if (yearTicks[yearTicks.length - 1] !== years[years.length - 1]) yearTicks.push(years[years.length - 1]);
-  }
-  // Remove duplicates, preserve order
-  yearTicks = yearTicks.filter((y, i) => yearTicks.indexOf(y) === i);
-  // On mobile, show only first, middle, last year for clarity
+  // On mobile, show only first and last year for clarity
   const isMobile = window.innerWidth < 600;
-  if (isMobile && years.length >= 2) {
-    yearTicks = [years[0], years[years.length-1]];
+  if (isMobile) {
+    options.hAxis.slantedText = true;
+    options.hAxis.slantedTextAngle = 90;
   }
-  // Add a trailing empty tick to force space for last year label
-  if (yearTicks.length) {
-    yearTicks.push('');
-  }
-  if (yearTicks.length && yearTicks.slice(0,-1).every(y => y === '' || years.includes(y))) {
-    options.hAxis.ticks = yearTicks.map(y => String(y));
-    // Always use vertical labels for mobile/small screens
-    if (isMobile) {
-      options.hAxis.slantedText = true;
-      options.hAxis.slantedTextAngle = 90;
-    } else {
-      options.hAxis.slantedText = false;
-      delete options.hAxis.slantedTextAngle;
-    }
-  }
-  // Maximize right chart padding to ensure last label is visible
+    // Ensure a small right chart padding so the chart fills most of the container
   if (options.chartArea) {
-    options.chartArea.right = Math.max(options.chartArea.right || 20, 120);
+    // Reduce the minimum right padding; previously set to 80px which left a large gap.
+    options.chartArea.right = Math.max(options.chartArea.right || 10, 20);
     if (isMobile) {
       options.chartArea.width = '70%';
     }
@@ -1083,6 +1123,87 @@ function updateChart(){
   setTimeout(() => {
     chart.draw(dataTable, options);
     chartContainer.classList.add('visible');
+    
+    // Manually add custom year labels with proper spacing
+    setTimeout(() => {
+      try {
+        const svg = chartContainer.querySelector('svg');
+        if (!svg) return;
+        
+        const chartLayout = chart.getChartLayoutInterface();
+        const chartArea = chartLayout.getChartAreaBoundingBox();
+        const labelY = chartArea.top + chartArea.height + 20;
+        const ns = 'http://www.w3.org/2000/svg';
+        
+        // Use calculateYearTicks to determine which years to show
+        const chartWidth = chartArea.width;
+        const labelsToShow = calculateYearTicks(years, chartWidth);
+        
+        // Get all x positions first to check for overlaps
+        const positions = [];
+        const labels = [];
+        const minSpacing = 40; // Minimum pixels between labels
+        
+        // First pass: collect all positions
+        for (const year of labelsToShow) {
+          const yearIndex = years.indexOf(year);
+          const x = chartLayout.getXLocation(yearIndex);
+          positions.push(x);
+          
+          const text = document.createElementNS(ns, 'text');
+          text.setAttribute('x', x);
+          text.setAttribute('y', labelY);
+          text.setAttribute('text-anchor', 'middle');
+          text.setAttribute('font-family', 'Arial, sans-serif');
+          text.setAttribute('font-size', '12');
+          text.setAttribute('fill', '#666');
+          text.textContent = year;
+          
+          // Store for later use
+          labels.push({
+            element: text,
+            x: x,
+            year: year
+          });
+        }
+        
+        // If the penultimate label is too close to the final label, drop it
+        if (labels.length >= 2) {
+          const lastIdx = labels.length - 1;
+          const lastX = parseFloat(labels[lastIdx].x || labels[lastIdx].element.getAttribute('x'));
+          const prevX = parseFloat(labels[lastIdx - 1].x || labels[lastIdx - 1].element.getAttribute('x'));
+          if ((lastX - prevX) < minSpacing) {
+            // remove penultimate label so final label isn't crowded
+            labels.splice(lastIdx - 1, 1);
+          }
+        }
+
+        // Second pass: adjust positions to prevent overlap
+        for (let i = 1; i < labels.length; i++) {
+          const prevX = parseFloat(labels[i-1].element.getAttribute('x'));
+          const currentX = labels[i].x;
+          
+          // If labels are too close, adjust the current label's position
+          if (Math.abs(currentX - prevX) < minSpacing) {
+            // Move the current label to the right of the previous one
+            const newX = prevX + minSpacing;
+            // But don't go beyond the chart area
+            if (newX < chartArea.left + chartArea.width - 20) {
+              labels[i].element.setAttribute('x', newX);
+              // Update the text-anchor to 'start' to prevent text from shifting
+              labels[i].element.setAttribute('text-anchor', 'start');
+            }
+          }
+        }
+        
+        // Add all labels to the SVG
+        labels.forEach(label => {
+          svg.appendChild(label.element);
+        });
+      } catch (e) {
+        console.warn('Could not add custom year labels:', e);
+      }
+    }, 150);
   }, 100);
 
   // update visible title on page
@@ -2363,18 +2484,6 @@ async function loadGroupInfo() {
 }
 document.addEventListener('DOMContentLoaded', () => google.charts.setOnLoadCallback(init));
 </script>
-<style>
-/* --- STRONGER FIX A: Move & de‐prioritise social sidebar --- */
-.sidebar-socials {
-  position: absolute !important;
-  top: 140px !important;     /* push further down */
-  right: 20px !important;     /* slight margin from edge */
-  z-index: 5 !important;      /* far below most UI elements */
-  /* optional: slightly reduce size to avoid visual intrusion */
-  width: auto;                /* ensure default width */
-}
-</style>
 
 </body>
-</html>
 </html>
