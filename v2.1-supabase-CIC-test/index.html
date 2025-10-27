@@ -105,7 +105,7 @@
       }
     }
 
-    @media (max-width: 700px) {
+    @media (max-width: 760px) {
       .main-title {
         padding-right: 0;
       }
@@ -115,7 +115,7 @@
       }
     }
 	
-    select, button { margin:6px; padding:6px 10px; border-radius:6px; border:1px solid #ccc; }
+  select, button { margin:4px; padding:6px 10px; border-radius:6px; border:1px solid #ccc; }
     
     /* Ensure buttons match v1 styling exactly - force override */
     #downloadBtn, #toggleSmoothBtn, #downloadCSVBtn, #downloadXLSXBtn, #shareBtn, .add-btn, .remove-btn {
@@ -145,9 +145,11 @@
     }
     
     #groupContainer { margin-top:10px; }
-    .groupRow { display:flex; align-items:center; gap:8px; margin:4px 0; }
+  .groupRow { display:flex; align-items:center; gap:8px; margin:4px 0; }
     .groupRow.dragging { opacity:0.5; }
     .dragHandle { cursor:grab; user-select:none; padding:4px 6px; background:#f0f0f0; border-radius:6px; }
+  /* Keep select and remove button together */
+  .group-control { display: inline-flex; align-items: center; gap: 8px; }
     #chartTitle { font-weight:700; font-size:18px; margin-top:8px; margin-bottom:6px; text-align:center; }
   .chart-wrapper {
     width: calc(100% - 140px);
@@ -254,7 +256,7 @@
       max-width: 100%;
     }
   }
-  @media (max-width:700px){
+  @media (max-width:760px){
   #mainContentTop {
     padding-right: 0 !important;
   }
@@ -266,6 +268,22 @@
   
     /* Use pointer cursor for interactive form elements */
     input, textarea, select { cursor: pointer; }
+
+  /* Year/download row spacing tweaks */
+  .year-download-row label { white-space: nowrap; margin-right: 4px; }
+  .year-download-row select { margin-left: 0; margin-right: 8px; }
+  .year-download-row button { margin-left: 4px; margin-right: 4px; }
+  .year-pair { display: inline-flex; align-items: center; white-space: nowrap; margin-right: 8px; }
+
+    /* Reduce vertical spacing for compact layout */
+    .button-row, .year-download-row, #groupContainer, .groupRow { row-gap: 6px; }
+
+    /* Mobile: stack group controls and move remove button below */
+    @media (max-width: 760px) {
+      .groupRow { flex-direction: column; align-items: flex-start; gap:6px; }
+      .groupRow .remove-btn { align-self: flex-start; margin-top: 4px; }
+      .year-download-row { max-width: 100%; margin-right: 0; }
+    }
 	/* --- Legend dot alignment fix --- */
 	#customLegend {
 	  margin-top: 10px;
@@ -487,10 +505,14 @@
 
     <div id="mainContentBottom">
       <div class="year-download-row">
-        <label for="startYear">Start Year:</label>
-        <select id="startYear" name="startYear"></select>
-        <label for="endYear">End Year:</label>
-        <select id="endYear" name="endYear"></select>
+        <span class="year-pair">
+          <label for="startYear">Start Year:</label>
+          <select id="startYear" name="startYear"></select>
+        </span>
+        <span class="year-pair">
+          <label for="endYear">End Year:</label>
+          <select id="endYear" name="endYear"></select>
+        </span>
         <button id="downloadBtn">⬇️ Download Chart as PNG</button>
         <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
         <button id="downloadCSVBtn">📄 Download Data - CSV</button>
@@ -848,7 +870,12 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   dragHandle.className = 'dragHandle';
   dragHandle.textContent = '⠿';
   dragHandle.style.marginRight = '6px';
-  div.appendChild(dragHandle);
+  // group control wrapper (keeps drag handle and select together)
+  const controlWrap = document.createElement('div');
+  controlWrap.className = 'group-control';
+
+  // attach drag handle inside the control so it stays next to the select on all sizes
+  controlWrap.appendChild(dragHandle);
 
   // group select
   const sel = document.createElement('select');
@@ -867,7 +894,9 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   if (defaultValue) sel.value = defaultValue;
   sel.addEventListener('change', () => { refreshGroupDropdowns(); updateChart(); });
 
-  div.appendChild(sel);
+  controlWrap.appendChild(sel);
+  // append the control wrap first; remove button will be appended to row as a sibling
+  div.appendChild(controlWrap);
 
   container.appendChild(div);
   addDragAndDropHandlers(div);
@@ -900,7 +929,7 @@ function refreshButtons() {
   const rows = container.querySelectorAll('.groupRow');
 
   // Add remove buttons only if there are 2 or more groups
-  if (rows.length >= 2) {
+    if (rows.length >= 2) {
     rows.forEach(row => {
       if (!row.querySelector('.remove-btn')) {
         const removeBtn = document.createElement('button');
@@ -912,6 +941,8 @@ function refreshButtons() {
           refreshGroupDropdowns();
           updateChart();
         };
+        // Append the remove button as a sibling to the control wrapper so it
+        // stays on the same line on wide screens but drops below on small screens
         row.appendChild(removeBtn);
       }
     });
