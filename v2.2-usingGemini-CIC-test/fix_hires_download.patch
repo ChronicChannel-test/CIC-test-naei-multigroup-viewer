@@ -1,0 +1,178 @@
+--- index.html(original)
++++ index.html(modified)
+@@ -667,6 +667,7 @@
+ const categoryBaseColor={ecodesign:distinctPalette[4],fireplace:distinctPalette[0],gas:distinctPalette[3],power:distinctPalette[1],road:distinctPalette[6]};
+ let colorCache={}, availableColors=[...distinctPalette];
+ let chart; // global chart instance
++let seriesVisibility = []; // global chart state
+ let smoothLines = true; // default to smooth (curved) lines
+ 
+ 
+@@ -1201,7 +1202,7 @@
+   // build custom legend (interactive)
+   const legendDiv = document.getElementById('customLegend');
+   legendDiv.innerHTML = '';
+-  const seriesVisibility = Array(groups.length).fill(true);
++  seriesVisibility = Array(groups.length).fill(true);
+ 
+   groups.forEach((g, i) => {
+     const item = document.createElement('span');
+@@ -1867,23 +1868,133 @@
+       alert('Sorry — failed to generate the PNG from the chart image.');
+     };
+ 
+-    // --- Get clean image URI from the LIVE chart ---
+-    // This function temporarily hides default year ticks, gets the
+-    // URI from the current chart state, and then restores the ticks.
+-    const cleanUri = getCleanChartImageURI(chart);
++    // --- Get HIGH-RES image URI by re-drawing off-screen ---
++    // This function re-draws the chart in a hidden div at high
++    // resolution, applying the current series visibility state.
+     
+-    if (cleanUri) {
+-      img.src = cleanUri;
+-    } else {
+-      // Fallback if getCleanChartImageURI fails
+-      console.warn('getCleanChartImageURI failed, falling back to raw chart.getImageURI()');
++    const getHighResChartURI = () => {
++      return new Promise((resolve, reject) => {
++        try {
++          // 1. Get current chart state
++          const pollutant = document.getElementById('pollutantSelect').value;
++          const startYear = +document.getElementById('startYear').value;
++          const endYear = +document.getElementById('endYear').value;
++          const selectedGroups = getSelectedGroups();
++          
++          // 2. Calculate high-res dimensions
++          const chartContainer = document.getElementById('chart_div');
++          // Aim for a crisp source image, e.g., 3000px wide.
++          // The onload handler will scale this slightly to the final 3508px target.
++          const targetWidth = 3000;
++          const baseWidth = chartContainer ? chartContainer.offsetWidth : 800;
++          const baseHeight = chartContainer ? chartContainer.offsetHeight : 400;
++          
++          const exportScale = targetWidth / baseWidth;
++          const offscreenW = Math.round(baseWidth * exportScale);
++          const offscreenH = Math.round(baseHeight * exportScale);
++
++          // 3. Get data for the off-screen chart
++          const yearsAll = window.globalYears || [];
++          const yearKeys = window.globalYearKeys || [];
++          const startIdx = yearsAll.indexOf(String(startYear));
++          const endIdx = yearsAll.indexOf(String(endYear));
++          const years = (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx)
++            ? yearsAll.slice(startIdx, endIdx + 1)
++            : yearsAll.slice();
++          const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
++
++          const chartRows = years.map((y, rowIdx) => {
++            const row = [y];
++            const key = keysForYears[rowIdx];
++            selectedGroups.forEach(g => {
++              const dataRow = groupedData[pollutant]?.[g];
++              const raw = dataRow ? dataRow[key] : null;
++              const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
++              row.push(Number.isNaN(val) ? null : val);
++            });
++            return row;
++          });
++
++          const dataTable = new google.visualization.DataTable();
++          dataTable.addColumn('string', 'Year');
++          selectedGroups.forEach(g => dataTable.addColumn('number', g));
++          dataTable.addRows(chartRows);
++
++          // 4. Build options, RESPECTING global seriesVisibility
++          const colors = selectedGroups.map(g => getColorForGroup ? getColorForGroup(g) : null);
++          const seriesOptions = {};
++          selectedGroups.forEach((g, i) => {
++            // HERE IS THE KEY FIX: Check the global seriesVisibility
++            const isVisible = (seriesVisibility.length > i) ? seriesVisibility[i] : true;
++            seriesOptions[i] = {
++              color: colors[i] || undefined,
++              lineWidth: isVisible ? 3 * (exportScale / 2) : 0, // Scale line width
++              pointSize: isVisible ? 4 * (exportScale / 2) : 0  // Scale point size
++            };
++          });
++          
++          // Get left margin (same logic as on-screen chart)
++          const maxValue = Math.max(
++            ...chartRows.flatMap(r => r.slice(1).filter(v => typeof v === "number"))
++          );
++          const labelLength = maxValue ? maxValue.toLocaleString().length : 3;
++          const baseLeftMargin = Math.min(100, Math.max(60, labelLength * 10));
++
++          const options = {
++            title: '',
++            width: offscreenW,
++            height: offscreenH,
++            legend: 'none',
++            // IMPORTANT: Hide default ticks. We draw our own on the canvas.
++            hAxis: { textStyle: { color: 'transparent' }, gridlines: { color: '#e0e0e0' }, baselineColor: '#666' },
++            vAxis: { 
++              title: `Emissions${unit ? " (" + unit + ")" : ""}`,
++              viewWindow: { min: 0 },
++              // Scale fonts for the high-res render
++              titleTextStyle: { fontSize: 13 * (exportScale / 2), bold: true },
++              textStyle: { fontSize: 12 * (exportScale / 2) }
++            },
++            series: seriesOptions,
++            curveType: smoothLines ? 'function' : 'none',
++            // chartArea needs to be scaled
++            chartArea: { 
++              top: 20 * exportScale, 
++              left: baseLeftMargin * exportScale, 
++              right: 10 * exportScale, 
++              bottom: 60 * exportScale,
++              height: '70%' // Keep this relative
++            }
++          };
++          
++          // 5. Create and draw the off-screen chart
++          const wrapper = document.createElement('div');
++          wrapper.style.position = 'absolute';
++          wrapper.style.left = '-9999px';
++          wrapper.style.top = '0';
++          wrapper.style.width = offscreenW + 'px';
++          wrapper.style.height = offscreenH + 'px';
++          document.body.appendChild(wrapper);
++
++          const tempChart = new google.visualization.LineChart(wrapper);
++          google.visualization.events.addListener(tempChart, 'ready', () => {
++            try {
++              const uri = tempChart.getImageURI();
++              setTimeout(() => { try { wrapper.remove(); } catch (e) {} }, 50);
++              resolve(uri); // Success!
++            } catch (e) { 
++              try { wrapper.remove(); } catch (er) {} 
++              reject(e); 
++            }
++          });
++          tempChart.draw(dataTable, options);
++
++        } catch (err) { 
++          reject(err); 
++        }
++      });
++    };
++    
++    // --- Call the new function ---
++    try {
++      const highResUri = await getHighResChartURI();
++      if (highResUri) {
++        img.src = highResUri;
++      } else {
++        throw new Error('getHighResChartURI() returned null.');
++      }
++    } catch (e) {
++      console.error('Failed to generate high-res chart, falling back to low-res.', e);
++      // Fallback to the low-res (but matching) on-screen image
+       try {
+-        img.src = chart.getImageURI();
+-      } catch (e) {
+-        console.error('chart.getImageURI() failed:', e);
++        img.src = getCleanChartImageURI(chart);
++      } catch (e2) {
++        console.error('Low-res fallback failed:', e2);
+         alert('Sorry — failed to generate the PNG from the chart.');
+       }
