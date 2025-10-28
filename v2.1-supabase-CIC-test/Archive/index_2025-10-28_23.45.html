@@ -1234,8 +1234,6 @@ function updateChart(){
           text.setAttribute('font-family', 'Arial, sans-serif');
           text.setAttribute('font-size', '12');
           text.setAttribute('fill', '#666');
-          // Mark custom year labels so export can distinguish them from default axis ticks
-          text.setAttribute('data-custom-year', 'true');
           text.textContent = year;
           
           // Store for later use
@@ -1414,31 +1412,6 @@ function setupDownloadButton() {
         if (!cloned.getAttribute('viewBox')) cloned.setAttribute('viewBox', `0 0 ${origW} ${origH}`);
         cloned.setAttribute('width', Math.round(origW * exportScale));
         cloned.setAttribute('height', Math.round(origH * exportScale));
-        // Remove default small year tick labels from the cloned SVG so only our custom labels remain
-        try {
-          // Remove <text> or <tspan> nodes that are bare 4-digit years unless they (or an ancestor) are marked as custom.
-          const nodes = cloned.querySelectorAll('text, tspan');
-          nodes.forEach(node => {
-            const txt = (node.textContent || '').trim();
-            if (/^\d{4}$/.test(txt)) {
-              // Check ancestor chain for data-custom-year attribute
-              let cur = node;
-              let hasCustom = false;
-              while (cur && cur.getAttribute) {
-                if (cur.getAttribute('data-custom-year')) { hasCustom = true; break; }
-                cur = cur.parentNode;
-              }
-              if (!hasCustom) {
-                // remove the containing <text> element (if node is a tspan, remove its parent text)
-                let toRemove = node;
-                while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
-                if (toRemove && toRemove.parentNode) toRemove.parentNode.removeChild(toRemove);
-              }
-            }
-          });
-        } catch (e) {
-          console.warn('Could not prune default year labels from cloned SVG:', e);
-        }
         const svgString = new XMLSerializer().serializeToString(cloned);
         const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
         const url = URL.createObjectURL(svgBlob);
@@ -1699,6 +1672,8 @@ function setupDownloadButton() {
       console.error('Failed to load chart image for export', e);
       alert('Sorry — failed to generate the PNG from the chart image.');
     };
+
+    img.src = imageURI;
   });
 }
 /* ---------------- Initialization ---------------- */
@@ -2335,28 +2310,6 @@ async function generateChartImage() {
           if (!cloned.getAttribute('viewBox')) cloned.setAttribute('viewBox', `0 0 ${origW} ${origH}`);
           cloned.setAttribute('width', Math.round(origW * exportScale));
           cloned.setAttribute('height', Math.round(origH * exportScale));
-          // Remove default small year tick labels from the cloned SVG so only our custom labels remain
-          try {
-            const nodes = cloned.querySelectorAll('text, tspan');
-            nodes.forEach(node => {
-              const txt = (node.textContent || '').trim();
-              if (/^\d{4}$/.test(txt)) {
-                let cur = node;
-                let hasCustom = false;
-                while (cur && cur.getAttribute) {
-                  if (cur.getAttribute('data-custom-year')) { hasCustom = true; break; }
-                  cur = cur.parentNode;
-                }
-                if (!hasCustom) {
-                  let toRemove = node;
-                  while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
-                  if (toRemove && toRemove.parentNode) toRemove.parentNode.removeChild(toRemove);
-                }
-              }
-            });
-          } catch (e) {
-            console.warn('Could not prune default year labels from cloned SVG (email export):', e);
-          }
           const svgString = new XMLSerializer().serializeToString(cloned);
           const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
           const url = URL.createObjectURL(svgBlob);
@@ -2523,6 +2476,8 @@ async function generateChartImage() {
       img.onerror = (e) => {
         reject(new Error('Failed to load chart image for generation'));
       };
+
+      img.src = imageURI;
     } catch (error) {
       reject(error);
     }
