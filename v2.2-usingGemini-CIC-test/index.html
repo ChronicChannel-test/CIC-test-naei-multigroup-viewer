@@ -62,7 +62,9 @@
     margin-top: 8px;
   }
   .sidebar-link {
-    display: block;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     width: 40px;
     height: 40px;
   }
@@ -71,6 +73,10 @@
     height: 40px;
     width: 40px;
     object-fit: contain;
+  }
+  a[href*="facebook.com"] img {
+    width: 36px;
+    height: 36px;
   }
 	
     h2 { margin-bottom:8px; width: 100%; display: block; }
@@ -246,6 +252,10 @@
     .sidebar-link img {
       width: 35px;
       height: 35px;
+    }
+    a[href*="facebook.com"] img {
+      width: 32px;
+      height: 32px;
     }
     .main-title {
       padding-right: 0;
@@ -671,6 +681,37 @@ const categoryBaseColor={ecodesign:distinctPalette[4],fireplace:distinctPalette[
 let colorCache={}, availableColors=[...distinctPalette];
 let chart; // global chart instance
 let seriesVisibility = [];
+// Minimum export scale used when rasterizing SVG -> PNG. Increase this to
+// get higher-res downloads. Change this value only when you're ready.
+const EXPORT_MIN_SCALE = 16;
+
+// Safety limits for exporting large images. Browsers will OOM or throw
+// for extremely large canvas sizes; clamp export scales to conservative
+// per-dimension and total-pixel limits.
+const EXPORT_MAX_DIM = 16000; // max width or height in pixels (conservative)
+const EXPORT_MAX_PIXELS = 100_000_000; // max total pixels (width * height)
+
+/**
+ * Compute a safe export scale that respects EXPORT_MAX_DIM and EXPORT_MAX_PIXELS.
+ * origW/origH are the logical SVG/chart sizes in CSS pixels. desiredScale is
+ * the requested scale (e.g. Math.max(devicePixelRatio, EXPORT_MIN_SCALE)).
+ */
+function computeSafeExportScale(origW, origH, desiredScale) {
+  if (!origW || !origH || !isFinite(desiredScale) || desiredScale <= 0) return 1;
+  // Max scale to keep each dimension under EXPORT_MAX_DIM
+  const maxDimScale = Math.min(EXPORT_MAX_DIM / origW, EXPORT_MAX_DIM / origH);
+  // Max scale to keep total pixels under EXPORT_MAX_PIXELS
+  const maxAreaScale = Math.sqrt(EXPORT_MAX_PIXELS / (origW * origH));
+  const allowed = Math.max(1, Math.min(desiredScale, maxDimScale, maxAreaScale));
+  if (allowed < desiredScale) {
+    console.warn(`Export scale ${desiredScale} reduced to ${allowed} to avoid huge canvas (${Math.round(origW*allowed)}x${Math.round(origH*allowed)})`);
+    try {
+      window.__export_debug = window.__export_debug || {};
+      window.__export_debug.lastClamped = { origW, origH, desiredScale, allowed };
+    } catch (e) {}
+  }
+  return allowed;
+}
 let smoothLines = true; // default to smooth (curved) lines
 
 
@@ -1574,7 +1615,18 @@ async function getOffscreenChartImageURI(
               ctx.fillStyle = '#ffffff';
               ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              // Draw rasterized chart image without browser smoothing for crisper lines
+              try {
+                const prevSmoothing = typeof ctx.imageSmoothingEnabled !== 'undefined' ? ctx.imageSmoothingEnabled : null;
+                try { ctx.imageSmoothingEnabled = false; } catch (e) {}
+                try { ctx.webkitImageSmoothingEnabled = false; } catch (e) {}
+                try { ctx.mozImageSmoothingEnabled = false; } catch (e) {}
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                if (prevSmoothing !== null) try { ctx.imageSmoothingEnabled = prevSmoothing; } catch (e) {}
+              } catch (eS) {
+                // Fallback to normal draw if the smoothing toggle failed
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              }
 
               const finalUri = canvas.toDataURL('image/png');
               try { document.body.removeChild(off); } catch (e) {}
@@ -1618,52 +1670,44 @@ async function getOffscreenChartImageURI(
     // Render chart SVG at a higher pixel density to improve exported PNG quality
     const chartContainer = document.getElementById('chart_div');
     const svgEl = chartContainer ? chartContainer.querySelector('svg') : null;
-    const exportScale = Math.max(window.devicePixelRatio || 1, 2); // at least 2x for crisp lines
+    const origW = svgEl ? (parseInt(svgEl.getAttribute('width')) || chartContainer.offsetWidth || 800) : (chartContainer ? chartContainer.offsetWidth : 800);
+    const origH = svgEl ? (parseInt(svgEl.getAttribute('height')) || chartContainer.offsetHeight || 400) : (chartContainer ? chartContainer.offsetHeight : 400);
+    const exportScale = computeSafeExportScale(origW, origH, Math.max(window.devicePixelRatio || 1, EXPORT_MIN_SCALE)); // at least EXPORT_MIN_SCALE for crisp lines
     let img = new Image();
     img.crossOrigin = 'anonymous';
 
     // img.onload handler moved up so we can set img.src from async helpers
     img.onload = () => {
       // --- Measure legend for layout ---
-  const legendClone = document.getElementById('customLegend').cloneNode(true);
-  legendClone.style.position = 'absolute';
-  legendClone.style.visibility = 'hidden';
-  // Prevent legend from overlapping the logo on export by limiting available width
-  const logoSize = 80;
-  const padding = 20;
-  const maxLegendWidth = Math.max(100, img.width - padding * 2 - logoSize - 20);
-  legendClone.style.width = Math.min(800, maxLegendWidth) + 'px';
-  document.body.appendChild(legendClone);
-  const legendHeight = legendClone.offsetHeight + 10;
-  document.body.removeChild(legendClone);
+      const legendClone = document.getElementById('customLegend').cloneNode(true);
+      legendClone.style.position = 'absolute';
+      legendClone.style.visibility = 'hidden';
+      const logoSize = 80;
+      const padding = 20;
+      const maxLegendWidth = Math.max(100, origW - padding * 2 - logoSize - 20);
+      legendClone.style.width = Math.min(800, maxLegendWidth) + 'px';
+      document.body.appendChild(legendClone);
+      const legendHeight = legendClone.offsetHeight + 10;
+      document.body.removeChild(legendClone);
 
-  const titleHeight = 30;
-  const footerHeight = 40;
-  // padding already declared above for legend width; reuse
-
-      // --- Determine output size ---
-      const unscaledWidth = img.width + padding * 2;
-      const unscaledHeight =
-        img.height + titleHeight + legendHeight + footerHeight + padding * 3;
+      const titleHeight = 30;
+      const footerHeight = 40;
 
       // --- Auto-scale for print quality ---
-      // For A4 landscape at 300 DPI: 3508 px wide
       const targetWidth = 3508;
-      const scale = Math.max(
-        window.devicePixelRatio || 1,
-        targetWidth / unscaledWidth
-      );
+      const logicalWidth = origW + padding * 2;
+      const logicalHeight = origH + titleHeight + legendHeight + footerHeight + padding * 3;
+      const scale = targetWidth / logicalWidth;
 
       const canvas = document.createElement('canvas');
-      canvas.width = Math.round(unscaledWidth * scale);
-      canvas.height = Math.round(unscaledHeight * scale);
+      canvas.width = Math.round(logicalWidth * scale);
+      canvas.height = Math.round(logicalHeight * scale);
       const ctx = canvas.getContext('2d');
-      // Use integer scaling to preserve crispness of rasterized SVG
       ctx.scale(scale, scale);
 
       // --- Background ---
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, unscaledWidth, unscaledHeight);
+      ctx.fillRect(0, 0, logicalWidth, logicalHeight);
 
       // --- Title ---
       ctx.font = 'bold 18px system-ui, sans-serif';
@@ -1671,7 +1715,7 @@ async function getOffscreenChartImageURI(
       ctx.textAlign = 'center';
       ctx.fillText(
         `${pollutant}${unit ? " (" + unit + ")" : ""}`,
-        unscaledWidth / 2,
+        logicalWidth / 2,
         padding + 15
       );
 
@@ -1680,7 +1724,7 @@ async function getOffscreenChartImageURI(
       const items = [...legendDiv.querySelectorAll('span')];
       let legendY = padding + 35;
       const legendRowHeight = 22;
-      const maxW = unscaledWidth - padding * 2;
+      const maxW = logicalWidth - padding * 2;
       const rowItems = [];
       let row = [],
         rowW = 0;
@@ -1704,7 +1748,7 @@ async function getOffscreenChartImageURI(
       if (row.length) rowItems.push({ row, rowW });
 
       rowItems.forEach(({ row, rowW }) => {
-        let x = (unscaledWidth - rowW) / 2;
+        let x = (logicalWidth - rowW) / 2;
 	row.forEach(({ dotColor, text }) => {
 	  const faded = text.includes('(No data available)');
 	  ctx.globalAlpha = faded ? 0.4 : 1.0;
@@ -1724,69 +1768,31 @@ async function getOffscreenChartImageURI(
 
       // --- Chart image ---
       try {
-        try {
-          window.__export_debug = window.__export_debug || {};
-          window.__export_debug.last = window.__export_debug.last || {};
-          window.__export_debug.last.drawnImageSrc = img && img.src ? img.src : null;
-          console.info('Export diagnostic: drawing image with src:', window.__export_debug.last.drawnImageSrc);
-        } catch (e) { /* ignore */ }
-      } catch (e) { /* ignore */ }
-      ctx.drawImage(img, padding, legendY + 10);
-      // Erase any small default tick labels that may be baked into the raster image.
-      // Compute the exact area from the chart layout and map it to the exported canvas so
-      // we don't accidentally cover the large custom year labels or axis title.
-      try {
-        const chartContainer = document.getElementById('chart_div');
-        const chartLayout = chart.getChartLayoutInterface && chart.getChartLayoutInterface();
-        if (chartLayout && chartContainer) {
-          const chartArea = chartLayout.getChartAreaBoundingBox();
-          // baseline Y for default tick labels (same logic as when drawing custom labels)
-          const tickY = chartArea.top + chartArea.height + 20;
-          const tickHeight = 18; // approximate height of small tick text
-
-          const containerW = chartContainer.offsetWidth || logicalChartW || 1;
-          const containerH = chartContainer.offsetHeight || logicalChartH || 1;
-          const scaleX = (img.width || containerW) / containerW;
-          const scaleY = (img.height || containerH) / containerH;
-
-          const rectX = padding + (chartArea.left || 0) * scaleX;
-          const rectY = legendY + 10 + tickY * scaleY - tickHeight / 2;
-          const rectW = (chartArea.width || containerW) * scaleX;
-          const rectH = tickHeight;
-
-          ctx.save();
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(rectX, rectY, rectW, rectH);
-          ctx.restore();
-        } else {
-          // Fallback: conservative small rectangle at bottom-of-chart
-          ctx.save();
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(padding, legendY + 10 + (img.height || 0) - 30, img.width || logicalChartW || 0, 40);
-          ctx.restore();
-        }
-      } catch (e) {
-        console.warn('Could not erase small tick area on exported image:', e);
+        const prevSmoothing = typeof ctx.imageSmoothingEnabled !== 'undefined' ? ctx.imageSmoothingEnabled : null;
+        try { ctx.imageSmoothingEnabled = false; } catch (e) {}
+        try { ctx.webkitImageSmoothingEnabled = false; } catch (e) {}
+        try { ctx.mozImageSmoothingEnabled = false; } catch (e) {}
+        ctx.drawImage(img, padding, legendY + 10, origW, origH);
+        if (prevSmoothing !== null) try { ctx.imageSmoothingEnabled = prevSmoothing; } catch (e) {}
+      } catch (eS) {
+        ctx.drawImage(img, padding, legendY + 10, origW, origH);
       }
-
-      // (moved) custom year labels will be drawn after logo/footer so they're on top
 
       // --- Logo and footer ---
       const logo = new Image();
-      logo.crossOrigin = 'anonymous'; // Allow CORS for canvas export
+      logo.crossOrigin = 'anonymous';
       logo.src = 'CIC - Square - Border - Words - Alpha 360x360.png';
 
 	  const finishExport = () => {
 	          const footerText =
 	            "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk licensed under the Open Government Licence (OGL).";
 	          const channelText = "Youtube Channel: youtube.com/@chronicillnesschannel";
-	          const timestamp = new Date().toISOString().replace("T", " ").substring(0, 19);
 
 	          // --- Footer text wrapping ---
 	          ctx.font = '12px system-ui, sans-serif';
 	          ctx.fillStyle = '#555';
 	          ctx.textAlign = 'center';
-	          const maxFooterWidth = unscaledWidth - 40;
+	          const maxFooterWidth = logicalWidth - 40;
 	          function wrapText(text, maxWidth) {
 	            const words = text.split(' ');
 	            let lines = [], line = '';
@@ -1804,13 +1810,13 @@ async function getOffscreenChartImageURI(
 	            return lines;
 	          }
 	          const footerLines = wrapText(footerText, maxFooterWidth);
-	          let footerY = legendY + img.height + 20;
+	          let footerY = legendY + 10 + origH + 20;
 	          footerLines.forEach((line, i) => {
-	            ctx.fillText(line, unscaledWidth / 2, footerY + i * 16);
+	            ctx.fillText(line, logicalWidth / 2, footerY + i * 16);
 	          });
 	          footerY += footerLines.length * 16;
 
-	          // Draw YouTube channel with bold label, also wrapped if needed
+	          // Draw YouTube channel with bold label
 	          const boldText = "Youtube Channel: ";
 	          const normalText = "youtube.com/@chronicillnesschannel";
 	          ctx.font = 'bold 12px system-ui, sans-serif';
@@ -1819,149 +1825,10 @@ async function getOffscreenChartImageURI(
 	          const normalWidth = ctx.measureText(normalText).width;
 	          const totalWidth = boldWidth + normalWidth;
 	          let channelY = footerY + 5;
-	          if (totalWidth > maxFooterWidth) {
-	            // Wrap channel text if needed
-	            ctx.font = 'bold 12px system-ui, sans-serif';
-	            const boldLines = wrapText(boldText, maxFooterWidth);
-	            boldLines.forEach((line, i) => {
-	              ctx.fillText(line, unscaledWidth / 2, channelY + i * 16);
-	            });
-	            channelY += boldLines.length * 16;
-	            ctx.font = '12px system-ui, sans-serif';
-	            const normalLines = wrapText(normalText, maxFooterWidth);
-	            normalLines.forEach((line, i) => {
-	              ctx.fillText(line, unscaledWidth / 2, channelY + i * 16);
-	            });
-	            channelY += normalLines.length * 16;
-	          } else {
-	            // Draw bold part
-	            ctx.font = 'bold 12px system-ui, sans-serif';
-	            ctx.fillText(boldText, (unscaledWidth - totalWidth) / 2 + boldWidth / 2, channelY);
-	            // Draw normal part
-	            ctx.font = '12px system-ui, sans-serif';
-	            ctx.fillText(normalText, (unscaledWidth - totalWidth) / 2 + boldWidth + normalWidth / 2, channelY);
-	            channelY += 16;
-	          }
-
-	          // --- Final: draw custom year labels on top of everything (logo/footer already drawn) ---
-	          try {
-	            // Aggressive final erase: paint a white rectangle over the x-axis tick area
-	            // (computed from the chart layout) and then re-draw our custom year labels on top.
-	            try {
-	              const chartContainer = document.getElementById('chart_div');
-	              const chartLayout = chart.getChartLayoutInterface && chart.getChartLayoutInterface();
-	              if (chartLayout && chartContainer) {
-	                const chartArea = chartLayout.getChartAreaBoundingBox();
-	                const containerW = chartContainer.offsetWidth || 1;
-	                const containerH = chartContainer.offsetHeight || 1;
-	                const scaleX = (img.width || containerW) / containerW;
-	                const scaleY = (img.height || containerH) / containerH;
-	                const tickY = chartArea.top + chartArea.height + 20;
-	                // make the erase zone slightly taller to be conservative
-	                const tickHeight = 28;
-	                const rectX = padding + (chartArea.left || 0) * scaleX;
-	                const rectY = legendY + 10 + tickY * scaleY - tickHeight / 2;
-	                const rectW = (chartArea.width || containerW) * scaleX;
-	                const rectH = tickHeight;
-	                ctx.save();
-	                ctx.fillStyle = '#ffffff';
-	                ctx.fillRect(rectX - 2, rectY - 2, rectW + 4, rectH + 4);
-	                ctx.restore();
-	              }
-	            } catch (e) {
-	              // ignore — we'll still attempt to draw labels below
-	            }
-	            const chartContainer = document.getElementById('chart_div');
-	            const chartLayout = chart.getChartLayoutInterface();
-	            if (chartLayout && chartContainer) {
-	              const yearsAll = window.globalYears || [];
-	              const startIdx = yearsAll.indexOf(String(document.getElementById('startYear').value));
-	              const endIdx = yearsAll.indexOf(String(document.getElementById('endYear').value));
-	              const years = (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx)
-	                ? yearsAll.slice(startIdx, endIdx + 1)
-	                : yearsAll.slice();
-
-	              const chartArea = chartLayout.getChartAreaBoundingBox();
-	              const scaleX = img.width / Math.max(1, chartContainer.offsetWidth || 1);
-	              const scaleY = img.height / Math.max(1, chartContainer.offsetHeight || 1);
-	              const rawLabelsToShow = calculateYearTicks(years, chartArea.width || (chartContainer.offsetWidth || 300));
-
-	              // --- FIX: Replicate on-screen overlap logic ---
-	              const minSpacing = 40; // Use same minSpacing as on-screen chart
-            
-	              // 1. Get labels with their X positions (in container-space)
-	              const labels = rawLabelsToShow.map(year => {
-	                  const yearIndex = years.indexOf(year);
-	                  if (yearIndex === -1) return null;
-	                  const x = chartLayout.getXLocation(yearIndex);
-	                  return { year: year, x: x };
-	              }).filter(Boolean); // filter out any nulls
-
-	              // 2. Check for overlap and splice if needed
-	              if (labels.length >= 2) {
-	                const lastIdx = labels.length - 1;
-	                const lastX = labels[lastIdx].x;
-	                const prevX = labels[lastIdx - 1].x;
-	                if ((lastX - prevX) < minSpacing) {
-	                  // remove penultimate label so final label isn't crowded
-	                  labels.splice(lastIdx - 1, 1);
-	                }
-	              }
-	              // --- END FIX ---
-
-	              // Match SVG label styling used in the DOM so exported labels are visually consistent
-	              ctx.fillStyle = '#333';
-	              ctx.font = '600 16px system-ui, Arial, sans-serif';
-	              ctx.textAlign = 'center';
-	              ctx.textBaseline = 'alphabetic';
-
-	              // 3. Loop over the *filtered* labels array
-	              labels.forEach(label => {
-	                const year = label.year;
-	                const xInContainer = label.x;
-              
-	                const xOnImage = padding + (xInContainer * scaleX);
-	                const yInContainer = chartArea.top + chartArea.height + 20;
-	                const yOnImage = legendY + 10 + (yInContainer * scaleY);
-              
-	                // Safety: don't draw into the footer area (basic check)
-	                if (yOnImage < (unscaledHeight - 50)) {
-	                   ctx.fillText(String(year), xOnImage, yOnImage);
-	                }
-	              });
-	            }
-	          } catch (err) {
-	            console.warn('Failed to draw final year labels on export:', err);
-	          }
-
-	          // --- Final diagnostic: append a small preview of the final canvas to debug panel ---
-	          try {
-	            window.__export_debug = window.__export_debug || {};
-	            window.__export_debug.finalPreviewTimestamp = Date.now();
-	            // create small data URL preview
-	            try {
-	              const previewDataURL = canvas.toDataURL('image/png');
-	              window.__export_debug.last = window.__export_debug.last || {};
-	              window.__export_debug.last.finalPreviewSample = String(previewDataURL).slice(0, 200);
-	              // append to debug panel if present
-	              const panel = document.getElementById('export_debug_panel');
-	              if (panel) {
-	                const label = document.createElement('div');
-	                label.textContent = 'Final canvas preview:';
-	                label.style.fontSize = '11px';
-	                label.style.marginTop = '6px';
-	                panel.appendChild(label);
-	                const finalImg = document.createElement('img');
-	                finalImg.src = previewDataURL;
-	                finalImg.style.width = '200px';
-	                finalImg.style.display = 'block';
-	                finalImg.style.marginBottom = '6px';
-	                panel.appendChild(finalImg);
-	              }
-	            } catch (e) {
-	              console.warn('Failed to create final preview data URL:', e);
-	            }
-	          } catch (e) { /* ignore */ }
+	          ctx.font = 'bold 12px system-ui, sans-serif';
+	          ctx.fillText(boldText, (logicalWidth - totalWidth) / 2 + boldWidth / 2, channelY);
+	          ctx.font = '12px system-ui, sans-serif';
+	          ctx.fillText(normalText, (logicalWidth - totalWidth) / 2 + boldWidth + normalWidth / 2, channelY);
 
 	          // --- Download ---
 	          const link = document.createElement('a');
@@ -1976,7 +1843,7 @@ async function getOffscreenChartImageURI(
       logo.onload = () => {
         try {
           const logoSize = 80;
-          ctx.drawImage(logo, unscaledWidth - logoSize - 20, 10, logoSize, logoSize);
+          ctx.drawImage(logo, logicalWidth - logoSize - 20, 10, logoSize, logoSize);
           finishExport();
         } catch (e) {
           console.warn('Logo failed to draw, continuing without logo:', e);
@@ -1995,22 +1862,29 @@ async function getOffscreenChartImageURI(
       alert('Sorry — failed to generate the PNG from the chart image.');
     };
 
-    // --- Get clean image URI from the LIVE chart ---
-    // This function temporarily hides default year ticks, gets the
-    // URI from the current chart state, and then restores the ticks.
-    const cleanUri = getCleanChartImageURI(chart);
-    
-    if (cleanUri) {
-      img.src = cleanUri;
-    } else {
-      // Fallback if getCleanChartImageURI fails
-      console.warn('getCleanChartImageURI failed, falling back to raw chart.getImageURI()');
+    // --- Get high-resolution SVG image ---
+    if (svgEl) {
       try {
-        img.src = chart.getImageURI();
-      } catch (e) {
-        console.error('chart.getImageURI() failed:', e);
-        alert('Sorry — failed to generate the PNG from the chart.');
+        const origW = parseInt(svgEl.getAttribute('width')) || chartContainer.offsetWidth || 800;
+        const origH = parseInt(svgEl.getAttribute('height')) || chartContainer.offsetHeight || 400;
+        const exportScale = computeSafeExportScale(origW, origH, Math.max(window.devicePixelRatio || 1, EXPORT_MIN_SCALE));
+        const cloned = svgEl.cloneNode(true);
+        if (!cloned.getAttribute('viewBox')) cloned.setAttribute('viewBox', `0 0 ${origW} ${origH}`);
+        cloned.setAttribute('width', Math.round(origW * exportScale));
+        cloned.setAttribute('height', Math.round(origH * exportScale));
+        
+        pruneYearsFromSVG(cloned, { debug: true });
+
+        let svgString = new XMLSerializer().serializeToString(cloned);
+        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(svgBlob);
+        img.src = url;
+      } catch (err) {
+        console.warn('SVG export failed, falling back to getImageURI()', err);
+        img.src = getCleanChartImageURI(chart) || chart.getImageURI();
       }
+    } else {
+      img.src = getCleanChartImageURI(chart) || chart.getImageURI();
     }
 
 // Return a clean chart image URI by temporarily hiding default 4-digit tick text nodes
@@ -2662,10 +2536,9 @@ async function generateChartImage() {
 
       const unit = pollutantUnits[pollutant] || "";
 
-      // Render chart SVG at higher pixel density for better quality in generated images
-      const chartContainer = document.getElementById('chart_div');
-      const svgEl = chartContainer ? chartContainer.querySelector('svg') : null;
-      const exportScale = Math.max(window.devicePixelRatio || 1, 2);
+    // Render chart SVG at higher pixel density for better quality in generated images
+    const chartContainer = document.getElementById('chart_div');
+    const svgEl = chartContainer ? chartContainer.querySelector('svg') : null;
       let img = new Image();
       img.crossOrigin = 'anonymous';
 
@@ -2673,6 +2546,7 @@ async function generateChartImage() {
         try {
           const origW = parseInt(svgEl.getAttribute('width')) || chartContainer.offsetWidth || 800;
           const origH = parseInt(svgEl.getAttribute('height')) || chartContainer.offsetHeight || 400;
+          const exportScale = computeSafeExportScale(origW, origH, Math.max(window.devicePixelRatio || 1, EXPORT_MIN_SCALE));
           const cloned = svgEl.cloneNode(true);
           if (!cloned.getAttribute('viewBox')) cloned.setAttribute('viewBox', `0 0 ${origW} ${origH}`);
           cloned.setAttribute('width', Math.round(origW * exportScale));
@@ -2809,7 +2683,17 @@ async function generateChartImage() {
           });
 
           // --- Chart image ---
-          ctx.drawImage(img, padding, legendY + 10);
+          // Draw rasterized chart image without browser smoothing for crisper lines
+          try {
+            const prevSmoothing = typeof ctx.imageSmoothingEnabled !== 'undefined' ? ctx.imageSmoothingEnabled : null;
+            try { ctx.imageSmoothingEnabled = false; } catch (e) {}
+            try { ctx.webkitImageSmoothingEnabled = false; } catch (e) {}
+            try { ctx.mozImageSmoothingEnabled = false; } catch (e) {}
+            ctx.drawImage(img, padding, legendY + 10);
+            if (prevSmoothing !== null) try { ctx.imageSmoothingEnabled = prevSmoothing; } catch (e) {}
+          } catch (eS) {
+            ctx.drawImage(img, padding, legendY + 10);
+          }
           // Erase any small default tick labels baked into the raster image.
           try {
             const chartContainer = document.getElementById('chart_div');
@@ -3104,7 +2988,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // compute offscreen pixel size (match exportScale used elsewhere)
       const chartContainer = document.getElementById('chart_div');
-      const exportScale = Math.max(window.devicePixelRatio || 1, 2);
+      const exportScale = computeSafeExportScale(
+        (chartContainer ? chartContainer.offsetWidth : 800),
+        (chartContainer ? chartContainer.offsetHeight : 400),
+        Math.max(window.devicePixelRatio || 1, EXPORT_MIN_SCALE)
+      );
       const offscreenW = Math.round((chartContainer ? chartContainer.offsetWidth : 800) * exportScale);
       const offscreenH = Math.round((chartContainer ? chartContainer.offsetHeight : 400) * exportScale);
 
@@ -3232,9 +3120,18 @@ document.addEventListener('DOMContentLoaded', () => {
           ctx.font = 'bold 18px system-ui, sans-serif'; ctx.fillStyle = '#000'; ctx.textAlign = 'center';
           ctx.fillText(`${pollutant}${unit ? ' ('+unit+')' : ''}`, unscaledWidth/2, padding+15);
 
-          // Draw the offscreen chart image
+          // Draw the offscreen chart image (disable smoothing for crisper lines)
           const legendY = padding + 35;
-          ctx.drawImage(img, padding, legendY + 10, img.width, img.height);
+          try {
+            const prevSmoothing = typeof ctx.imageSmoothingEnabled !== 'undefined' ? ctx.imageSmoothingEnabled : null;
+            try { ctx.imageSmoothingEnabled = false; } catch (e) {}
+            try { ctx.webkitImageSmoothingEnabled = false; } catch (e) {}
+            try { ctx.mozImageSmoothingEnabled = false; } catch (e) {}
+            ctx.drawImage(img, padding, legendY + 10, img.width, img.height);
+            if (prevSmoothing !== null) try { ctx.imageSmoothingEnabled = prevSmoothing; } catch (e) {}
+          } catch (eS) {
+            ctx.drawImage(img, padding, legendY + 10, img.width, img.height);
+          }
 
           // Draw logo (if available)
           const logo = new Image(); logo.crossOrigin = 'anonymous';
