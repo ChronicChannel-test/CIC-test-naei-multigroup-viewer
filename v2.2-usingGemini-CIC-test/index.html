@@ -670,6 +670,7 @@ const distinctPalette=['#E6194B','#3CB44B','#FFE119','#4363D8','#F58231','#911EB
 const categoryBaseColor={ecodesign:distinctPalette[4],fireplace:distinctPalette[0],gas:distinctPalette[3],power:distinctPalette[1],road:distinctPalette[6]};
 let colorCache={}, availableColors=[...distinctPalette];
 let chart; // global chart instance
+let seriesVisibility = [];
 let smoothLines = true; // default to smooth (curved) lines
 
 
