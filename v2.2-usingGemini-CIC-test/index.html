@@ -1408,7 +1408,7 @@ function setupDownloadButton() {
  * Render a fresh offscreen Google Chart into a hidden container, return a high-DPI PNG data URI.
  *
  * Parameters must match how you call it currently:
- *   pollutant, selectedGroups, startYear, endYear, pixelW, pixelH, smoothLines
+ * pollutant, selectedGroups, startYear, endYear, pixelW, pixelH, smoothLines
  *
  * Important: this function explicitly sets chart options (chartArea, axis fonts, hAxis ticks)
  * to match the on-screen chart's visual layout so the bitmap matches exactly.
@@ -1573,69 +1573,7 @@ async function getOffscreenChartImageURI(
     }
   });
 }
-
-            return row;
-          });
-
-          const dataTable = new google.visualization.DataTable();
-          dataTable.addColumn('string', 'Year');
-          groups.forEach(g => dataTable.addColumn('number', g));
-          dataTable.addRows(chartRows);
-
-          // Minimal options to render the chart but hide hAxis text
-          // Match on-screen chart appearance: use the same series colors and left margin
-          const colors = groups.map(g => getColorForGroup ? getColorForGroup(g) : null);
-          const seriesOptions = {};
-          groups.forEach((g, i) => { seriesOptions[i] = { color: colors[i] || undefined, lineWidth: 3, pointSize: 4 }; });
-          // Compute left margin based on max value so label widths match the visible chart
-          const maxValue = Math.max(...chartRows.flatMap(r => r.slice(1).filter(v => typeof v === 'number')));
-          const labelLength = maxValue ? maxValue.toLocaleString().length : 3;
-          const leftMargin = Math.min(100, Math.max(60, labelLength * 10));
-          const options = {
-            title: '',
-            width: width || 800,
-            height: height || 400,
-            legend: 'none',
-            hAxis: { textPosition: 'none', gridlines: { color: '#e0e0e0' }, baselineColor: '#666' },
-            vAxis: { viewWindow: { min: 0 } },
-            series: seriesOptions,
-            curveType: smoothLinesOpt ? 'function' : 'none',
-            lineWidth: 3,
-            pointSize: 4,
-            chartArea: { top: 20, left: leftMargin, right: 10, bottom: 60, height: '70%' }
-          };
-
-          // Offscreen container
-          const wrapper = document.createElement('div');
-          wrapper.style.position = 'absolute';
-          wrapper.style.left = '-9999px';
-          wrapper.style.top = '0';
-          wrapper.style.width = (options.width || 800) + 'px';
-          wrapper.style.height = (options.height || 400) + 'px';
-          document.body.appendChild(wrapper);
-
-          const tempChart = new google.visualization.LineChart(wrapper);
-          // Wait for the chart to be ready, then getImageURI
-          google.visualization.events.addListener(tempChart, 'ready', () => {
-            try {
-              const uri = tempChart.getImageURI();
-              // cleanup
-              setTimeout(() => { try { wrapper.remove(); } catch (e) {} }, 50);
-              resolve(uri);
-            } catch (e) {
-              try { wrapper.remove(); } catch (er) {}
-              reject(e);
-            }
-          });
-          // Draw
-          tempChart.draw(dataTable, options);
-      try {
-        const el = document.getElementById('offscreen_chart_export');
-        if (el && el.parentNode) el.parentNode.removeChild(el);
-      } catch (e) {}
-          reject(err);
-        }
-
+    
     // Render chart SVG at a higher pixel density to improve exported PNG quality
     const chartContainer = document.getElementById('chart_div');
     const svgEl = chartContainer ? chartContainer.querySelector('svg') : null;
@@ -1797,865 +1735,203 @@ async function getOffscreenChartImageURI(
       logo.crossOrigin = 'anonymous'; // Allow CORS for canvas export
       logo.src = 'CIC - Square - Border - Words - Alpha 360x360.png';
 
-      const finishExport = () => {
-        const footerText =
-          "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk licensed under the Open Government Licence (OGL).";
-        const channelText = "Youtube Channel: youtube.com/@chronicillnesschannel";
-        const timestamp = new Date().toISOString().replace("T", " ").substring(0, 19);
+	  const finishExport = () => {
+	          const footerText =
+	            "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk licensed under the Open Government Licence (OGL).";
+	          const channelText = "Youtube Channel: youtube.com/@chronicillnesschannel";
+	          const timestamp = new Date().toISOString().replace("T", " ").substring(0, 19);
 
-        // --- Footer text wrapping ---
-        ctx.font = '12px system-ui, sans-serif';
-        ctx.fillStyle = '#555';
-        ctx.textAlign = 'center';
-        const maxFooterWidth = unscaledWidth - 40;
-        function wrapText(text, maxWidth) {
-          const words = text.split(' ');
-          let lines = [], line = '';
-          for (let n = 0; n < words.length; n++) {
-            const testLine = line + (line ? ' ' : '') + words[n];
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > maxWidth && line) {
-              lines.push(line);
-              line = words[n];
-            } else {
-              line = testLine;
-            }
-          }
-          if (line) lines.push(line);
-          return lines;
-        }
-        const footerLines = wrapText(footerText, maxFooterWidth);
-        let footerY = legendY + img.height + 20;
-        footerLines.forEach((line, i) => {
-          ctx.fillText(line, unscaledWidth / 2, footerY + i * 16);
-        });
-        footerY += footerLines.length * 16;
+	          // --- Footer text wrapping ---
+	          ctx.font = '12px system-ui, sans-serif';
+	          ctx.fillStyle = '#555';
+	          ctx.textAlign = 'center';
+	          const maxFooterWidth = unscaledWidth - 40;
+	          function wrapText(text, maxWidth) {
+	            const words = text.split(' ');
+	            let lines = [], line = '';
+	            for (let n = 0; n < words.length; n++) {
+	              const testLine = line + (line ? ' ' : '') + words[n];
+	              const metrics = ctx.measureText(testLine);
+	              if (metrics.width > maxWidth && line) {
+	                lines.push(line);
+	                line = words[n];
+	              } else {
+	                line = testLine;
+	              }
+	            }
+	            if (line) lines.push(line);
+	            return lines;
+	          }
+	          const footerLines = wrapText(footerText, maxFooterWidth);
+	          let footerY = legendY + img.height + 20;
+	          footerLines.forEach((line, i) => {
+	            ctx.fillText(line, unscaledWidth / 2, footerY + i * 16);
+	          });
+	          footerY += footerLines.length * 16;
 
-        // Draw YouTube channel with bold label, also wrapped if needed
-        const boldText = "Youtube Channel: ";
-        const normalText = "youtube.com/@chronicillnesschannel";
-        ctx.font = 'bold 12px system-ui, sans-serif';
-        const boldWidth = ctx.measureText(boldText).width;
-        ctx.font = '12px system-ui, sans-serif';
-        const normalWidth = ctx.measureText(normalText).width;
-        const totalWidth = boldWidth + normalWidth;
-        let channelY = footerY + 5;
-        if (totalWidth > maxFooterWidth) {
-          // Wrap channel text if needed
-          ctx.font = 'bold 12px system-ui, sans-serif';
-          const boldLines = wrapText(boldText, maxFooterWidth);
-          boldLines.forEach((line, i) => {
-            ctx.fillText(line, unscaledWidth / 2, channelY + i * 16);
-          });
-          channelY += boldLines.length * 16;
-          ctx.font = '12px system-ui, sans-serif';
-          const normalLines = wrapText(normalText, maxFooterWidth);
-          normalLines.forEach((line, i) => {
-            ctx.fillText(line, unscaledWidth / 2, channelY + i * 16);
-          });
-          channelY += normalLines.length * 16;
-        } else {
-          // Draw bold part
-          ctx.font = 'bold 12px system-ui, sans-serif';
-          ctx.fillText(boldText, (unscaledWidth - totalWidth) / 2 + boldWidth / 2, channelY);
-          // Draw normal part
-          ctx.font = '12px system-ui, sans-serif';
-          ctx.fillText(normalText, (unscaledWidth - totalWidth) / 2 + boldWidth + normalWidth / 2, channelY);
-          channelY += 16;
-        }
+	          // Draw YouTube channel with bold label, also wrapped if needed
+	          const boldText = "Youtube Channel: ";
+	          const normalText = "youtube.com/@chronicillnesschannel";
+	          ctx.font = 'bold 12px system-ui, sans-serif';
+	          const boldWidth = ctx.measureText(boldText).width;
+	          ctx.font = '12px system-ui, sans-serif';
+	          const normalWidth = ctx.measureText(normalText).width;
+	          const totalWidth = boldWidth + normalWidth;
+	          let channelY = footerY + 5;
+	          if (totalWidth > maxFooterWidth) {
+	            // Wrap channel text if needed
+	            ctx.font = 'bold 12px system-ui, sans-serif';
+	            const boldLines = wrapText(boldText, maxFooterWidth);
+	            boldLines.forEach((line, i) => {
+	              ctx.fillText(line, unscaledWidth / 2, channelY + i * 16);
+	            });
+	            channelY += boldLines.length * 16;
+	            ctx.font = '12px system-ui, sans-serif';
+	            const normalLines = wrapText(normalText, maxFooterWidth);
+	            normalLines.forEach((line, i) => {
+	              ctx.fillText(line, unscaledWidth / 2, channelY + i * 16);
+	            });
+	            channelY += normalLines.length * 16;
+	          } else {
+	            // Draw bold part
+	            ctx.font = 'bold 12px system-ui, sans-serif';
+	            ctx.fillText(boldText, (unscaledWidth - totalWidth) / 2 + boldWidth / 2, channelY);
+	            // Draw normal part
+	            ctx.font = '12px system-ui, sans-serif';
+	            ctx.fillText(normalText, (unscaledWidth - totalWidth) / 2 + boldWidth + normalWidth / 2, channelY);
+	            channelY += 16;
+	          }
 
-        // --- Final: draw custom year labels on top of everything (logo/footer already drawn) ---
-        try {
-          // Aggressive final erase: paint a white rectangle over the x-axis tick area
-          // (computed from the chart layout) and then re-draw our custom year labels on top.
-          try {
-            const chartContainer = document.getElementById('chart_div');
-            const chartLayout = chart.getChartLayoutInterface && chart.getChartLayoutInterface();
-            if (chartLayout && chartContainer) {
-              const chartArea = chartLayout.getChartAreaBoundingBox();
-              const containerW = chartContainer.offsetWidth || 1;
-              const containerH = chartContainer.offsetHeight || 1;
-              const scaleX = (img.width || containerW) / containerW;
-              const scaleY = (img.height || containerH) / containerH;
-              const tickY = chartArea.top + chartArea.height + 20;
-              // make the erase zone slightly taller to be conservative
-              const tickHeight = 28;
-              const rectX = padding + (chartArea.left || 0) * scaleX;
-              const rectY = legendY + 10 + tickY * scaleY - tickHeight / 2;
-              const rectW = (chartArea.width || containerW) * scaleX;
-              const rectH = tickHeight;
-              ctx.save();
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(rectX - 2, rectY - 2, rectW + 4, rectH + 4);
-              ctx.restore();
-            }
-          } catch (e) {
-            // ignore — we'll still attempt to draw labels below
-          }
-          const chartContainer = document.getElementById('chart_div');
-          const chartLayout = chart.getChartLayoutInterface();
-          if (chartLayout && chartContainer) {
-            const yearsAll = window.globalYears || [];
-            const startIdx = yearsAll.indexOf(String(document.getElementById('startYear').value));
-            const endIdx = yearsAll.indexOf(String(document.getElementById('endYear').value));
-            const years = (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx)
-              ? yearsAll.slice(startIdx, endIdx + 1)
-              : yearsAll.slice();
+	          // --- Final: draw custom year labels on top of everything (logo/footer already drawn) ---
+	          try {
+	            // Aggressive final erase: paint a white rectangle over the x-axis tick area
+	            // (computed from the chart layout) and then re-draw our custom year labels on top.
+	            try {
+	              const chartContainer = document.getElementById('chart_div');
+	              const chartLayout = chart.getChartLayoutInterface && chart.getChartLayoutInterface();
+	              if (chartLayout && chartContainer) {
+	                const chartArea = chartLayout.getChartAreaBoundingBox();
+	                const containerW = chartContainer.offsetWidth || 1;
+	                const containerH = chartContainer.offsetHeight || 1;
+	                const scaleX = (img.width || containerW) / containerW;
+	                const scaleY = (img.height || containerH) / containerH;
+	                const tickY = chartArea.top + chartArea.height + 20;
+	                // make the erase zone slightly taller to be conservative
+	                const tickHeight = 28;
+	                const rectX = padding + (chartArea.left || 0) * scaleX;
+	                const rectY = legendY + 10 + tickY * scaleY - tickHeight / 2;
+	                const rectW = (chartArea.width || containerW) * scaleX;
+	                const rectH = tickHeight;
+	                ctx.save();
+	                ctx.fillStyle = '#ffffff';
+	                ctx.fillRect(rectX - 2, rectY - 2, rectW + 4, rectH + 4);
+	                ctx.restore();
+	              }
+	            } catch (e) {
+	              // ignore — we'll still attempt to draw labels below
+	            }
+	            const chartContainer = document.getElementById('chart_div');
+	            const chartLayout = chart.getChartLayoutInterface();
+	            if (chartLayout && chartContainer) {
+	              const yearsAll = window.globalYears || [];
+	              const startIdx = yearsAll.indexOf(String(document.getElementById('startYear').value));
+	              const endIdx = yearsAll.indexOf(String(document.getElementById('endYear').value));
+	              const years = (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx)
+	                ? yearsAll.slice(startIdx, endIdx + 1)
+	                : yearsAll.slice();
 
-            const chartArea = chartLayout.getChartAreaBoundingBox();
-            const scaleX = img.width / Math.max(1, chartContainer.offsetWidth || 1);
-            const scaleY = img.height / Math.max(1, chartContainer.offsetHeight || 1);
-            const labelsToShow = calculateYearTicks(years, chartArea.width || (chartContainer.offsetWidth || 300));
+	              const chartArea = chartLayout.getChartAreaBoundingBox();
+	              const scaleX = img.width / Math.max(1, chartContainer.offsetWidth || 1);
+	              const scaleY = img.height / Math.max(1, chartContainer.offsetHeight || 1);
+	              const rawLabelsToShow = calculateYearTicks(years, chartArea.width || (chartContainer.offsetWidth || 300));
 
-            // Match SVG label styling used in the DOM so exported labels are visually consistent
-            ctx.fillStyle = '#333';
-            ctx.font = '600 16px system-ui, Arial, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'alphabetic';
+	              // --- FIX: Replicate on-screen overlap logic ---
+	              const minSpacing = 40; // Use same minSpacing as on-screen chart
+            
+	              // 1. Get labels with their X positions (in container-space)
+	              const labels = rawLabelsToShow.map(year => {
+	                  const yearIndex = years.indexOf(year);
+	                  if (yearIndex === -1) return null;
+	                  const x = chartLayout.getXLocation(yearIndex);
+	                  return { year: year, x: x };
+	              }).filter(Boolean); // filter out any nulls
 
-            labelsToShow.forEach(year => {
-              const yearIndex = years.indexOf(year);
-              if (yearIndex === -1) return;
-              const xInContainer = chartLayout.getXLocation(yearIndex);
-              const xOnImage = padding + (xInContainer * scaleX);
-              const yInContainer = chartArea.top + chartArea.height + 20;
-              const yOnImage = legendY + 10 + (yInContainer * scaleY);
-              // Safety: don't draw into the footer area
-              if (yOnImage < unscaledWidth * 10) { /* cheap guard, mostly harmless */ }
-              ctx.fillText(String(year), xOnImage, yOnImage);
-            });
-          }
-        } catch (err) {
-          console.warn('Failed to draw final year labels on export:', err);
-        }
+	              // 2. Check for overlap and splice if needed
+	              if (labels.length >= 2) {
+	                const lastIdx = labels.length - 1;
+	                const lastX = labels[lastIdx].x;
+	                const prevX = labels[lastIdx - 1].x;
+	                if ((lastX - prevX) < minSpacing) {
+	                  // remove penultimate label so final label isn't crowded
+	                  labels.splice(lastIdx - 1, 1);
+	                }
+	              }
+	              // --- END FIX ---
 
-        // --- Final diagnostic: append a small preview of the final canvas to debug panel ---
-        try {
-          window.__export_debug = window.__export_debug || {};
-          window.__export_debug.finalPreviewTimestamp = Date.now();
-          // create small data URL preview
-          try {
-            const previewDataURL = canvas.toDataURL('image/png');
-            window.__export_debug.last = window.__export_debug.last || {};
-            window.__export_debug.last.finalPreviewSample = String(previewDataURL).slice(0, 200);
-            // append to debug panel if present
-            const panel = document.getElementById('export_debug_panel');
-            if (panel) {
-              const label = document.createElement('div');
-              label.textContent = 'Final canvas preview:';
-              label.style.fontSize = '11px';
-              label.style.marginTop = '6px';
-              panel.appendChild(label);
-              const finalImg = document.createElement('img');
-              finalImg.src = previewDataURL;
-              finalImg.style.width = '200px';
-              finalImg.style.display = 'block';
-              finalImg.style.marginBottom = '6px';
-              panel.appendChild(finalImg);
-            }
-          } catch (e) {
-            console.warn('Failed to create final preview data URL:', e);
-          }
-        } catch (e) { /* ignore */ }
+	              // Match SVG label styling used in the DOM so exported labels are visually consistent
+	              ctx.fillStyle = '#333';
+	              ctx.font = '600 16px system-ui, Arial, sans-serif';
+	              ctx.textAlign = 'center';
+	              ctx.textBaseline = 'alphabetic';
 
-        // --- Download ---
-        const link = document.createElement('a');
-        const safeName = pollutant.replace(/[^a-z0-9_\-]/gi, '_');
-        link.download = `${safeName}_comparison.png`;
-        link.href = canvas.toDataURL('image/png');
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      };
+	              // 3. Loop over the *filtered* labels array
+	              labels.forEach(label => {
+	                const year = label.year;
+	                const xInContainer = label.x;
+              
+	                const xOnImage = padding + (xInContainer * scaleX);
+	                const yInContainer = chartArea.top + chartArea.height + 20;
+	                const yOnImage = legendY + 10 + (yInContainer * scaleY);
+              
+	                // Safety: don't draw into the footer area (basic check)
+	                if (yOnImage < (unscaledHeight - 50)) {
+	                   ctx.fillText(String(year), xOnImage, yOnImage);
+	                }
+	              });
+	            }
+	          } catch (err) {
+	            console.warn('Failed to draw final year labels on export:', err);
+	          }
 
-      logo.onload = () => {
-        try {
-          const logoSize = 80;
-          ctx.drawImage(logo, unscaledWidth - logoSize - 20, 10, logoSize, logoSize);
-          finishExport();
-        } catch (e) {
-          console.warn('Logo failed to draw, continuing without logo:', e);
-          finishExport();
-        }
-      };
+	          // --- Final diagnostic: append a small preview of the final canvas to debug panel ---
+	          try {
+	            window.__export_debug = window.__export_debug || {};
+	            window.__export_debug.finalPreviewTimestamp = Date.now();
+	            // create small data URL preview
+	            try {
+	              const previewDataURL = canvas.toDataURL('image/png');
+	              window.__export_debug.last = window.__export_debug.last || {};
+	              window.__export_debug.last.finalPreviewSample = String(previewDataURL).slice(0, 200);
+	              // append to debug panel if present
+	              const panel = document.getElementById('export_debug_panel');
+	              if (panel) {
+	                const label = document.createElement('div');
+	                label.textContent = 'Final canvas preview:';
+	                label.style.fontSize = '11px';
+	                label.style.marginTop = '6px';
+	                panel.appendChild(label);
+	                const finalImg = document.createElement('img');
+	                finalImg.src = previewDataURL;
+	                finalImg.style.width = '200px';
+	                finalImg.style.display = 'block';
+	                finalImg.style.marginBottom = '6px';
+	                panel.appendChild(finalImg);
+	              }
+	            } catch (e) {
+	              console.warn('Failed to create final preview data URL:', e);
+	            }
+	          } catch (e) { /* ignore */ }
 
-      logo.onerror = () => {
-        console.warn('Logo failed to load, continuing without logo');
-        finishExport();
-      };
-    }
-
-    // --- Prefer offscreen bitmap export (robust) ---
-    try {
-      const offscreenW = Math.round((chartContainer ? chartContainer.offsetWidth : 1000) * exportScale);
-      const offscreenH = Math.round((chartContainer ? chartContainer.offsetHeight : 600) * exportScale);
-      getOffscreenChartImageURI(
-        pollutant,
-        selectedGroups,
-        startYear,
-        endYear,
-        offscreenW,
-        offscreenH,
-        !!smoothLines
-      ).then(function(offscreenURI){
-        if (offscreenURI) {
-          img.src = offscreenURI;
-          return;
-        } else {
-          console.warn('Offscreen export returned no URI — falling back to SVG clone export');
-          startSvgCloneExport();
-        }
-      }).catch(function(e){
-        console.warn('Offscreen export attempt failed — will fall back to SVG-clone export', e);
-        startSvgCloneExport();
-      });
-    } catch (e) {
-      console.warn('Offscreen export attempt setup failed — falling back', e);
-      startSvgCloneExport();
-    }
-        return;
-      }
-    } catch (e) {
-      console.warn('Offscreen export attempt failed — will fall back to SVG-clone export', e);
-    }
-
-;
-
-    if (svgEl) {
-      try {
-        const origW = parseInt(svgEl.getAttribute('width')) || chartContainer.offsetWidth || 800;
-        const origH = parseInt(svgEl.getAttribute('height')) || chartContainer.offsetHeight || 400;
-        const cloned = svgEl.cloneNode(true);
-        // Ensure viewBox exists so scaling works correctly
-        if (!cloned.getAttribute('viewBox')) cloned.setAttribute('viewBox', `0 0 ${origW} ${origH}`);
-        cloned.setAttribute('width', Math.round(origW * exportScale));
-        cloned.setAttribute('height', Math.round(origH * exportScale));
-        // Aggressive pruning: attach cloned SVG offscreen, compute bboxes and remove any remaining
-        // bare 4-digit year labels (unless marked data-custom-year). This helps when Google
-        // injects tick <text> elements in ways that are hard to catch from the detached clone.
-        try {
-          const wrapper = document.createElement('div');
-          wrapper.style.position = 'absolute';
-          wrapper.style.left = '-9999px';
-          wrapper.style.top = '0';
-          wrapper.style.width = origW + 'px';
-          wrapper.style.height = origH + 'px';
-          wrapper.style.visibility = 'hidden';
-          wrapper.appendChild(cloned);
-          document.body.appendChild(wrapper);
-
-		  // --- Robust pruning of any default 4-digit year labels ---
-		  // Remove any <text> or <tspan> that contains ONLY a 4-digit year,
-		  // unless it is inside an ancestor explicitly marked data-custom-year.
-		  try {
-		    const candidates = Array.from(cloned.querySelectorAll('text, tspan'));
-		    candidates.forEach(node => {
-		      const txt = (node.textContent || '').trim();
-		      if (!/^\d{4}$/.test(txt)) return;
-
-		      // If any ancestor has data-custom-year, keep it (these are your injected labels)
-		      if (node.closest && node.closest('[data-custom-year]')) return;
-
-		      // Find the nearest enclosing <text> ancestor (if node is a <tspan>)
-		      let textEl = node;
-		      while (textEl && textEl.nodeName && textEl.nodeName.toLowerCase() !== 'text') {
-		        textEl = textEl.parentNode;
-		      }
-		      if (!textEl) return;
-
-		      // Remove this text element unconditionally (we kept the custom ones above).
-		      try {
-		        if (textEl.parentNode) textEl.parentNode.removeChild(textEl);
-		      } catch (e) {
-		        // Best-effort removal; ignore errors here but log for debugging
-		        console.warn('Prune-year: failed to remove textEl', e);
-		      }
-		    });
-
-		    // Additionally, remove any tiny tick labels that may be inside <g> elements by selector:
-		    Array.from(cloned.querySelectorAll('g')).forEach(g => {
-		      // if the group contains a 4-digit text node and is not custom, remove the group
-		      const yearText = g.querySelector('text, tspan');
-		      if (yearText) {
-		        const t = (yearText.textContent || '').trim();
-		        if (/^\d{4}$/.test(t) && !g.closest('[data-custom-year]')) {
-		          try { g.parentNode && g.parentNode.removeChild(g); } catch (e) {}
-		        }
-		      }
-		    });
-
-		  } catch (e) {
-		    console.warn('Robust pruning failed:', e);
-		  }
- 
-
-          // Clean up wrapper but keep cloned (detached) for serialization
-          document.body.removeChild(wrapper);
-        } catch (e) {
-          console.warn('Aggressive pruning of cloned SVG failed:', e);
-        }
-  let svgString = new XMLSerializer().serializeToString(cloned);
-        try {
-          // As a final textual safeguard, strip any remaining bare 4-digit year labels
-          // that might have been missed by DOM pruning. IMPORTANT: do NOT remove
-          // labels which are marked with data-custom-year (our injected labels).
-          // Only remove <text> elements that do NOT contain the data-custom-year attribute.
-          svgString = svgString.replace(/<text(?![^>]*data-custom-year)[^>]*>\s*\d{4}\s*<\/text>/g, '');
-          // Remove <text> blocks that contain a single <tspan> with a 4-digit year,
-          // but only if the enclosing <text> does not have data-custom-year.
-          svgString = svgString.replace(/<text(?![^>]*data-custom-year)[^>]*>[\s\S]*?<tspan[^>]*>\s*\d{4}\s*<\/tspan>[\s\S]*?<\/text>/g, '');
-        } catch (e) {
-          console.warn('Final SVG string pruning failed:', e);
-        }
-        // If any bare 4-digit year labels remain in the serialized SVG (and are not
-        // marked with data-custom-year), treat the cloned SVG as not-clean and
-        // switch to the offscreen bitmap fallback instead. This prevents small
-        // default tick numbers from leaking into PNG exports.
-        const hasResidualYears = /<text(?![^>]*data-custom-year)[^>]*>\s*\d{4}\s*<\/text>/i.test(svgString)
-          || /<text(?![^>]*data-custom-year)[^>]*>[\s\S]*?<tspan[^>]*>\s*\d{4}\s*<\/tspan>[\s\S]*?<\/text>/i.test(svgString);
-        if (hasResidualYears) {
-          try {
-            window.__export_debug = window.__export_debug || {};
-            window.__export_debug.last = window.__export_debug.last || {};
-            window.__export_debug.last.method = 'svg_contains_years';
-            window.__export_debug.last.svgSample = svgString.slice(0, 2000);
-            console.warn('Export diagnostic: serialized SVG still contains year ticks; switching to offscreen fallback.');
-            // Use the offscreen fallback to get a clean bitmap (this function
-            // already exists and returns a data URI or promise). We prefer the
-            // offscreenChart helper which hides axis labels.
-            getOffscreenChartImageURI(pollutant, selectedGroups, startYear, endYear, origW || (chartContainer ? chartContainer.offsetWidth : 800), origH || (chartContainer ? chartContainer.offsetHeight : 400), !!smoothLines)
-              .then(uri => {
-                try {
-                  window.__export_debug.last.fallbackImageURI = uri;
-                  window.__export_debug.last.timestamp = Date.now();
-                  console.info('Export diagnostic: using offscreen fallback bitmap due to residual years');
-                  img.src = uri || url; // if uri falsy, fall back to blob URL to avoid blocking
-                } catch (e) { console.warn('Failed to set img.src for fallback', e); img.src = url; }
-              })
-              .catch(e => {
-                console.warn('Offscreen fallback failed after detecting residual years, falling back to blob URL', e);
-                try { img.src = url; } catch (er) { console.error('Failed to set img.src to blob URL', er); }
-              });
-            // Create the blob URL so the debug panel can still show it if needed
-            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-            const url = URL.createObjectURL(svgBlob);
-            // still show debug panel with cloned SVG raster for inspection
-            (function showDebugPanel(blobUrl){
-              try {
-                let panel = document.getElementById('export_debug_panel');
-                if (!panel) {
-                  panel = document.createElement('div');
-                  panel.id = 'export_debug_panel';
-                  panel.style.position = 'fixed';
-                  panel.style.right = '10px';
-                  panel.style.top = '10px';
-                  panel.style.background = 'rgba(255,255,255,0.95)';
-                  panel.style.border = '1px solid #ccc';
-                  panel.style.padding = '6px';
-                  panel.style.zIndex = 99999;
-                  panel.style.maxWidth = '220px';
-                  panel.style.maxHeight = '360px';
-                  panel.style.overflow = 'auto';
-                  const title = document.createElement('div');
-                  title.textContent = 'Export debug';
-                  title.style.fontSize = '12px';
-                  title.style.fontWeight = '600';
-                  title.style.marginBottom = '6px';
-                  panel.appendChild(title);
-                  const btn = document.createElement('button');
-                  btn.textContent = 'Close';
-                  btn.style.display = 'block';
-                  btn.style.marginBottom = '6px';
-                  btn.onclick = () => panel.remove();
-                  panel.appendChild(btn);
-                  document.body.appendChild(panel);
-                }
-                const imgDbg = document.createElement('img');
-                imgDbg.src = blobUrl;
-                imgDbg.style.width = '200px';
-                imgDbg.style.display = 'block';
-                imgDbg.style.marginBottom = '6px';
-                panel.appendChild(imgDbg);
-              } catch (e) { console.warn('Failed to show export debug panel:', e); }
-            })(url);
-            // we've queued the fallback; return early so we don't set img.src=url below
-            return;
-          } catch (e) {
-            console.warn('Error while switching to offscreen fallback:', e);
-          }
-        }
-        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-        const url = URL.createObjectURL(svgBlob);
-        // Diagnostic: record that we're using the cloned SVG path
-        try {
-          window.__export_debug = window.__export_debug || {};
-          window.__export_debug.last = {
-            method: 'svg',
-            timestamp: Date.now(),
-            blobURL: url
-          };
-          // Keep a short sample of the serialized SVG (avoid huge memory use)
-          window.__export_debug.svgSample = svgString.slice(0, 2000);
-          console.info('Export diagnostic: using cloned SVG (blob URL):', url);
-          // Append a small debug panel with the rasterized cloned SVG so you can inspect it
-          (function showDebugPanel(blobUrl){
-            try {
-              let panel = document.getElementById('export_debug_panel');
-              if (!panel) {
-                panel = document.createElement('div');
-                panel.id = 'export_debug_panel';
-                panel.style.position = 'fixed';
-                panel.style.right = '10px';
-                panel.style.top = '10px';
-                panel.style.background = 'rgba(255,255,255,0.95)';
-                panel.style.border = '1px solid #ccc';
-                panel.style.padding = '6px';
-                panel.style.zIndex = 99999;
-                panel.style.maxWidth = '220px';
-                panel.style.maxHeight = '360px';
-                panel.style.overflow = 'auto';
-                const title = document.createElement('div');
-                title.textContent = 'Export debug';
-                title.style.fontSize = '12px';
-                title.style.fontWeight = '600';
-                title.style.marginBottom = '6px';
-                panel.appendChild(title);
-                const btn = document.createElement('button');
-                btn.textContent = 'Close';
-                btn.style.display = 'block';
-                btn.style.marginBottom = '6px';
-                btn.onclick = () => panel.remove();
-                panel.appendChild(btn);
-                document.body.appendChild(panel);
-              }
-              const imgDbg = document.createElement('img');
-              imgDbg.src = blobUrl;
-              imgDbg.style.width = '200px';
-              imgDbg.style.display = 'block';
-              imgDbg.style.marginBottom = '6px';
-              panel.appendChild(imgDbg);
-            } catch (e) {
-              console.warn('Failed to show export debug panel:', e);
-            }
-          })(url);
-        } catch (e) {
-          console.warn('Failed to record export diagnostic info for SVG path:', e);
-        }
-        img.src = url;
-        try {
-          window.__export_debug = window.__export_debug || {};
-          window.__export_debug.last = window.__export_debug.last || {};
-          window.__export_debug.last.method = 'svg';
-          window.__export_debug.last.blobURL = url;
-        } catch (e) { /* ignore */ }
-      } catch (err) {
-        console.warn('SVG export failed, falling back to getImageURI()', err);
-        try {
-          window.__export_debug = window.__export_debug || {};
-          window.__export_debug.last = {
-            method: 'svg_failed',
-            timestamp: Date.now(),
-            errorMessage: String(err && err.message ? err.message : err)
-          };
-        } catch (e) { /* ignore */ }
-        img = new Image();
-        img.crossOrigin = 'anonymous';
-        // Before using Google Charts' bitmap fallback, prune small year ticks from the live SVG
-        try {
-          const liveSvg = chartContainer ? chartContainer.querySelector('svg') : null;
-          if (liveSvg) {
-            const nodes = liveSvg.querySelectorAll('text, tspan');
-            nodes.forEach(node => {
-              const txt = (node.textContent || '').trim();
-              if (/^\d{4}$/.test(txt) && !node.closest('[data-custom-year]')) {
-                let toRemove = node;
-                while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
-                if (toRemove && toRemove.parentNode) toRemove.parentNode.removeChild(toRemove);
-              }
-            });
-          }
-        } catch (e) {
-          console.warn('Failed to prune live SVG ticks before fallback:', e);
-        }
-        try {
-          // Prefer creating a clean bitmap from an offscreen chart (hides axis labels reliably)
-          const offscreenW = Math.round((typeof origW !== 'undefined' ? origW : (chartContainer ? chartContainer.offsetWidth : 800)) * (exportScale || 1));
-          const offscreenH = Math.round((typeof origH !== 'undefined' ? origH : (chartContainer ? chartContainer.offsetHeight : 400)) * (exportScale || 1));
-          getOffscreenChartImageURI(pollutant, selectedGroups, startYear, endYear, offscreenW, offscreenH, !!smoothLines)
-            .then(uri => {
-              window.__export_debug = window.__export_debug || {};
-              window.__export_debug.last = window.__export_debug.last || {};
-              window.__export_debug.last.method = 'fallback_offscreen';
-              window.__export_debug.last.fallbackImageURI = uri;
-              window.__export_debug.last.timestamp = Date.now();
-              console.info('Export diagnostic: using offscreen fallback bitmap');
-              if (uri) img.src = uri; else img.src = chart.getImageURI();
-            })
-            .catch(e => {
-              window.__export_debug = window.__export_debug || {};
-              window.__export_debug.last = window.__export_debug.last || {};
-              window.__export_debug.last.method = 'fallback_offscreen_failed';
-              window.__export_debug.last.fallbackError = String(e && e.message ? e.message : e);
-              console.warn('Offscreen fallback failed, falling back to chart.getImageURI()', e);
-              try { img.src = chart.getImageURI(); } catch (err) { console.warn('chart.getImageURI() also failed', err); }
-            });
-        } catch (e) {
-          window.__export_debug = window.__export_debug || {};
-          window.__export_debug.last = window.__export_debug.last || {};
-          window.__export_debug.last.method = 'fallback_error';
-          window.__export_debug.last.fallbackError = String(e && e.message ? e.message : e);
-          console.warn('Export fallback preparation threw', e);
-          try { img.src = chart.getImageURI(); } catch (err) { console.warn('chart.getImageURI() also failed', err); }
-        }
-      }
-    } else {
-      // No SVG available — fall back to the chart's PNG export
-      try {
-        const liveSvg = chartContainer ? chartContainer.querySelector('svg') : null;
-        if (liveSvg) {
-          const nodes = liveSvg.querySelectorAll('text, tspan');
-          nodes.forEach(node => {
-            const txt = (node.textContent || '').trim();
-            if (/^\d{4}$/.test(txt) && !node.closest('[data-custom-year]')) {
-              let toRemove = node;
-              while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
-              if (toRemove && toRemove.parentNode) toRemove.parentNode.removeChild(toRemove);
-            }
-          });
-        }
-      } catch (e) {
-        console.warn('Failed to prune live SVG ticks before fallback:', e);
-      }
-  // Attempt offscreen redraw to get a clean bitmap without axis ticks, otherwise fall back
-  getOffscreenChartImageURI(pollutant, selectedGroups, startYear, endYear, chartContainer ? chartContainer.offsetWidth : 800, chartContainer ? chartContainer.offsetHeight : 400, !!smoothLines)
-    .then(uri => { img.src = uri || chart.getImageURI(); })
-    .catch(e => { console.warn('Offscreen chart bitmap failed, using chart.getImageURI()', e); try { img.src = chart.getImageURI(); } catch (err) { console.warn('chart.getImageURI() also failed', err); } });
-    }
-
-    img.onload = () => {
-      // --- Measure legend for layout ---
-  const legendClone = document.getElementById('customLegend').cloneNode(true);
-  legendClone.style.position = 'absolute';
-  legendClone.style.visibility = 'hidden';
-  // Prevent legend from overlapping the logo on export by limiting available width
-  const logoSize = 80;
-  const padding = 20;
-  const maxLegendWidth = Math.max(100, img.width - padding * 2 - logoSize - 20);
-  legendClone.style.width = Math.min(800, maxLegendWidth) + 'px';
-  document.body.appendChild(legendClone);
-  const legendHeight = legendClone.offsetHeight + 10;
-  document.body.removeChild(legendClone);
-
-  const titleHeight = 30;
-  const footerHeight = 40;
-  // padding already declared above for legend width; reuse
-
-      // --- Determine output size ---
-      const unscaledWidth = img.width + padding * 2;
-      const unscaledHeight =
-        img.height + titleHeight + legendHeight + footerHeight + padding * 3;
-
-      // --- Auto-scale for print quality ---
-      // For A4 landscape at 300 DPI: 3508 px wide
-      const targetWidth = 3508;
-      const scale = Math.max(
-        window.devicePixelRatio || 1,
-        targetWidth / unscaledWidth
-      );
-
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(unscaledWidth * scale);
-      canvas.height = Math.round(unscaledHeight * scale);
-      const ctx = canvas.getContext('2d');
-      // Use integer scaling to preserve crispness of rasterized SVG
-      ctx.scale(scale, scale);
-
-      // --- Background ---
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, unscaledWidth, unscaledHeight);
-
-      // --- Title ---
-      ctx.font = 'bold 18px system-ui, sans-serif';
-      ctx.fillStyle = '#000000';
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        `${pollutant}${unit ? " (" + unit + ")" : ""}`,
-        unscaledWidth / 2,
-        padding + 15
-      );
-
-      // --- Legend ---
-      const legendDiv = document.getElementById('customLegend');
-      const items = [...legendDiv.querySelectorAll('span')];
-      let legendY = padding + 35;
-      const legendRowHeight = 22;
-      const maxW = unscaledWidth - padding * 2;
-      const rowItems = [];
-      let row = [],
-        rowW = 0;
-
-      items.forEach((it) => {
-        const dot = it.querySelector('span');
-        if (!dot) return;
-        const text = it.textContent.trim();
-        ctx.font = '600 14px system-ui, sans-serif';
-        const textW = ctx.measureText(text).width;
-        const w = textW + 40;
-        if (rowW + w > maxW && row.length) {
-          rowItems.push({ row, rowW });
-          row = [];
-          rowW = 0;
-        }
-        row.push({ dotColor: dot.style.backgroundColor, text });
-        rowW += w;
-      });
-
-      if (row.length) rowItems.push({ row, rowW });
-
-      rowItems.forEach(({ row, rowW }) => {
-        let x = (unscaledWidth - rowW) / 2;
-	row.forEach(({ dotColor, text }) => {
-	  const faded = text.includes('(No data available)');
-	  ctx.globalAlpha = faded ? 0.4 : 1.0;
-	  ctx.beginPath();
-	  ctx.arc(x + 6, legendY - 5, 6, 0, 2 * Math.PI);
-	  ctx.fillStyle = dotColor;
-	  ctx.fill();
-	  ctx.font = '600 14px system-ui, sans-serif';
-	  ctx.fillStyle = '#000000';
-	  ctx.textAlign = 'left';
-	  ctx.fillText(text, x + 18, legendY);
-	  ctx.globalAlpha = 1.0;
-	  x += ctx.measureText(text).width + 40;
-	});
-        legendY += legendRowHeight;
-      });
-
-      // --- Chart image ---
-      try {
-        try {
-          window.__export_debug = window.__export_debug || {};
-          window.__export_debug.last = window.__export_debug.last || {};
-          window.__export_debug.last.drawnImageSrc = img && img.src ? img.src : null;
-          console.info('Export diagnostic: drawing image with src:', window.__export_debug.last.drawnImageSrc);
-        } catch (e) { /* ignore */ }
-      } catch (e) { /* ignore */ }
-      ctx.drawImage(img, padding, legendY + 10);
-      // Erase any small default tick labels that may be baked into the raster image.
-      // Compute the exact area from the chart layout and map it to the exported canvas so
-      // we don't accidentally cover the large custom year labels or axis title.
-      try {
-        const chartContainer = document.getElementById('chart_div');
-        const chartLayout = chart.getChartLayoutInterface && chart.getChartLayoutInterface();
-        if (chartLayout && chartContainer) {
-          const chartArea = chartLayout.getChartAreaBoundingBox();
-          // baseline Y for default tick labels (same logic as when drawing custom labels)
-          const tickY = chartArea.top + chartArea.height + 20;
-          const tickHeight = 18; // approximate height of small tick text
-
-          const containerW = chartContainer.offsetWidth || logicalChartW || 1;
-          const containerH = chartContainer.offsetHeight || logicalChartH || 1;
-          const scaleX = (img.width || containerW) / containerW;
-          const scaleY = (img.height || containerH) / containerH;
-
-          const rectX = padding + (chartArea.left || 0) * scaleX;
-          const rectY = legendY + 10 + tickY * scaleY - tickHeight / 2;
-          const rectW = (chartArea.width || containerW) * scaleX;
-          const rectH = tickHeight;
-
-          ctx.save();
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(rectX, rectY, rectW, rectH);
-          ctx.restore();
-        } else {
-          // Fallback: conservative small rectangle at bottom-of-chart
-          ctx.save();
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(padding, legendY + 10 + (img.height || 0) - 30, img.width || logicalChartW || 0, 40);
-          ctx.restore();
-        }
-      } catch (e) {
-        console.warn('Could not erase small tick area on exported image:', e);
-      }
-
-      // (moved) custom year labels will be drawn after logo/footer so they're on top
-
-      // --- Logo and footer ---
-      const logo = new Image();
-      logo.crossOrigin = 'anonymous'; // Allow CORS for canvas export
-      logo.src = 'CIC - Square - Border - Words - Alpha 360x360.png';
-
-      const finishExport = () => {
-        const footerText =
-          "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk licensed under the Open Government Licence (OGL).";
-        const channelText = "Youtube Channel: youtube.com/@chronicillnesschannel";
-        const timestamp = new Date().toISOString().replace("T", " ").substring(0, 19);
-
-        // --- Footer text wrapping ---
-        ctx.font = '12px system-ui, sans-serif';
-        ctx.fillStyle = '#555';
-        ctx.textAlign = 'center';
-        const maxFooterWidth = unscaledWidth - 40;
-        function wrapText(text, maxWidth) {
-          const words = text.split(' ');
-          let lines = [], line = '';
-          for (let n = 0; n < words.length; n++) {
-            const testLine = line + (line ? ' ' : '') + words[n];
-            const metrics = ctx.measureText(testLine);
-            if (metrics.width > maxWidth && line) {
-              lines.push(line);
-              line = words[n];
-            } else {
-              line = testLine;
-            }
-          }
-          if (line) lines.push(line);
-          return lines;
-        }
-        const footerLines = wrapText(footerText, maxFooterWidth);
-        let footerY = legendY + img.height + 20;
-        footerLines.forEach((line, i) => {
-          ctx.fillText(line, unscaledWidth / 2, footerY + i * 16);
-        });
-        footerY += footerLines.length * 16;
-
-        // Draw YouTube channel with bold label, also wrapped if needed
-        const boldText = "Youtube Channel: ";
-        const normalText = "youtube.com/@chronicillnesschannel";
-        ctx.font = 'bold 12px system-ui, sans-serif';
-        const boldWidth = ctx.measureText(boldText).width;
-        ctx.font = '12px system-ui, sans-serif';
-        const normalWidth = ctx.measureText(normalText).width;
-        const totalWidth = boldWidth + normalWidth;
-        let channelY = footerY + 5;
-        if (totalWidth > maxFooterWidth) {
-          // Wrap channel text if needed
-          ctx.font = 'bold 12px system-ui, sans-serif';
-          const boldLines = wrapText(boldText, maxFooterWidth);
-          boldLines.forEach((line, i) => {
-            ctx.fillText(line, unscaledWidth / 2, channelY + i * 16);
-          });
-          channelY += boldLines.length * 16;
-          ctx.font = '12px system-ui, sans-serif';
-          const normalLines = wrapText(normalText, maxFooterWidth);
-          normalLines.forEach((line, i) => {
-            ctx.fillText(line, unscaledWidth / 2, channelY + i * 16);
-          });
-          channelY += normalLines.length * 16;
-        } else {
-          // Draw bold part
-          ctx.font = 'bold 12px system-ui, sans-serif';
-          ctx.fillText(boldText, (unscaledWidth - totalWidth) / 2 + boldWidth / 2, channelY);
-          // Draw normal part
-          ctx.font = '12px system-ui, sans-serif';
-          ctx.fillText(normalText, (unscaledWidth - totalWidth) / 2 + boldWidth + normalWidth / 2, channelY);
-          channelY += 16;
-        }
-
-        // --- Final: draw custom year labels on top of everything (logo/footer already drawn) ---
-        try {
-          // Aggressive final erase: paint a white rectangle over the x-axis tick area
-          // (computed from the chart layout) and then re-draw our custom year labels on top.
-          try {
-            const chartContainer = document.getElementById('chart_div');
-            const chartLayout = chart.getChartLayoutInterface && chart.getChartLayoutInterface();
-            if (chartLayout && chartContainer) {
-              const chartArea = chartLayout.getChartAreaBoundingBox();
-              const containerW = chartContainer.offsetWidth || 1;
-              const containerH = chartContainer.offsetHeight || 1;
-              const scaleX = (img.width || containerW) / containerW;
-              const scaleY = (img.height || containerH) / containerH;
-              const tickY = chartArea.top + chartArea.height + 20;
-              // make the erase zone slightly taller to be conservative
-              const tickHeight = 28;
-              const rectX = padding + (chartArea.left || 0) * scaleX;
-              const rectY = legendY + 10 + tickY * scaleY - tickHeight / 2;
-              const rectW = (chartArea.width || containerW) * scaleX;
-              const rectH = tickHeight;
-              ctx.save();
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(rectX - 2, rectY - 2, rectW + 4, rectH + 4);
-              ctx.restore();
-            }
-          } catch (e) {
-            // ignore — we'll still attempt to draw labels below
-          }
-          const chartContainer = document.getElementById('chart_div');
-          const chartLayout = chart.getChartLayoutInterface();
-          if (chartLayout && chartContainer) {
-            const yearsAll = window.globalYears || [];
-            const startIdx = yearsAll.indexOf(String(document.getElementById('startYear').value));
-            const endIdx = yearsAll.indexOf(String(document.getElementById('endYear').value));
-            const years = (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx)
-              ? yearsAll.slice(startIdx, endIdx + 1)
-              : yearsAll.slice();
-
-            const chartArea = chartLayout.getChartAreaBoundingBox();
-            const scaleX = img.width / Math.max(1, chartContainer.offsetWidth || 1);
-            const scaleY = img.height / Math.max(1, chartContainer.offsetHeight || 1);
-            const labelsToShow = calculateYearTicks(years, chartArea.width || (chartContainer.offsetWidth || 300));
-
-            // Match SVG label styling used in the DOM so exported labels are visually consistent
-            ctx.fillStyle = '#333';
-            ctx.font = '600 16px system-ui, Arial, sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'alphabetic';
-
-            labelsToShow.forEach(year => {
-              const yearIndex = years.indexOf(year);
-              if (yearIndex === -1) return;
-              const xInContainer = chartLayout.getXLocation(yearIndex);
-              const xOnImage = padding + (xInContainer * scaleX);
-              const yInContainer = chartArea.top + chartArea.height + 20;
-              const yOnImage = legendY + 10 + (yInContainer * scaleY);
-              // Safety: don't draw into the footer area
-              if (yOnImage < unscaledWidth * 10) { /* cheap guard, mostly harmless */ }
-              ctx.fillText(String(year), xOnImage, yOnImage);
-            });
-          }
-        } catch (err) {
-          console.warn('Failed to draw final year labels on export:', err);
-        }
-
-        // --- Final diagnostic: append a small preview of the final canvas to debug panel ---
-        try {
-          window.__export_debug = window.__export_debug || {};
-          window.__export_debug.finalPreviewTimestamp = Date.now();
-          // create small data URL preview
-          try {
-            const previewDataURL = canvas.toDataURL('image/png');
-            window.__export_debug.last = window.__export_debug.last || {};
-            window.__export_debug.last.finalPreviewSample = String(previewDataURL).slice(0, 200);
-            // append to debug panel if present
-            const panel = document.getElementById('export_debug_panel');
-            if (panel) {
-              const label = document.createElement('div');
-              label.textContent = 'Final canvas preview:';
-              label.style.fontSize = '11px';
-              label.style.marginTop = '6px';
-              panel.appendChild(label);
-              const finalImg = document.createElement('img');
-              finalImg.src = previewDataURL;
-              finalImg.style.width = '200px';
-              finalImg.style.display = 'block';
-              finalImg.style.marginBottom = '6px';
-              panel.appendChild(finalImg);
-            }
-          } catch (e) {
-            console.warn('Failed to create final preview data URL:', e);
-          }
-        } catch (e) { /* ignore */ }
-
-        // --- Download ---
-        const link = document.createElement('a');
-        const safeName = pollutant.replace(/[^a-z0-9_\-]/gi, '_');
-        link.download = `${safeName}_comparison.png`;
-        link.href = canvas.toDataURL('image/png');
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-      };
-
+	          // --- Download ---
+	          const link = document.createElement('a');
+	          const safeName = pollutant.replace(/[^a-z0-9_\-]/gi, '_');
+	          link.download = `${safeName}_comparison.png`;
+	          link.href = canvas.toDataURL('image/png');
+	          document.body.appendChild(link);
+	          link.click();
+	          link.remove();
+	        };
+			
       logo.onload = () => {
         try {
           const logoSize = 80;
@@ -2677,6 +1953,24 @@ async function getOffscreenChartImageURI(
       console.error('Failed to load chart image for export', e);
       alert('Sorry — failed to generate the PNG from the chart image.');
     };
+
+    // --- Get clean image URI from the LIVE chart ---
+    // This function temporarily hides default year ticks, gets the
+    // URI from the current chart state, and then restores the ticks.
+    const cleanUri = getCleanChartImageURI(chart);
+    
+    if (cleanUri) {
+      img.src = cleanUri;
+    } else {
+      // Fallback if getCleanChartImageURI fails
+      console.warn('getCleanChartImageURI failed, falling back to raw chart.getImageURI()');
+      try {
+        img.src = chart.getImageURI();
+      } catch (e) {
+        console.error('chart.getImageURI() failed:', e);
+        alert('Sorry — failed to generate the PNG from the chart.');
+      }
+    }
 
 // Return a clean chart image URI by temporarily hiding default 4-digit tick text nodes
 // (those not marked with data-custom-year) so chart.getImageURI() won't include them.
@@ -2705,6 +1999,8 @@ function getCleanChartImageURI(chart) {
     console.warn('getCleanChartImageURI failed, falling back to chart.getImageURI():', e);
     try { return chart.getImageURI(); } catch (err) { console.warn('chart.getImageURI() also failed', err); return null; }
   }
+}
+  });
 }
 /* ---------------- Initialization ---------------- */
 // Parse URL parameters for shared configurations
@@ -3984,6 +3280,5 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 });
 </script>
-
 </body>
 </html>
