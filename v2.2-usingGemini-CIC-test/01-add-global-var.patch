@@ -1,0 +1,6 @@
+--- index.html	(original)
++++ index.html	(modified)
+@@ -668,6 +668,7 @@
+ const categoryBaseColor={ecodesign:distinctPalette[4],fireplace:distinctPalette[0],gas:distinctPalette[3],power:distinctPalette[1],road:distinctPalette[6]};
+ let colorCache={}, availableColors=[...distinctPalette];
+ let chart; // global chart instance

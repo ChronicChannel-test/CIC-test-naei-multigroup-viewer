@@ -1040,6 +1040,46 @@ function calculateYearTicks(years, chartWidth) {
   return result;
 }
 
+/**
+ * Remove bare 4-digit year tick elements from an SVG root unless they're
+ * explicitly marked with `data-custom-year`. Returns an object listing
+ * removed labels for diagnostics.
+ */
+function pruneYearsFromSVG(svgRoot, opts = {}) {
+  const debug = opts.debug || false;
+  const removed = [];
+  try {
+    if (!svgRoot || !svgRoot.querySelectorAll) return { removed };
+    const nodes = svgRoot.querySelectorAll('text, tspan');
+    nodes.forEach(node => {
+      try {
+        const txt = (node.textContent || '').trim();
+        if (/^\d{4}$/.test(txt)) {
+          let cur = node;
+          let hasCustom = false;
+          while (cur && cur.getAttribute) {
+            if (cur.getAttribute('data-custom-year')) { hasCustom = true; break; }
+            cur = cur.parentNode;
+          }
+          if (!hasCustom) {
+            let toRemove = node;
+            while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
+            if (toRemove && toRemove.parentNode) {
+              toRemove.parentNode.removeChild(toRemove);
+              removed.push(txt);
+            }
+          }
+        }
+      } catch (e) {
+        if (debug) console.warn('pruneYearsFromSVG inner error', e);
+      }
+    });
+  } catch (e) {
+    if (debug) console.warn('pruneYearsFromSVG failed', e);
+  }
+  return { removed };
+}
+
 /* ---------------- Drag and drop handlers ---------------- */
 function addDragAndDropHandlers(div){
   div.addEventListener('dragstart', e => {
@@ -2638,23 +2678,8 @@ async function generateChartImage() {
           cloned.setAttribute('height', Math.round(origH * exportScale));
           // Remove default small year tick labels from the cloned SVG so only our custom labels remain
           try {
-            const nodes = cloned.querySelectorAll('text, tspan');
-            nodes.forEach(node => {
-              const txt = (node.textContent || '').trim();
-              if (/^\d{4}$/.test(txt)) {
-                let cur = node;
-                let hasCustom = false;
-                while (cur && cur.getAttribute) {
-                  if (cur.getAttribute('data-custom-year')) { hasCustom = true; break; }
-                  cur = cur.parentNode;
-                }
-                if (!hasCustom) {
-                  let toRemove = node;
-                  while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
-                  if (toRemove && toRemove.parentNode) toRemove.parentNode.removeChild(toRemove);
-                }
-              }
-            });
+            // Centralized pruning helper removes default 4-digit tick labels
+            pruneYearsFromSVG(cloned, { debug: true });
           } catch (e) {
             console.warn('Could not prune default year labels from cloned SVG (email export):', e);
           }
@@ -2675,15 +2700,7 @@ async function generateChartImage() {
           try {
             const liveSvg = chartContainer ? chartContainer.querySelector('svg') : null;
             if (liveSvg) {
-              const nodes = liveSvg.querySelectorAll('text, tspan');
-              nodes.forEach(node => {
-                const txt = (node.textContent || '').trim();
-                if (/^\d{4}$/.test(txt) && !node.closest('[data-custom-year]')) {
-                  let toRemove = node;
-                  while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
-                  if (toRemove && toRemove.parentNode) toRemove.parentNode.removeChild(toRemove);
-                }
-              });
+              try { pruneYearsFromSVG(liveSvg, { debug: false }); } catch (e) { console.warn('pruneYearsFromSVG failed on liveSvg', e); }
             }
           } catch (e) { console.warn('Failed to prune live SVG ticks before fallback:', e); }
           img.src = getCleanChartImageURI(chart) || chart.getImageURI();
@@ -2697,15 +2714,7 @@ async function generateChartImage() {
         try {
           const liveSvg = chartContainer ? chartContainer.querySelector('svg') : null;
           if (liveSvg) {
-            const nodes = liveSvg.querySelectorAll('text, tspan');
-            nodes.forEach(node => {
-              const txt = (node.textContent || '').trim();
-              if (/^\d{4}$/.test(txt) && !node.closest('[data-custom-year]')) {
-                let toRemove = node;
-                while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
-                if (toRemove && toRemove.parentNode) toRemove.parentNode.removeChild(toRemove);
-              }
-            });
+            try { pruneYearsFromSVG(liveSvg, { debug: false }); } catch (e) { console.warn('pruneYearsFromSVG failed on liveSvg', e); }
           }
         } catch (e) { console.warn('Failed to prune live SVG ticks before fallback:', e); }
   img.src = getCleanChartImageURI(chart) || chart.getImageURI();
