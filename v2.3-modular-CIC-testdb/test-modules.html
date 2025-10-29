@@ -80,14 +80,14 @@
       for (const [module, funcs] of Object.entries(functionsToTest)) {
         functionHtml += `<li><strong>${module}</strong><ul>`;
         for (const func of funcs) {
-          const exists = typeof window[func] === 'function' || typeof eval(`typeof ${func}`) === 'function';
-          try {
-            eval(func);
+          // Check if function exists in global scope
+          const exists = typeof window[func] === 'function';
+          if (exists) {
             functionHtml += `<li class="pass">✓ ${func}</li>`;
             results.functions.push({ func, exists: true });
-          } catch (e) {
-            functionHtml += `<li class="fail">✗ ${func} - ${e.message}</li>`;
-            results.functions.push({ func, exists: false, error: e.message });
+          } else {
+            functionHtml += `<li class="fail">✗ ${func} - not found in global scope</li>`;
+            results.functions.push({ func, exists: false, error: 'not found' });
           }
         }
         functionHtml += '</ul></li>';
@@ -106,14 +106,15 @@
 
       let variableHtml = '<ul>';
       for (const varName of variablesToTest) {
-        try {
-          const value = eval(varName);
+        // Check if variable exists in global scope
+        if (typeof window[varName] !== 'undefined') {
+          const value = window[varName];
           const type = typeof value;
           variableHtml += `<li class="pass">✓ ${varName} (${type})</li>`;
           results.variables.push({ varName, accessible: true, type });
-        } catch (e) {
-          variableHtml += `<li class="fail">✗ ${varName} - ${e.message}</li>`;
-          results.variables.push({ varName, accessible: false, error: e.message });
+        } else {
+          variableHtml += `<li class="fail">✗ ${varName} - not accessible in global scope</li>`;
+          results.variables.push({ varName, accessible: false, error: 'not found' });
         }
       }
       
@@ -130,8 +131,8 @@
       // Test 4: Initialization Check
       const initDiv = document.getElementById('init-test');
       try {
-        // Check if init function exists and has proper structure
-        if (typeof init === 'function') {
+        // Check if init function exists in global scope
+        if (typeof window.init === 'function' || typeof init === 'function') {
           initDiv.innerHTML = '<span class="pass">✓ init() function exists and is properly defined</span><br>';
           initDiv.innerHTML += '<span class="pending">⚠ Full initialization requires Google Charts and Supabase connection</span><br>';
           initDiv.innerHTML += '<span class="pending">⚠ Manual testing in browser required to verify complete initialization</span>';
