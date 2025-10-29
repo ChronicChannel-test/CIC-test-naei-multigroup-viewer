@@ -60,7 +60,7 @@
     flex-direction: column;
     gap: 8px;
     margin-top: 8px;
-    align-items: flex-end;
+    align-items: center;
   }
   .sidebar-link {
     display: flex;
@@ -368,15 +368,15 @@
     width: 250px;
   }
 
-  .kofi-button .kofi-icon {
+  .kofi-button .kofi-icon-svg {
+    display: inline-block;
     width: 40px;
     height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     flex-shrink: 0;
-    padding: 4px;
-    box-sizing: border-box;
+    background-image: url('kofi_symbol.svg');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
   }
 
   .kofi-button .kofi-text {
@@ -416,7 +416,7 @@
             </a>
             <a href="https://ko-fi.com/F2F21NGXA3" class="kofi-button" target="_blank" rel="noopener">
               <span class="kofi-text">Support Chronic Illness Channel</span>
-              <img class="kofi-icon" src="kofi_symbol.svg" alt="Ko-fi">
+              <span class="kofi-icon-svg"></span>
             </a>
           </div>
         </div>
@@ -590,7 +590,7 @@
   <strong>YouTube Channel:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener">www.youtube.com/@ChronicIllnessChannel</a>
   <br>
   <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-    Version: v2.1 test (Supabase) • Build: 2025.10.27
+    Version: v2.2 testdb Gemini • Build: 2025.10.29
   </span>
 </footer>
 
@@ -1997,7 +1997,7 @@ async function init(){
     
     // Track page load
     trackAnalytics('page_load', {
-      version: 'v2.1 test (Supabase)',
+      version: 'v2.2 testdb Gemini',
       load_time: Date.now(),
       screen_resolution: screen.width + 'x' + screen.height,
       viewport: window.innerWidth + 'x' + window.innerHeight

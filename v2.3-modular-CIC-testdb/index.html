@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NAEI Multi-Group Pollutant Viewer</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <div id="loadingOverlay">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="loading-text">Loading data, please wait…</div>
+  </div>
+  <div id="mainContent" aria-hidden="true">
+    <!-- UI content will be inserted here -->
+  </div>
+  <footer>
+    © Crown 2025 copyright Defra &amp; DESNZ via 
+    <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener">naei.energysecurity.gov.uk</a> 
+    licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener">Open Government Licence (OGL)</a>.
+    <br>
+    <strong>YouTube Channel:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener">www.youtube.com/@ChronicIllnessChannel</a>
+    <br>
+    <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
+      Version: v2.3 modular testdb • Build: 2025.10.29
+    </span>
+  </footer>
+  <script src="supabase.js"></script>
+  <script src="main.js"></script>
+  <script src="export.js"></script>
+</body>
+</html>
