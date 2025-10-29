@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/png" sizes="64x64" href="favicon.png">
+    <link rel="apple-touch-icon" href="favicon.png">
+    <title>WIP Sessions - NAEI Viewer</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 15px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        header {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #667eea;
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .controls {
+            background: white;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-items: center;
+        }
+        
+        .controls label {
+            font-weight: 600;
+            color: #555;
+        }
+        
+        .controls input, .controls select {
+            padding: 8px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .refresh-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .refresh-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .refresh-btn:active {
+            transform: translateY(0);
+        }
+        
+        .stats-bar {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #667eea;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 0.85em;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .sessions-grid {
+            display: grid;
+            gap: 15px;
+        }
+        
+        .session-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .session-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .session-id {
+            font-family: monospace;
+            font-size: 0.9em;
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .session-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-recent {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .status-idle {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status-active .status-indicator {
+            background: #28a745;
+        }
+        
+        .status-recent .status-indicator {
+            background: #ffc107;
+        }
+        
+        .status-idle .status-indicator {
+            background: #dc3545;
+        }
+        
+        .session-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .info-label {
+            font-size: 0.75em;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .info-value {
+            font-size: 1em;
+            color: #333;
+            font-weight: 500;
+        }
+        
+        .session-activity {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        
+        .activity-title {
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 10px;
+        }
+        
+        .activity-list {
+            list-style: none;
+        }
+        
+        .activity-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.85em;
+            color: #666;
+        }
+        
+        .activity-item:last-child {
+            border-bottom: none;
+        }
+        
+        .activity-time {
+            color: #999;
+            font-size: 0.9em;
+        }
+        
+        .progress-bar {
+            height: 6px;
+            background: #e0e0e0;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s ease;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error {
+            background: #fee;
+            color: #c33;
+            padding: 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            border: 2px solid #fcc;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.3;
+        }
+        
+        .empty-state-text {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.4em;
+            }
+            
+            .session-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .controls input,
+            .controls select,
+            .refresh-btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔄 Work In Progress Sessions</h1>
+            <p class="subtitle">Real-time view of active and recent user sessions</p>
+            <div style="margin-top: 15px;">
+                <a href="analytics-dashboard.html" style="display: inline-block; background: #007cba; color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-right: 10px; font-size: 0.9em;">📊 Analytics Dashboard</a>
+                <a href="index.html" style="display: inline-block; background: #007cba; color: white; padding: 8px 16px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 0.9em;">🏠 Back to Viewer</a>
+            </div>
+        </header>
+
+        <div class="controls">
+            <label for="timeWindow">Time Window:</label>
+            <select id="timeWindow">
+                <option value="5">Last 5 minutes</option>
+                <option value="15" selected>Last 15 minutes</option>
+                <option value="30">Last 30 minutes</option>
+                <option value="60">Last 1 hour</option>
+                <option value="180">Last 3 hours</option>
+            </select>
+            
+            <label for="minEvents">Min Events:</label>
+            <input type="number" id="minEvents" value="1" min="1" max="50" style="width: 80px;">
+            
+            <button class="refresh-btn" onclick="loadWIPSessions()">🔄 Refresh</button>
+            
+            <span style="margin-left: auto; color: #666; font-size: 0.85em;">
+                Last updated: <span id="lastUpdated">Never</span>
+            </span>
+        </div>
+
+        <div class="stats-bar" id="statsBar" style="display: none;">
+            <div class="stat-card">
+                <span class="stat-value" id="totalSessions">0</span>
+                <span class="stat-label">Total Sessions</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="activeSessions">0</span>
+                <span class="stat-label">Active (< 5 min)</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="totalEvents">0</span>
+                <span class="stat-label">Total Events</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="avgDuration">0</span>
+                <span class="stat-label">Avg Duration (min)</span>
+            </div>
+        </div>
+
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            <div>Loading WIP sessions...</div>
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="sessionsContainer" class="sessions-grid" style="display: none;"></div>
+        
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <div class="empty-state-icon">📭</div>
+            <div class="empty-state-text">No active sessions found in the selected time window</div>
+        </div>
+    </div>
+
+    <script src="supabase.js"></script>
+    <script>
+        // Use the supabase client from supabase.js
+        
+        // Wait for supabase.js to load
+        function initSupabase() {
+            if (typeof supabase !== 'undefined' && supabase) {
+                loadWIPSessions();
+            } else if (typeof SUPABASE_URL !== 'undefined' && typeof SUPABASE_KEY !== 'undefined' && window.supabase && window.supabase.createClient) {
+                // Fallback: create client if needed
+                window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+                loadWIPSessions();
+            } else {
+                setTimeout(initSupabase, 100);
+            }
+        }
+
+        function getSessionStatus(lastActivityMinutes) {
+            if (lastActivityMinutes < 5) {
+                return { class: 'status-active', label: 'Active' };
+            } else if (lastActivityMinutes < 15) {
+                return { class: 'status-recent', label: 'Recent' };
+            } else {
+                return { class: 'status-idle', label: 'Idle' };
+            }
+        }
+
+        function formatTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            if (seconds < 60) return `${seconds}s ago`;
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            return `${Math.floor(hours / 24)}d ago`;
+        }
+
+        function formatDuration(minutes) {
+            if (minutes < 1) return '< 1 min';
+            if (minutes < 60) return `${Math.round(minutes)} min`;
+            const hours = Math.floor(minutes / 60);
+            const mins = Math.round(minutes % 60);
+            return `${hours}h ${mins}m`;
+        }
+
+        async function loadWIPSessions() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const statsBar = document.getElementById('statsBar');
+            const sessionsContainer = document.getElementById('sessionsContainer');
+            const emptyState = document.getElementById('emptyState');
+            
+            // Get supabase client
+            const client = window.supabaseClient || supabase;
+            if (!client) {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = 'Supabase client not initialized. Please check your configuration.';
+                return;
+            }
+
+            // Show loading
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            statsBar.style.display = 'none';
+            sessionsContainer.style.display = 'none';
+            emptyState.style.display = 'none';
+
+            try {
+                const timeWindow = parseInt(document.getElementById('timeWindow').value);
+                const minEvents = parseInt(document.getElementById('minEvents').value);
+                const cutoffTime = new Date(Date.now() - timeWindow * 60 * 1000).toISOString();
+
+                // Fetch recent events
+                const { data: events, error: eventsError } = await client
+                    .from('analytics_events')
+                    .select('*')
+                    .gte('timestamp', cutoffTime)
+                    .order('timestamp', { ascending: false });
+
+                if (eventsError) throw eventsError;
+
+                // Group events by session
+                const sessions = {};
+                events.forEach(event => {
+                    const sid = event.session_id;
+                    if (!sessions[sid]) {
+                        sessions[sid] = {
+                            id: sid,
+                            events: [],
+                            firstEvent: null,
+                            lastEvent: null,
+                            userFingerprint: event.user_fingerprint,
+                            userAgent: event.user_agent,
+                            country: event.event_data?.country || 'Unknown'
+                        };
+                    }
+                    sessions[sid].events.push(event);
+                });
+
+                // Calculate session metrics
+                const sessionsList = Object.values(sessions)
+                    .filter(s => s.events.length >= minEvents)
+                    .map(session => {
+                        // Sort events by timestamp
+                        session.events.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                        
+                        session.firstEvent = new Date(session.events[0].timestamp);
+                        session.lastEvent = new Date(session.events[session.events.length - 1].timestamp);
+                        session.duration = (session.lastEvent - session.firstEvent) / 1000 / 60; // minutes
+                        session.lastActivityMinutes = (Date.now() - session.lastEvent) / 1000 / 60;
+                        
+                        // Extract activities
+                        session.activities = session.events.map(e => ({
+                            type: e.event_type,
+                            data: e.event_data,
+                            timestamp: new Date(e.timestamp)
+                        }));
+                        
+                        return session;
+                    })
+                    .sort((a, b) => b.lastEvent - a.lastEvent);
+
+                // Calculate statistics
+                const activeSessions = sessionsList.filter(s => s.lastActivityMinutes < 5).length;
+                const totalEvents = sessionsList.reduce((sum, s) => sum + s.events.length, 0);
+                const avgDuration = sessionsList.length > 0 
+                    ? sessionsList.reduce((sum, s) => sum + s.duration, 0) / sessionsList.length 
+                    : 0;
+
+                // Update stats
+                document.getElementById('totalSessions').textContent = sessionsList.length;
+                document.getElementById('activeSessions').textContent = activeSessions;
+                document.getElementById('totalEvents').textContent = totalEvents;
+                document.getElementById('avgDuration').textContent = avgDuration.toFixed(1);
+
+                // Hide loading
+                loading.style.display = 'none';
+
+                if (sessionsList.length === 0) {
+                    emptyState.style.display = 'block';
+                    return;
+                }
+
+                // Show stats and sessions
+                statsBar.style.display = 'grid';
+                sessionsContainer.style.display = 'grid';
+
+                // Render sessions
+                sessionsContainer.innerHTML = sessionsList.map(session => {
+                    const status = getSessionStatus(session.lastActivityMinutes);
+                    const progressPercent = Math.min(100, (session.events.length / 20) * 100);
+                    
+                    // Get unique pollutants viewed
+                    const pollutants = new Set();
+                    session.activities.forEach(a => {
+                        if (a.data?.pollutant) pollutants.add(a.data.pollutant);
+                    });
+                    
+                    // Get event type summary
+                    const eventTypes = {};
+                    session.activities.forEach(a => {
+                        eventTypes[a.type] = (eventTypes[a.type] || 0) + 1;
+                    });
+                    
+                    return `
+                        <div class="session-card">
+                            <div class="session-header">
+                                <span class="session-id">${session.id.substring(0, 20)}...</span>
+                                <span class="session-status ${status.class}">
+                                    <span class="status-indicator"></span>
+                                    ${status.label}
+                                </span>
+                            </div>
+                            
+                            <div class="session-info">
+                                <div class="info-item">
+                                    <span class="info-label">Last Activity</span>
+                                    <span class="info-value">${formatTimeAgo(session.lastEvent)}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Duration</span>
+                                    <span class="info-value">${formatDuration(session.duration)}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Events</span>
+                                    <span class="info-value">${session.events.length}</span>
+                                </div>
+                                <div class="info-item">
+                                    <span class="info-label">Country</span>
+                                    <span class="info-value">${session.country}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: ${progressPercent}%"></div>
+                            </div>
+                            
+                            <div class="session-activity">
+                                <div class="activity-title">Recent Activity</div>
+                                <ul class="activity-list">
+                                    ${Object.entries(eventTypes).slice(0, 5).map(([type, count]) => `
+                                        <li class="activity-item">
+                                            <strong>${type}</strong>: ${count} event${count > 1 ? 's' : ''}
+                                        </li>
+                                    `).join('')}
+                                    ${pollutants.size > 0 ? `
+                                        <li class="activity-item">
+                                            <strong>Pollutants viewed</strong>: ${Array.from(pollutants).slice(0, 3).join(', ')}
+                                            ${pollutants.size > 3 ? ` +${pollutants.size - 3} more` : ''}
+                                        </li>
+                                    ` : ''}
+                                </ul>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Update timestamp
+                document.getElementById('lastUpdated').textContent = new Date().toLocaleTimeString();
+
+            } catch (err) {
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = `Error loading sessions: ${err.message}`;
+                console.error('Error loading WIP sessions:', err);
+            }
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            const client = window.supabaseClient || supabase;
+            if (client) loadWIPSessions();
+        }, 30000);
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initSupabase);
+    </script>
+</body>
+</html>
