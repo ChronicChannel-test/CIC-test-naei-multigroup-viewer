@@ -92,7 +92,6 @@ function exportData(format = 'csv') {
 
 // Generate shareable URL with current configuration
 function generateShareUrl() {
-function generateShareUrl() {
   const pollutantSelect = document.getElementById('pollutantSelect');
   const selectedGroups = getSelectedGroups();
   
@@ -346,6 +345,38 @@ function showShareDialog(shareUrl) {
   setTimeout(() => {
     content.querySelector('#shareUrlInput').select();
   }, 100);
+}
+
+/**
+ * Get clean chart image URI without default year tick labels
+ * @param {Object} chart - Google Chart instance
+ * @returns {string} Data URI of the chart image
+ */
+function getCleanChartImageURI(chart) {
+  try {
+    const chartContainer = document.getElementById('chart_div');
+    const svg = chartContainer ? chartContainer.querySelector('svg') : null;
+    const hidden = [];
+    if (svg) {
+      const nodes = Array.from(svg.querySelectorAll('text'));
+      nodes.forEach(node => {
+        const txt = (node.textContent || '').trim();
+        if (/^\d{4}$/.test(txt) && !node.closest('[data-custom-year]')) {
+          // hide the <text> element (record previous inline display)
+          hidden.push({ el: node, prev: node.style.display });
+          node.style.display = 'none';
+        }
+      });
+    }
+    // synchronous call returning data URI
+    const uri = chart.getImageURI();
+    // restore
+    hidden.forEach(h => { try { h.el.style.display = h.prev || ''; } catch (e) {} });
+    return uri;
+  } catch (e) {
+    console.warn('getCleanChartImageURI failed, falling back to chart.getImageURI():', e);
+    try { return chart.getImageURI(); } catch (err) { console.warn('chart.getImageURI() also failed', err); return null; }
+  }
 }
 
 // Generate comprehensive chart image for email sharing (same as PNG download)
@@ -618,7 +649,6 @@ async function generateChartImage() {
 
 // Convert data URL to Blob for clipboard
 function dataURLtoBlob(dataURL) {
-function dataURLtoBlob(dataURL) {
   const arr = dataURL.split(',');
   const mime = arr[0].match(/:(.*?);/)[1];
   const bstr = atob(arr[1]);
@@ -699,7 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
               hAxis: { textPosition: 'none', gridlines: { color: '#e0e0e0' }, baselineColor: '#666' },
               vAxis: { viewWindow: { min: 0 } },
               series: seriesOptions,
-              curveType: (window.__smoothLinesEnabled ? 'function' : 'none'),
+              curveType: (window.smoothLines ? 'function' : 'none'),
               lineWidth: 3,
               pointSize: 4,
               chartArea: { top: 20, left: leftMargin, right: 10, bottom: 60, height: '70%' }
