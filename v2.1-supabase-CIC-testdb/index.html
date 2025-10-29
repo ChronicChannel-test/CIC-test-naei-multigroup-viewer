@@ -576,198 +576,200 @@ function getUserCountry() {
       'America/Toronto': 'CA', 'America/Vancouver': 'CA'
     };
     
-    userCountry = timezoneCountryMap[timezone] || locale.split('-')[1] || 'Unknown';
-    return userCountry;
-  } catch (e) {
-    return 'Unknown';
-  }
-}
 
-// Generate a privacy-friendly user fingerprint
-function generateUserFingerprint() {
-  if (userFingerprint) return userFingerprint;
+    // Move getOffscreenChartImageURI to global scope so it is accessible everywhere
+    /**
+     * Render a fresh offscreen Google Chart into a hidden container, return a high-DPI PNG data URI.
+     *
+     * Parameters must match how you call it currently:
+     *   pollutant, selectedGroups, startYear, endYear, pixelW, pixelH, smoothLines
+     *
+     * Important: this function explicitly sets chart options (chartArea, axis fonts, hAxis ticks)
+     * to match the on-screen chart's visual layout so the bitmap matches exactly.
+     */
+    async function getOffscreenChartImageURI(
+      pollutant,
+      selectedGroups,
+      startYear,
+      endYear,
+      pixelW,
+      pixelH,
+      smoothLines
+    ) {
+      return new Promise((resolve, reject) => {
+        try {
+          // Create offscreen container
+          const off = document.createElement('div');
+          off.style.position = 'fixed';
+          off.style.left = '-99999px';
+          off.style.top = '0';
+          off.style.width = Math.round(pixelW / (window.devicePixelRatio || 1)) + 'px';
+          off.style.height = Math.round(pixelH / (window.devicePixelRatio || 1)) + 'px';
+          off.style.opacity = '0';
+          off.id = 'offscreen_chart_export';
+          document.body.appendChild(off);
 
-  // Get or create persistent UUID for this browser
-  let uuid = localStorage.getItem('naei_analytics_uuid');
-  if (!uuid) {
-    uuid = ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
-      (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
-    );
-    localStorage.setItem('naei_analytics_uuid', uuid);
-  }
+          // Build the same DataTable you use for the on-screen chart.
+          // IMPORTANT: this assumes you have a helper `buildChartDataTable(...)` that returns a google.visualization.DataTable
+          // If you don't, inline the code you already use to create the data table.
+          let dt;
+          try {
+            dt = buildChartDataTable(pollutant, selectedGroups, startYear, endYear);
+          } catch (errDt) {
+            console.warn('getOffscreenChartImageURI: falling back to global dataTable or chart.getDataTable', errDt);
+            try { dt = chart && chart.getDataTable && chart.getDataTable(); } catch (e) { dt = null; }
+          }
+          if (!dt) {
+            // If we cannot build the table, bail: resolve null so caller falls back.
+            document.body.removeChild(off);
+            return resolve(null);
+          }
 
-  // Collect non-invasive browser info for analytics
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  ctx.textBaseline = 'top';
-  ctx.font = '14px Arial';
-  ctx.fillText('Browser fingerprint', 2, 2);
-  const canvasData = canvas.toDataURL();
+          // Compute axis ticks (ensure they match the custom year labels you draw on-screen).
+          // If you already compute `yearTicks` elsewhere (array of numbers), reuse it; otherwise generate one:
+          let yearTicks = [];
+          if (typeof getYearTickArray === 'function') {
+            try { yearTicks = getYearTickArray(startYear, endYear); } catch (e) { yearTicks = []; }
+          }
+          if (!yearTicks || !yearTicks.length) {
+            // fallback: pick a reasonable ticks set between start and end
+            const s = parseInt(startYear, 10), e = parseInt(endYear, 10);
+            if (!isNaN(s) && !isNaN(e)) {
+              const span = Math.max(1, e - s);
+              // choose ~10 ticks across span
+              const step = Math.max(1, Math.round(span / 10));
+              for (let y = s; y <= e; y += step) yearTicks.push(y);
+              if (yearTicks[yearTicks.length-1] !== e) yearTicks.push(e);
+            }
+          }
 
-  const fingerprint = [
-    uuid,
-    navigator.userAgent,
-    navigator.language,
-    screen.width + 'x' + screen.height,
-    new Date().getTimezoneOffset(),
-    canvasData.slice(-50)
-  ].join('|');
+          // Chart options - make these match your on-screen options exactly.
+          const dpr = window.devicePixelRatio || 1;
+          const logicalW = Math.round(pixelW / dpr);
+          const logicalH = Math.round(pixelH / dpr);
 
-  // Hash it for privacy
-  userFingerprint = btoa(fingerprint).substr(0, 24); // Slightly longer for more uniqueness
-  return userFingerprint;
-}
+          const chartOptions = {
+            // Use same font sizes and chartArea as on-screen (tweak if your on-screen differs)
+            chartArea: {
+              left: 70,
+              top: 40,
+              width: logicalW - 140,
+              height: logicalH - 140
+            },
+            height: logicalH,
+            width: logicalW,
+            backgroundColor: '#ffffff',
+            legend: { position: 'none' },
+            hAxis: {
+              ticks: yearTicks.map(y => ({ v: Number(y), f: String(y) })),
+              textStyle: { fontSize: 12 },
+              baselineColor: '#000000',
+              gridlines: { color: '#e9e9e9', count: 0 }
+            },
+            vAxis: {
+              textStyle: { fontSize: 12 },
+              gridlines: { color: '#e9e9e9', count: 10 },
+              baselineColor: '#000000'
+            },
+            series: {},
+            pointSize: 5,
+            curveType: smoothLines ? 'function' : 'none',
+            tooltip: { trigger: 'none' },
+            enableInteractivity: false
+          };
 
-// Track analytics events
-async function trackAnalytics(eventType, eventData = {}) {
-  try {
-    if (!eventType) return;
+          // Draw chart
+          const offChart = new google.visualization.LineChart(off);
+          google.visualization.events.addListener(offChart, 'ready', function () {
+            try {
+              let dataUri;
+              try {
+                dataUri = offChart.getImageURI();
+              } catch (eGet) {
+                console.warn('offChart.getImageURI failed', eGet);
+                dataUri = null;
+              }
 
-    if (!supabase) {
-      if (!supabaseUnavailableLogged) {
-        console.warn('Supabase client unavailable; analytics events will be skipped.');
-        supabaseUnavailableLogged = true;
-      }
-      return;
+              if (!dataUri) {
+                document.body.removeChild(off);
+                return resolve(null);
+              }
+
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              img.onload = function () {
+                try {
+                  const canvas = document.createElement('canvas');
+                  canvas.width = pixelW;
+                  canvas.height = pixelH;
+
+                  ctx.fillStyle = '#ffffff';
+                  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                  const finalUri = canvas.toDataURL('image/png');
+                  try { document.body.removeChild(off); } catch (e) {}
+                  return resolve(finalUri);
+                } catch (eDraw) {
+                  console.error('getOffscreenChartImageURI: draw error', eDraw);
+                  try { document.body.removeChild(off); } catch (e) {}
+                  return resolve(null);
+                }
+              };
+              img.onerror = function (err) {
+                console.warn('getOffscreenChartImageURI: image load failed', err);
+                try { document.body.removeChild(off); } catch (e) {}
+                return resolve(null);
+              };
+              img.src = dataUri;
+            } catch (errReady) {
+              console.error('getOffscreenChartImageURI: ready handler error', errReady);
+              try { document.body.removeChild(off); } catch (e) {}
+              return resolve(null);
+            }
+          });
+
+          offChart.draw(dt, chartOptions);
+
+          setTimeout(() => {
+            if (document.getElementById('offscreen_chart_export')) {
+              try { document.body.removeChild(document.getElementById('offscreen_chart_export')); } catch (e) {}
+              resolve(null);
+            }
+          }, 2500);
+
+        } catch (err) {
+          console.error('getOffscreenChartImageURI: error', err);
+          try { document.getElementById('offscreen_chart_export') && document.body.removeChild(document.getElementById('offscreen_chart_export')); } catch (e) {}
+          resolve(null);
+        }
+      });
     }
 
-    const analyticsData = {
-      session_id: sessionId,
-      user_fingerprint: generateUserFingerprint(),
-      event_type: eventType,
-      event_data: {
-        ...eventData,
-        country: getUserCountry()
-      },
-      timestamp: new Date().toISOString(),
-      user_agent: navigator.userAgent,
-      page_url: window.location.href,
-      referrer: document.referrer || null
-    };
+    function setupDownloadButton() {
+      const dl = document.getElementById('downloadBtn');
 
-    console.log('📊 Analytics:', eventType, eventData);
+      dl.addEventListener('click', async () => {
+        const pollutant = document.getElementById('pollutantSelect').value;
+        if (!chart || !pollutant) return;
 
-    const { error } = await supabase
-      .from('analytics_events')
-      .insert([analyticsData]);
+        // Track chart download analytics
+        const selectedGroups = getSelectedGroups();
+        const startYear = +document.getElementById('startYear').value;
+        const endYear = +document.getElementById('endYear').value;
+        trackAnalytics('chart_download', {
+          pollutant: pollutant,
+          start_year: startYear,
+          end_year: endYear,
+          groups: selectedGroups,
+          groups_count: selectedGroups.length,
+          filename: pollutant.replace(/[^a-z0-9_\-]/gi, '_') + '_comparison.png'
+        });
 
-    if (error && !error.message?.includes('relation "analytics_events" does not exist')) {
-      console.warn('Analytics tracking failed:', error);
-    }
-  } catch (err) {
-    console.warn('Analytics error:', err);
-  }
-}
+        const unit = pollutantUnits[pollutant] || "";
 
-let globalRows=[], globalHeaders=[], pollutantUnits={}, groupedData={};
-let allGroupsList = [];
-let allPollutants = [];
-let allGroups = [];
-let pollutantsData = []; // Store raw pollutant data for ID lookups
-let groupsData = []; // Store raw group data for ID lookups
-
-const distinctPalette=['#E6194B','#3CB44B','#FFE119','#4363D8','#F58231','#911EB4','#46F0F0','#F032E6','#BCF60C','#FABEBE'];
-const categoryBaseColor={ecodesign:distinctPalette[4],fireplace:distinctPalette[0],gas:distinctPalette[3],power:distinctPalette[1],road:distinctPalette[6]};
-let colorCache={}, availableColors=[...distinctPalette];
-let chart; // global chart instance
-let smoothLines = true; // default to smooth (curved) lines
-
-
-/* ---------------- Color helpers ---------------- */
-function resetColorSystem() {
-  colorCache = {};
-  availableColors = [...distinctPalette];
-}
-
-function getColorForGroup(name) {
-  if (!name) return '#888888';
-  if (colorCache[name]) return colorCache[name];
-
-  const lower = name.toLowerCase();
-  const cat = Object.keys(categoryBaseColor).find(c => lower.includes(c));
-
-  // Prefer category colour if available
-  let baseColor = cat ? categoryBaseColor[cat] : null;
-  let chosenColor = baseColor;
-
-  // Avoid duplicates: if base colour already used, pick next available
-  if (!chosenColor || Object.values(colorCache).includes(chosenColor)) {
-    chosenColor = availableColors.find(c => !Object.values(colorCache).includes(c));
-  }
-
-  // Fallback to any colour if palette exhausted (shouldn't happen with ≤10)
-  if (!chosenColor) {
-    chosenColor = distinctPalette[Object.keys(colorCache).length % distinctPalette.length];
-  }
-
-  colorCache[name] = chosenColor;
-  return chosenColor;
-}
-
-
-// --- Replace Google Sheets data load with Supabase ---
-async function loadUnits() {
-  const { data, error } = await supabase.from('NAEI_global_Pollutants').select('*');
-  if (error) throw error;
-  pollutantUnits = {};
-  data.forEach(r => {
-    if (r.Pollutant && r["Emission Unit"]) {
-      pollutantUnits[r.Pollutant] = r["Emission Unit"];
-    } else if (r.pollutant) {
-      pollutantUnits[r.pollutant] = r["emission unit"] || r['Emission Unit'] || '';
-    }
-  });
-}
-
-async function loadData() {
-  console.log("Fetching data from Supabase (separate tables for robustness)...");
-
-  // Fetch pollutants, groups, and the timeseries table separately.
-  const [pollutantsResp, groupsResp, dataResp] = await Promise.all([
-    supabase.from('NAEI_global_Pollutants').select('*'),
-    supabase.from('NAEI_global_t_Group').select('*'),
-    supabase.from('NAEI_2023ds_t_Group_Data').select('*')  // Now fetches all rows due to project setting
-  ]);
-
-  if (pollutantsResp.error) throw pollutantsResp.error;
-  if (groupsResp.error) throw groupsResp.error;
-  if (dataResp.error) throw dataResp.error;
-
-  const pollutants = pollutantsResp.data || [];
-  const groups = groupsResp.data || [];
-  const rows = dataResp.data || [];
-  
-  // Store globally for URL parameter lookups
-  pollutantsData = pollutants;
-  groupsData = groups;
-
-  // Build ID -> name maps for joins
-  const pollutantIdToName = {};
-  pollutants.forEach(p => {
-    const id = p.id;
-    const name = p.Pollutant || p.pollutant || p['Pollutant'] || p['pollutant'];
-    if (name) {
-      pollutantIdToName[id] = name;
-      // capture unit if present
-      const unit = p["Emission Unit"] || p["emission unit"] || p['Emission Unit'] || p.emission_unit || '';
-      if (unit) pollutantUnits[name] = unit;
-    }
-  });
-
-  const groupIdToTitle = {};
-  groups.forEach(g => {
-    const id = g.id;
-    const title = g.Group_Title || g.group_title || g['Group_Title'] || g.group_title;
-    if (title) groupIdToTitle[id] = title;
-  });
-  
-
-
-  // Build lists used for dropdowns
-  allPollutants = [...new Set(Object.values(pollutantIdToName).filter(Boolean))].sort();
-  allGroups = [...new Set(Object.values(groupIdToTitle).filter(Boolean))].sort((a, b) => {
-    if (a.toLowerCase() === "all") return -1;
-    if (b.toLowerCase() === "all") return 1;
+        // Create a bitmap from an offscreen Google chart (returns a Promise resolving to data URI).
     return a.localeCompare(b);
   });
 
@@ -1986,6 +1988,28 @@ async function getOffscreenChartImageURI(
     }
 
     // --- Prefer offscreen bitmap export (robust) ---
+
+    // Minimal fallback for SVG clone export if offscreen fails
+    function startSvgCloneExport() {
+      if (svgEl) {
+        try {
+          const origW = parseInt(svgEl.getAttribute('width')) || chartContainer.offsetWidth || 800;
+          const origH = parseInt(svgEl.getAttribute('height')) || chartContainer.offsetHeight || 400;
+          const cloned = svgEl.cloneNode(true);
+          if (!cloned.getAttribute('viewBox')) cloned.setAttribute('viewBox', `0 0 ${origW} ${origH}`);
+          cloned.setAttribute('width', Math.round(origW * exportScale));
+          cloned.setAttribute('height', Math.round(origH * exportScale));
+          let svgString = new XMLSerializer().serializeToString(cloned);
+          const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+          const url = URL.createObjectURL(svgBlob);
+          img.src = url;
+        } catch (e) {
+          console.warn('SVG clone export failed:', e);
+        }
+      } else {
+        console.warn('No SVG element found for fallback export.');
+      }
+    }
     try {
       const offscreenW = Math.round((chartContainer ? chartContainer.offsetWidth : 1000) * exportScale);
       const offscreenH = Math.round((chartContainer ? chartContainer.offsetHeight : 600) * exportScale);
@@ -2013,13 +2037,6 @@ async function getOffscreenChartImageURI(
       console.warn('Offscreen export attempt setup failed — falling back', e);
       startSvgCloneExport();
     }
-        return;
-      }
-    } catch (e) {
-      console.warn('Offscreen export attempt failed — will fall back to SVG-clone export', e);
-    }
-
-;
 
     if (svgEl) {
       try {
@@ -2178,8 +2195,7 @@ async function getOffscreenChartImageURI(
                 panel.appendChild(imgDbg);
               } catch (e) { console.warn('Failed to show export debug panel:', e); }
             })(url);
-            // we've queued the fallback; return early so we don't set img.src=url below
-            return;
+            // we've queued the fallback; do not set img.src=url below
           } catch (e) {
             console.warn('Error while switching to offscreen fallback:', e);
           }

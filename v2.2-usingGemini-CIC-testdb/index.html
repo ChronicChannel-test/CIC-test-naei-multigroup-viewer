@@ -60,6 +60,7 @@
     flex-direction: column;
     gap: 8px;
     margin-top: 8px;
+    align-items: flex-end;
   }
   .sidebar-link {
     display: flex;
@@ -347,6 +348,42 @@
   summary {
     width: fit-content;
   }
+
+  .kofi-button {
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    background-color: #ff9301;
+    border-radius: 8px;
+    height: 40px;
+    width: 40px;
+    color: white;
+    text-decoration: none;
+    overflow: hidden;
+    transition: width 0.3s ease-in-out;
+    margin-top: 8px;
+  }
+
+  .kofi-button:hover {
+    width: 250px;
+  }
+
+  .kofi-button .kofi-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding: 4px;
+    box-sizing: border-box;
+  }
+
+  .kofi-button .kofi-text {
+    white-space: nowrap;
+    padding-left: 15px;
+    font-weight: bold;
+  }
   
   </style>
 </head>
@@ -376,6 +413,10 @@
             </a>
             <a href="https://facebook.com/ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
               <img src="facebook.svg" alt="Facebook">
+            </a>
+            <a href="https://ko-fi.com/F2F21NGXA3" class="kofi-button" target="_blank" rel="noopener">
+              <span class="kofi-text">Support Chronic Illness Channel</span>
+              <img class="kofi-icon" src="kofi_symbol.svg" alt="Ko-fi">
             </a>
           </div>
         </div>
