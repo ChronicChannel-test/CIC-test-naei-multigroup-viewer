@@ -420,6 +420,8 @@
     <script src="supabase.js"></script>
     <script>
         // Use the supabase client from supabase.js
+        let initRetryCount = 0;
+        const MAX_INIT_RETRIES = 50; // 5 seconds max wait
         
         // Wait for supabase.js to load
         function initSupabase() {
@@ -429,8 +431,16 @@
                 // Fallback: create client if needed
                 window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
                 loadWIPSessions();
-            } else {
+            } else if (initRetryCount < MAX_INIT_RETRIES) {
+                initRetryCount++;
                 setTimeout(initSupabase, 100);
+            } else {
+                // Failed to initialize after max retries
+                const loading = document.getElementById('loading');
+                const error = document.getElementById('error');
+                loading.style.display = 'none';
+                error.style.display = 'block';
+                error.textContent = 'Failed to initialize Supabase client. Please refresh the page or check your connection.';
             }
         }
 
@@ -470,8 +480,10 @@
             const sessionsContainer = document.getElementById('sessionsContainer');
             const emptyState = document.getElementById('emptyState');
             
-            // Get supabase client
-            const client = window.supabaseClient || supabase;
+            // Get supabase client - safely check if it exists
+            const client = (typeof window.supabaseClient !== 'undefined' && window.supabaseClient) || 
+                          (typeof supabase !== 'undefined' && supabase) || null;
+            
             if (!client) {
                 loading.style.display = 'none';
                 error.style.display = 'block';
@@ -649,7 +661,8 @@
 
         // Auto-refresh every 30 seconds
         setInterval(() => {
-            const client = window.supabaseClient || supabase;
+            const client = (typeof window.supabaseClient !== 'undefined' && window.supabaseClient) || 
+                          (typeof supabase !== 'undefined' && supabase) || null;
             if (client) loadWIPSessions();
         }, 30000);
 
