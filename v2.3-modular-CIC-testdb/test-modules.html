@@ -132,7 +132,7 @@
       const initDiv = document.getElementById('init-test');
       try {
         // Check if init function exists in global scope
-        if (typeof window.init === 'function' || typeof init === 'function') {
+        if (typeof window.init === 'function') {
           initDiv.innerHTML = '<span class="pass">✓ init() function exists and is properly defined</span><br>';
           initDiv.innerHTML += '<span class="pending">⚠ Full initialization requires Google Charts and Supabase connection</span><br>';
           initDiv.innerHTML += '<span class="pending">⚠ Manual testing in browser required to verify complete initialization</span>';
