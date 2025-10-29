@@ -729,7 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
               hAxis: { textPosition: 'none', gridlines: { color: '#e0e0e0' }, baselineColor: '#666' },
               vAxis: { viewWindow: { min: 0 } },
               series: seriesOptions,
-              curveType: (window.__smoothLinesEnabled ? 'function' : 'none'),
+              curveType: (window.smoothLines ? 'function' : 'none'),
               lineWidth: 3,
               pointSize: 4,
               chartArea: { top: 20, left: leftMargin, right: 10, bottom: 60, height: '70%' }

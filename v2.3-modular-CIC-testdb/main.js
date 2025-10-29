@@ -22,6 +22,7 @@ const EXPORT_MAX_PIXELS = 100_000_000;
 
 // Chart options
 let smoothLines = true; // default to smooth (curved) lines
+window.smoothLines = smoothLines; // Expose for export.js
 
 /**
  * Compute a safe export scale that respects EXPORT_MAX_DIM and EXPORT_MAX_PIXELS.
@@ -973,6 +974,7 @@ function setupSmoothingToggle() {
   const btn = document.getElementById('toggleSmoothBtn');
   btn.addEventListener('click', () => {
     smoothLines = !smoothLines;
+    window.smoothLines = smoothLines; // Keep window.smoothLines in sync
     btn.textContent = smoothLines ? '🚫 Disable Smoothing' : '✅ Enable Smoothing';
     updateChart();
   });
