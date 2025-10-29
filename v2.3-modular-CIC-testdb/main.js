@@ -640,6 +640,19 @@ window.addEventListener('resize', () => {
 });
 
 async function renderInitialView() {
+  return new Promise(resolve => {
+    requestAnimationFrame(() => {
+      try {
+        updateChart();
+      } catch (err) {
+        console.error('Initial chart render failed:', err);
+      } finally {
+        setTimeout(resolve, 350);
+      }
+    });
+  });
+}
+
 async function revealMainContent() {
   const overlay = document.getElementById('loadingOverlay');
   const content = document.getElementById('mainContent');
