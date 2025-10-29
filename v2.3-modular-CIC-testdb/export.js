@@ -843,4 +843,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
-</script>

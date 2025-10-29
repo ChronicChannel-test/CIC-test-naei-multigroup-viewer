@@ -23,23 +23,6 @@ const EXPORT_MAX_PIXELS = 100_000_000;
 // Chart options
 let smoothLines = true; // default to smooth (curved) lines
 
-google.charts.load('current', {packages:['corechart']});
-
-const distinctPalette=['#E6194B','#3CB44B','#FFE119','#4363D8','#F58231','#911EB4','#46F0F0','#F032E6','#BCF60C','#FABEBE'];
-const categoryBaseColor={ecodesign:distinctPalette[4],fireplace:distinctPalette[0],gas:distinctPalette[3],power:distinctPalette[1],road:distinctPalette[6]};
-let colorCache={}, availableColors=[...distinctPalette];
-let chart; // global chart instance
-let seriesVisibility = [];
-// Minimum export scale used when rasterizing SVG -> PNG. Increase this to
-// get higher-res downloads. Change this value only when you're ready.
-const EXPORT_MIN_SCALE = 16;
-
-// Safety limits for exporting large images. Browsers will OOM or throw
-// for extremely large canvas sizes; clamp export scales to conservative
-// per-dimension and total-pixel limits.
-const EXPORT_MAX_DIM = 16000; // max width or height in pixels (conservative)
-const EXPORT_MAX_PIXELS = 100_000_000; // max total pixels (width * height)
-
 /**
  * Compute a safe export scale that respects EXPORT_MAX_DIM and EXPORT_MAX_PIXELS.
  * origW/origH are the logical SVG/chart sizes in CSS pixels. desiredScale is
@@ -61,8 +44,6 @@ function computeSafeExportScale(origW, origH, desiredScale) {
   }
   return allowed;
 }
-let smoothLines = true; // default to smooth (curved) lines
-
 
 /* ---------------- Color helpers ---------------- */
 function resetColorSystem() {
@@ -684,36 +665,43 @@ function setupDownloadButton() {
   const dl = document.getElementById('downloadBtn');
 
   dl.addEventListener('click', async () => {
-    const pollutant = document.getElementById('pollutantSelect').value;
-    if (!chart || !pollutant) return;
+    try {
+      const pollutant = document.getElementById('pollutantSelect').value;
+      if (!chart || !pollutant) return;
 
-    // Track chart download analytics
-    const selectedGroups = getSelectedGroups();
-    const startYear = +document.getElementById('startYear').value;
-    const endYear = +document.getElementById('endYear').value;
-    trackAnalytics('chart_download', {
-      pollutant: pollutant,
-      start_year: startYear,
-      end_year: endYear,
-      groups: selectedGroups,
-      groups_count: selectedGroups.length,
-      filename: pollutant.replace(/[^a-z0-9_\-]/gi, '_') + '_comparison.png'
-    });
+      // Track chart download analytics
+      const selectedGroups = getSelectedGroups();
+      const startYear = +document.getElementById('startYear').value;
+      const endYear = +document.getElementById('endYear').value;
+      trackAnalytics('chart_download', {
+        pollutant: pollutant,
+        start_year: startYear,
+        end_year: endYear,
+        groups: selectedGroups,
+        groups_count: selectedGroups.length,
+        filename: pollutant.replace(/[^a-z0-9_\-]/gi, '_') + '_comparison.png'
+      });
 
-    const unit = pollutantUnits[pollutant] || "";
+      const unit = pollutantUnits[pollutant] || "";
 
-    // Create a bitmap from an offscreen Google chart (returns a Promise resolving to data URI).
-    
-/**
- * Render a fresh offscreen Google Chart into a hidden container, return a high-DPI PNG data URI.
- *
- * Parameters must match how you call it currently:
- * pollutant, selectedGroups, startYear, endYear, pixelW, pixelH, smoothLines
- *
- * Important: this function explicitly sets chart options (chartArea, axis fonts, hAxis ticks)
- * to match the on-screen chart's visual layout so the bitmap matches exactly.
- */
-async function getOffscreenChartImageURI(
+      // Get chart image and create final PNG with legend and footer
+      const chartImageData = await generateChartImage();
+      
+      // Trigger download
+      const link = document.createElement('a');
+      link.download = `${pollutant.replace(/[^a-z0-9_\-]/gi, '_')}_comparison.png`;
+      link.href = chartImageData;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      console.error('Download failed:', error);
+      alert('Failed to download chart image. Please try again.');
+    }
+  });
+}
+
+/* ---------------- URL Parameters and Initialization ---------------- */
 function parseUrlParameters() {
   const params = new URLSearchParams(window.location.search);
   const result = {};
