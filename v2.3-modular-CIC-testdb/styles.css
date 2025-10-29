@@ -433,20 +433,26 @@ footer a:hover {
 }
 
 .kofi-button .kofi-icon-svg {
-  display: inline-block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 40px;
   height: 40px;
+  min-width: 40px;
   flex-shrink: 0;
-  background-image: url('kofi_symbol.svg');
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
 }
 
 .kofi-button .kofi-text {
   white-space: nowrap;
-  padding-left: 15px;
+  padding-right: 15px;
+  padding-left: 8px;
   font-weight: bold;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.kofi-button:hover .kofi-text {
+  opacity: 1;
 }
 
 /* Mobile styles */

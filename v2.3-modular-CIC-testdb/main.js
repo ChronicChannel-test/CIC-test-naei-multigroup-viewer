@@ -749,7 +749,7 @@ async function init(){
     
     // Track page load
     trackAnalytics('page_load', {
-      version: 'v2.2 testdb Gemini',
+      version: 'v2.3 Modular CIC-testdb',
       load_time: Date.now(),
       screen_resolution: screen.width + 'x' + screen.height,
       viewport: window.innerWidth + 'x' + window.innerHeight
