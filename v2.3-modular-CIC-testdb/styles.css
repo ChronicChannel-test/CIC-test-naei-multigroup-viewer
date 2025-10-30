@@ -206,6 +206,16 @@ button, .add-btn, .remove-btn, .dragHandle {
 }
 
 /* Layout rows */
+.controls-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-right: 130px;
+}
+
 .button-row {
   display: flex;
   flex-wrap: wrap;
@@ -216,25 +226,26 @@ button, .add-btn, .remove-btn, .dragHandle {
   padding-right: 130px;
 }
 
-.year-download-row {
+.controls-wrapper {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
   padding-right: 130px;
+  margin-bottom: 12px;
 }
 
-.year-download-row label { 
+.controls-wrapper label { 
   white-space: nowrap; 
   margin-right: 4px; 
 }
 
-.year-download-row select { 
+.controls-wrapper select { 
   margin-left: 0; 
   margin-right: 8px; 
 }
 
-.year-download-row button { 
+.controls-wrapper button { 
   margin-left: 4px; 
   margin-right: 4px; 
 }
@@ -246,7 +257,7 @@ button, .add-btn, .remove-btn, .dragHandle {
   margin-right: 8px; 
 }
 
-.button-row, .year-download-row, #groupContainer, .groupRow { 
+.button-row, .controls-wrapper, #groupContainer, .groupRow { 
   row-gap: 6px; 
 }
 
@@ -588,4 +599,24 @@ footer a:hover {
     width: 100%;
     max-width: 100%;
   }
+}
+
+.year-and-buttons-wrapper {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.year-select-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chart-actions-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
