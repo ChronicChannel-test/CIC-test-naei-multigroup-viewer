@@ -365,6 +365,79 @@ function getDragAfterElement(container, y){
   }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
+/**
+ * Adds custom year labels to the X-axis of the chart.
+ * This function is called after every chart draw/redraw.
+ */
+function addCustomXAxisLabels() {
+  try {
+    const chartContainer = document.getElementById('chart_div');
+    const svg = chartContainer.querySelector('svg');
+    if (!svg || !chart) return;
+
+    const chartLayout = chart.getChartLayoutInterface();
+    const chartArea = chartLayout.getChartAreaBoundingBox();
+    const labelY = chartArea.top + chartArea.height + 20;
+    const ns = 'http://www.w3.org/2000/svg';
+
+    const startYear = +document.getElementById('startYear').value;
+    const endYear = +document.getElementById('endYear').value;
+    const yearsAll = window.globalYears || [];
+    const startIdx = yearsAll.indexOf(String(startYear));
+    const endIdx = yearsAll.indexOf(String(endYear));
+    if (startIdx === -1 || endIdx === -1) return;
+    const years = yearsAll.slice(startIdx, endIdx + 1);
+
+    // Use calculateYearTicks to determine which years to show
+    const chartWidth = chartArea.width;
+    const labelsToShow = calculateYearTicks(years, chartWidth);
+
+    const positions = [];
+    const labels = [];
+    const minSpacing = 40; // Minimum pixels between labels
+
+    // First pass: collect all positions
+    for (const year of labelsToShow) {
+      const yearIndex = years.indexOf(year);
+      if (yearIndex === -1) continue;
+      
+      const x = chartLayout.getXLocation(yearIndex);
+      positions.push(x);
+
+      const text = document.createElementNS(ns, 'text');
+      text.setAttribute('x', x);
+      text.setAttribute('y', labelY);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-family', 'Arial, sans-serif');
+      text.setAttribute('font-size', '14');
+      text.setAttribute('font-weight', '500');
+      text.setAttribute('fill', '#333');
+      text.setAttribute('data-custom-year', 'true');
+      text.textContent = year;
+
+      labels.push({ element: text, x: x, year: year });
+    }
+
+    // If the penultimate label is too close to the final label, drop it
+    if (labels.length >= 2) {
+      const lastIdx = labels.length - 1;
+      const lastX = parseFloat(labels[lastIdx].x || labels[lastIdx].element.getAttribute('x'));
+      const prevX = parseFloat(labels[lastIdx - 1].x || labels[lastIdx - 1].element.getAttribute('x'));
+      if ((lastX - prevX) < minSpacing) {
+        labels.splice(lastIdx - 1, 1);
+      }
+    }
+
+    // Add all labels to the SVG
+    labels.forEach(label => {
+      svg.appendChild(label.element);
+    });
+  } catch (e) {
+    console.warn('Could not add custom year labels:', e);
+  }
+}
+
+
 /* ---------------- Chart rendering & legend ---------------- */
 function updateChart(){
   const pollutant = document.getElementById('pollutantSelect').value;
@@ -471,6 +544,10 @@ function updateChart(){
   // draw chart and show pollutant as visible page title
   chart = new google.visualization.LineChart(chartContainer);
 
+  // Add a 'ready' event listener that will fire after every draw,
+  // ensuring custom labels are always present.
+  google.visualization.events.addListener(chart, 'ready', addCustomXAxisLabels);
+
   // Compute safe width/height to avoid negative SVG dimensions
   const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
   const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
@@ -496,92 +573,6 @@ function updateChart(){
   setTimeout(() => {
     chart.draw(dataTable, options);
     chartContainer.classList.add('visible');
-    
-    // Manually add custom year labels with proper spacing
-    setTimeout(() => {
-      try {
-        const svg = chartContainer.querySelector('svg');
-        if (!svg) return;
-        
-        const chartLayout = chart.getChartLayoutInterface();
-        const chartArea = chartLayout.getChartAreaBoundingBox();
-        const labelY = chartArea.top + chartArea.height + 20;
-        const ns = 'http://www.w3.org/2000/svg';
-        
-          // Use calculateYearTicks to determine which years to show
-        const chartWidth = chartArea.width;
-        const labelsToShow = calculateYearTicks(years, chartWidth);
-        
-        // Get all x positions first to check for overlaps
-        const positions = [];
-        const labels = [];
-        const minSpacing = 40; // Minimum pixels between labels
-        
-          // First pass: collect all positions
-        for (const year of labelsToShow) {
-          const yearIndex = years.indexOf(year);
-          const x = chartLayout.getXLocation(yearIndex);
-          positions.push(x);
-          
-          const text = document.createElementNS(ns, 'text');
-          text.setAttribute('x', x);
-          text.setAttribute('y', labelY);
-          text.setAttribute('text-anchor', 'middle');
-          text.setAttribute('font-family', 'Arial, sans-serif');
-          // Keep on-screen labels slightly smaller / lighter so they look correct in the UI.
-          // We draw larger labels onto the export canvas when necessary.
-          text.setAttribute('font-size', '14');
-          text.setAttribute('font-weight', '500');
-          text.setAttribute('fill', '#333');
-          // Mark custom year labels so export can distinguish them from default axis ticks
-          text.setAttribute('data-custom-year', 'true');
-          text.textContent = year;
-          
-          // Store for later use
-          labels.push({
-            element: text,
-            x: x,
-            year: year
-          });
-        }
-        
-        // If the penultimate label is too close to the final label, drop it
-        if (labels.length >= 2) {
-          const lastIdx = labels.length - 1;
-          const lastX = parseFloat(labels[lastIdx].x || labels[lastIdx].element.getAttribute('x'));
-          const prevX = parseFloat(labels[lastIdx - 1].x || labels[lastIdx - 1].element.getAttribute('x'));
-          if ((lastX - prevX) < minSpacing) {
-            // remove penultimate label so final label isn't crowded
-            labels.splice(lastIdx - 1, 1);
-          }
-        }
-
-        // Second pass: adjust positions to prevent overlap
-        for (let i = 1; i < labels.length; i++) {
-          const prevX = parseFloat(labels[i-1].element.getAttribute('x'));
-          const currentX = labels[i].x;
-          
-          // If labels are too close, adjust the current label's position
-          if (Math.abs(currentX - prevX) < minSpacing) {
-            // Move the current label to the right of the previous one
-            const newX = prevX + minSpacing;
-            // But don't go beyond the chart area
-            if (newX < chartArea.left + chartArea.width - 20) {
-              labels[i].element.setAttribute('x', newX);
-              // Update the text-anchor to 'start' to prevent text from shifting
-              labels[i].element.setAttribute('text-anchor', 'start');
-            }
-          }
-        }
-        
-        // Add all labels to the SVG
-        labels.forEach(label => {
-          svg.appendChild(label.element);
-        });
-      } catch (e) {
-        console.warn('Could not add custom year labels:', e);
-      }
-    }, 150);
   }, 100);
 
   // update visible title on page
