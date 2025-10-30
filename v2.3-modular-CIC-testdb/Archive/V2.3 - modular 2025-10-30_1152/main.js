@@ -392,11 +392,10 @@ function addCustomXAxisLabels() {
     const chartWidth = chartArea.width;
     const labelsToShow = calculateYearTicks(years, chartWidth);
 
-    const positions = [];
     const labels = [];
     const minSpacing = 40; // Minimum pixels between labels
 
-    // First pass: collect all positions
+    // First pass: collect all labels and their intended positions
     for (const year of labelsToShow) {
       const yearIndex = years.indexOf(year);
       if (yearIndex === -1) continue;
@@ -462,6 +461,7 @@ function updateChart(){
   const yearKeys = window.globalYearKeys || [];
   const startIdx = yearsAll.indexOf(String(startYear));
   const endIdx = yearsAll.indexOf(String(endYear));
+  if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) return;
   const years = yearsAll.slice(startIdx, endIdx + 1);
   const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
   const colors = groups.map(g => getColorForGroup(g));
@@ -496,14 +496,7 @@ function updateChart(){
   const unit = pollutantUnits[pollutant] || "";
   const seriesOptions = {};
   groups.forEach((g, i) => {
-    // Use the global seriesVisibility state to determine visibility
-    // Ensure the array is initialized if this is the first run or group count changed
-    if (seriesVisibility.length !== groups.length) {
-      seriesVisibility = Array(groups.length).fill(true);
-    }
-    seriesOptions[i] = seriesVisibility[i]
-      ? { color: colors[i], lineWidth: 3, pointSize: 4 }
-      : { color: colors[i], lineWidth: 0, pointSize: 0 };
+    seriesOptions[i] = { color: colors[i], lineWidth: 3, pointSize: 4 };
   });
 
   // Estimate left margin dynamically based on Y-axis label width
@@ -585,50 +578,47 @@ function updateChart(){
   const titleEl = document.getElementById('chartTitle');
   titleEl.textContent = `${pollutant}${unit ? " (" + unit + ")" : ""}`;
 
-  // build custom legend (interactive)
-  const legendDiv = document.getElementById('customLegend');
-  legendDiv.innerHTML = '';
+  // --- Custom Legend ---
+  updateCustomLegend(groups, colors, groupHasData);
+}
 
-  // Ensure visibility array is correctly sized before building the legend
+function updateCustomLegend(groups, colors, groupHasData) {
+  const legendContainer = document.getElementById('customLegend');
+  legendContainer.innerHTML = '';
+
+  // Initialize visibility array if it's the first time or if the number of groups has changed
   if (seriesVisibility.length !== groups.length) {
     seriesVisibility = Array(groups.length).fill(true);
   }
 
-  groups.forEach((g, i) => {
-    const item = document.createElement('span');
-    const dot = document.createElement('span');
-    dot.style.display = 'inline-block';
-    dot.style.width = '12px';
-    dot.style.height = '12px';
-    dot.style.borderRadius = '50%';
-    dot.style.backgroundColor = colors[i];
-    item.appendChild(dot);
+  groups.forEach((group, i) => {
+    if (!groupHasData[i]) return; // Don't show groups with no data
 
-    const labelText = document.createTextNode(g + (groupHasData[i] ? '' : ' (No data available)'));
-    item.appendChild(labelText);
+    const legendItem = document.createElement('div');
+    legendItem.className = 'legend-item';
+    legendItem.style.opacity = seriesVisibility[i] ? '1' : '0.5';
+    legendItem.onclick = () => toggleSeries(i);
 
-    // Fade if no data, or if the series is toggled off
-    item.style.opacity = (!groupHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
-    if (!groupHasData[i]) {
-      item.title = 'No data available';
-    }
+    const colorBox = document.createElement('span');
+    colorBox.className = 'legend-color-box';
+    colorBox.style.backgroundColor = colors[i];
 
-    // Toggle visibility only if data exists
-    if (groupHasData[i]) {
-      item.addEventListener('click', () => {
-        // Toggle the visibility state for the clicked series
-        seriesVisibility[i] = !seriesVisibility[i];
-        // Trigger a full chart update to redraw everything correctly
-        updateChart();
-      });
-    }
+    const label = document.createElement('span');
+    label.className = 'legend-label';
+    label.textContent = group;
 
-    legendDiv.appendChild(item);
+    legendItem.appendChild(colorBox);
+    legendItem.appendChild(label);
+    legendContainer.appendChild(legendItem);
   });
+}
 
-  // ensure controls reflect available choices
-  refreshGroupDropdowns();
-  refreshButtons();
+function toggleSeries(index) {
+  // Toggle the visibility state
+  seriesVisibility[index] = !seriesVisibility[index];
+
+  // Redraw the chart with updated series visibility
+  updateChart();
 }
 
 window.addEventListener('resize', () => {
