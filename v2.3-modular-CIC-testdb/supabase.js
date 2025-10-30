@@ -100,43 +100,44 @@ function generateUserFingerprint() {
  * @param {string} eventType - Type of event to track
  * @param {Object} eventData - Additional event data
  */
-async function trackAnalytics(eventType, eventData = {}) {
-  try {
-    if (!eventType) return;
+async function trackAnalytics(eventName, details = {}) {
+  // Check for analytics opt-out flag in URL
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('analytics') === 'off') {
+    console.log('Analytics is turned off via URL parameter. Skipping event:', eventName);
+    return; // Do not track if analytics=off is in the URL
+  }
 
-    if (!supabase) {
-      if (!supabaseUnavailableLogged) {
-        console.warn('Supabase client unavailable; analytics events will be skipped.');
-        supabaseUnavailableLogged = true;
-      }
-      return;
+  if (!supabase) {
+    if (!supabaseUnavailableLogged) {
+      console.warn('Supabase client unavailable; analytics events will be skipped.');
+      supabaseUnavailableLogged = true;
     }
+    return;
+  }
 
-    const analyticsData = {
-      session_id: sessionId,
-      user_fingerprint: generateUserFingerprint(),
-      event_type: eventType,
-      event_data: {
-        ...eventData,
-        country: getUserCountry()
-      },
-      timestamp: new Date().toISOString(),
-      user_agent: navigator.userAgent,
-      page_url: window.location.href,
-      referrer: document.referrer || null
-    };
+  const analyticsData = {
+    session_id: sessionId,
+    user_fingerprint: generateUserFingerprint(),
+    event_type: eventName,
+    event_data: {
+      ...details,
+      country: getUserCountry()
+    },
+    timestamp: new Date().toISOString(),
+    user_agent: navigator.userAgent,
+    page_url: window.location.href,
+    referrer: document.referrer || null
+  };
 
-    console.log('📊 Analytics:', eventType, eventData);
+  console.log('📊 Analytics:', eventName, details);
 
-    const { error } = await supabase
-      .from('analytics_events')
-      .insert([analyticsData]);
+  const { error } = await supabase
+    .from('analytics_events')
+    .insert([analyticsData]);
 
-    if (error && !error.message?.includes('relation "analytics_events" does not exist')) {
-      console.warn('Analytics tracking failed:', error);
-    }
-  } catch (err) {
-    console.warn('Analytics error:', err);
+  if (error && !error.message?.includes('relation "analytics_events" does not exist')) {
+    console.warn('Analytics tracking failed:', error);
   }
 }
 
