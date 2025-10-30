@@ -347,37 +347,7 @@ function showShareDialog(shareUrl) {
   }, 100);
 }
 
-/**
- * Get clean chart image URI without default year tick labels
- * @param {Object} chart - Google Chart instance
- * @returns {string} Data URI of the chart image
- */
-function getCleanChartImageURI(chart) {
-  try {
-    const chartContainer = document.getElementById('chart_div');
-    const svg = chartContainer ? chartContainer.querySelector('svg') : null;
-    const hidden = [];
-    if (svg) {
-      const nodes = Array.from(svg.querySelectorAll('text'));
-      nodes.forEach(node => {
-        const txt = (node.textContent || '').trim();
-        if (/^\d{4}$/.test(txt) && !node.closest('[data-custom-year]')) {
-          // hide the <text> element (record previous inline display)
-          hidden.push({ el: node, prev: node.style.display });
-          node.style.display = 'none';
-        }
-      });
-    }
-    // synchronous call returning data URI
-    const uri = chart.getImageURI();
-    // restore
-    hidden.forEach(h => { try { h.el.style.display = h.prev || ''; } catch (e) {} });
-    return uri;
-  } catch (e) {
-    console.warn('getCleanChartImageURI failed, falling back to chart.getImageURI():', e);
-    try { return chart.getImageURI(); } catch (err) { console.warn('chart.getImageURI() also failed', err); return null; }
-  }
-}
+
 
 /**
  * Creates a high-resolution image from the visible chart's SVG, then composites it.

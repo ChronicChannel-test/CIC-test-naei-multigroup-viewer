@@ -675,45 +675,7 @@ async function revealMainContent() {
   });
 }
 
-function setupDownloadButton() {
-  const dl = document.getElementById('downloadBtn');
 
-  dl.addEventListener('click', async () => {
-    try {
-      const pollutant = document.getElementById('pollutantSelect').value;
-      if (!chart || !pollutant) return;
-
-      // Track chart download analytics
-      const selectedGroups = getSelectedGroups();
-      const startYear = +document.getElementById('startYear').value;
-      const endYear = +document.getElementById('endYear').value;
-      trackAnalytics('chart_download', {
-        pollutant: pollutant,
-        start_year: startYear,
-        end_year: endYear,
-        groups: selectedGroups,
-        groups_count: selectedGroups.length,
-        filename: pollutant.replace(/[^a-z0-9_\-]/gi, '_') + '_comparison.png'
-      });
-
-      const unit = pollutantUnits[pollutant] || "";
-
-      // Get chart image and create final PNG with legend and footer
-      const chartImageData = await generateChartImage();
-      
-      // Trigger download
-      const link = document.createElement('a');
-      link.download = `${pollutant.replace(/[^a-z0-9_\-]/gi, '_')}_comparison.png`;
-      link.href = chartImageData;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-    } catch (error) {
-      console.error('Download failed:', error);
-      alert('Failed to download chart image. Please try again.');
-    }
-  });
-}
 
 /* ---------------- URL Parameters and Initialization ---------------- */
 function parseUrlParameters() {
@@ -785,7 +747,7 @@ async function init(){
 
       const revealPromise = revealMainContent();
 
-      setupDownloadButton();
+
       setupSmoothingToggle();
       setupShareButton();
       setupInteractionTracking();
@@ -914,7 +876,7 @@ async function init(){
     // === SHOW UI for shared URLs - after URL processing ===
     const revealPromise = revealMainContent();
 
-    setupDownloadButton();
+
     setupSmoothingToggle();
     setupShareButton();
     setupInteractionTracking();
