@@ -45,7 +45,7 @@ function exportData(format = 'csv') {
   }
   const years = yearsAll.slice(startIdx, endIdx + 1);
   const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
-  const unit = pollutantUnits[pollutant] || '';
+  const unit = window.pollutantUnits[pollutant] || '';
 
   // --- Build rows ---
   const rows = [];
@@ -62,7 +62,7 @@ function exportData(format = 'csv') {
   selectedGroups.forEach(group => {
     const values = keysForYears.map((k) => {
       // look up the data row for this pollutant and group
-      const dataRow = groupedData[pollutant] ? groupedData[pollutant][group] : null;
+      const dataRow = window.groupedData[pollutant] ? window.groupedData[pollutant][group] : null;
       const raw = dataRow ? dataRow[k] : null;
       return raw ?? '';
     });
@@ -100,22 +100,26 @@ function generateShareUrl() {
     return null;
   }
   
-  // Get pollutant ID
-  const pollutantData = pollutantsData.find(pd => 
-    (pd.Pollutant || pd.pollutant) === pollutantSelect.value
-  );
+  const pollutants = window.allPollutantsData || [];
+  const groups = window.allGroupsData || [];
+  
+  if (!pollutants.length || !groups.length) {
+    alert('Data not yet loaded. Please try again.');
+    return null;
+  }
+  
+  // Find pollutant ID
+  const pollutantData = pollutants.find(pd => pd.pollutant === pollutantSelect.value);
   
   if (!pollutantData) {
     alert('Unable to find pollutant ID for sharing.');
     return null;
   }
   
-  // Get group IDs
+  // Find group IDs
   const groupIds = [];
   selectedGroups.forEach(groupName => {
-    const groupData = groupsData.find(gd => 
-      (gd.Group_Title || gd.group_title) === groupName
-    );
+    const groupData = groups.find(gd => gd.group_title === groupName);
     if (groupData) {
       groupIds.push(groupData.id);
     }
@@ -201,6 +205,7 @@ function showShareDialog(shareUrl) {
     max-width: 500px;
     width: 90%;
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+    position: relative;
   `;
   
   const yearRange = (startYear && endYear) ? ` (${startYear}-${endYear})` : '';
@@ -208,6 +213,10 @@ function showShareDialog(shareUrl) {
   const description = `View ${pollutantName} emissions data for ${selectedGroups.length === 1 ? selectedGroups[0] : selectedGroups.length + ' groups'}${yearRange ? ` from ${startYear} to ${endYear}` : ''} using the NAEI Multi-Group Pollutant Viewer.`;
   
   content.innerHTML = `
+    <button id="closeShareBtn" style="position: absolute; top: 16px; right: 16px; padding: 8px 16px; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
+      ❌ Close
+    </button>
+    
     <h3 style="margin: 0 0 16px 0; color: #333;">🔗 Share Chart</h3>
     <p style="margin: 0 0 16px 0; color: #666;">Share this specific chart configuration:</p>
     <p style="margin: 0 0 16px 0; font-weight: 600; color: #000;">${title}</p>
@@ -217,24 +226,25 @@ function showShareDialog(shareUrl) {
       <div style="display: flex; gap: 8px;">
    <input type="text" id="shareUrlInput" name="shareUrlInput" value="${shareUrl}" readonly 
      style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; background: #f9f9f9;">
-        <button id="copyUrlBtn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-          📋 Copy
+        <button id="copyUrlBtn" style="padding: 8px 16px; background: #9C27B0; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; min-width: 130px;">
+          📋 Copy URL
         </button>
       </div>
     </div>
     
     <div style="margin: 16px 0;">
-      <label style="display: flex; align-items: center; margin-bottom: 12px; cursor: pointer;">
-  <input type="checkbox" id="includeImageCheckbox" name="includeImageCheckbox" style="margin-right: 8px;">
-        <span style="font-weight: 600;">🖼️ Copy chart image to clipboard for pasting into email</span>
-      </label>
-      
-      <button id="emailShareBtn" style="padding: 12px 20px; background: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; margin-right: 8px;">
-        📧 Email Link
+      <button id="copyPngBtn" style="padding: 10px 16px; background: #FF9800; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; min-width: 370px;">
+        🖼️ Copy Chart Image as PNG to clipboard
       </button>
-      <button id="closeShareBtn" style="padding: 12px 20px; background: #666; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;">
-        ❌ Close
-      </button>
+    </div>
+    
+    <div style="margin: 16px 0;">
+      <div style="display: flex; align-items: center; gap: 12px;">
+        <button id="emailShareBtn" style="padding: 12px 20px; background: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; white-space: nowrap;">
+          📧 Send Email
+        </button>
+        <p style="margin: 0; color: #000; font-weight: 600;">Chart will be copied to clipboard<br>for pasting into email</p>
+      </div>
     </div>
   `;
   
@@ -247,6 +257,7 @@ function showShareDialog(shareUrl) {
     try {
       await navigator.clipboard.writeText(shareUrl);
       const btn = content.querySelector('#copyUrlBtn');
+      const originalText = btn.textContent;
       btn.textContent = '✅ Copied!';
       btn.style.background = '#4CAF50';
       
@@ -259,8 +270,8 @@ function showShareDialog(shareUrl) {
       });
       
       setTimeout(() => {
-        btn.textContent = '📋 Copy';
-        btn.style.background = '#4CAF50';
+        btn.textContent = originalText;
+        btn.style.background = '#9C27B0';
       }, 2000);
     } catch (err) {
       // Fallback for older browsers
@@ -270,11 +281,68 @@ function showShareDialog(shareUrl) {
     }
   });
   
+  // Copy PNG functionality
+  content.querySelector('#copyPngBtn').addEventListener('click', async () => {
+    const btn = content.querySelector('#copyPngBtn');
+    const originalText = btn.textContent;
+    const originalBg = btn.style.background;
+    
+    try {
+      btn.disabled = true;
+      
+      const chartImageData = await generateChartImage();
+      const blob = dataURLtoBlob(chartImageData);
+      
+      if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+        const clipboardItem = new ClipboardItem({ 'image/png': blob });
+        await navigator.clipboard.write([clipboardItem]);
+        
+        btn.textContent = '✅ Copied!';
+        btn.style.background = '#4CAF50';
+        
+        trackAnalytics('share_png_copied', {
+          pollutant: pollutantName,
+          group_count: selectedGroups.length,
+          start_year: startYear,
+          end_year: endYear
+        });
+        
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = originalBg;
+          btn.disabled = false;
+        }, 2000);
+      } else {
+        btn.textContent = originalText;
+        btn.style.background = originalBg;
+        btn.disabled = false;
+        alert('Your browser doesn\'t support copying images to clipboard. Please use the PNG download button instead.');
+      }
+    } catch (error) {
+      console.error('Failed to copy PNG:', error);
+      btn.textContent = originalText;
+      btn.style.background = originalBg;
+      btn.disabled = false;
+      alert('Failed to copy chart image: ' + error.message);
+    }
+  });
+  
   // Email sharing functionality
   content.querySelector('#emailShareBtn').addEventListener('click', async () => {
-    const includeImage = content.querySelector('#includeImageCheckbox').checked;
+    try {
+      // Always copy chart image to clipboard
+      const chartImageData = await generateChartImage();
+      
+      if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+        const blob = dataURLtoBlob(chartImageData);
+        const clipboardItem = new ClipboardItem({ 'image/png': blob });
+        await navigator.clipboard.write([clipboardItem]);
+      }
+    } catch (error) {
+      console.warn('Could not copy chart image to clipboard:', error);
+    }
     
-    // Create detailed email content
+    // Create email content
     const subject = encodeURIComponent(`NAEI Emissions Data: ${pollutantName} ${yearRange}`);
     
     let emailBody = `I'm sharing NAEI emissions data for ${pollutantName}${yearRange ? ` from ${startYear} to ${endYear}` : ''}.\n\n`;
@@ -283,35 +351,6 @@ function showShareDialog(shareUrl) {
       emailBody += `${index + 1}. ${group}\n`;
     });
     emailBody += `\n`;
-    
-    if (includeImage) {
-      try {
-        // Generate comprehensive chart image (same as PNG download)
-        const chartImageData = await generateChartImage();
-        
-        // Copy to clipboard
-        if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
-          const blob = dataURLtoBlob(chartImageData);
-          const clipboardItem = new ClipboardItem({ 'image/png': blob });
-          await navigator.clipboard.write([clipboardItem]);
-          
-          emailBody += `🖼️ Chart Image:\n`;
-          emailBody += `The complete chart image (including title, legend, and CIC logo) has been copied to your clipboard.\n`;
-          emailBody += `You can now paste it directly into your email.\n\n`;
-        } else {
-          emailBody += `📋 Chart Image:\n`;
-          emailBody += `Your browser doesn't support automatic clipboard copying.\n`;
-          emailBody += `Please use the "⬇️ Download Chart as PNG" button to get the chart image.\n\n`;
-        }
-        
-      } catch (error) {
-        console.warn('Could not generate chart image:', error);
-        emailBody += `🖼️ Chart Image:\n`;
-        emailBody += `Chart image could not be generated automatically.\n`;
-        emailBody += `Please use the "⬇️ Download Chart as PNG" button to get the chart image.\n\n`;
-      }
-    }
-    
     emailBody += `Interactive chart: ${shareUrl}\n\n`;
     emailBody += `Generated by the Chronic Illness Channel NAEI Multi-Group Pollutant Viewer\n`;
     emailBody += `Youtube Channel: http://youtube.com/@chronicillnesschannel`;
@@ -324,8 +363,7 @@ function showShareDialog(shareUrl) {
       group_count: selectedGroups.length,
       start_year: startYear,
       end_year: endYear,
-      has_year_range: !!(startYear && endYear),
-      include_image: includeImage
+      has_year_range: !!(startYear && endYear)
     });
     
     window.location.href = mailto;
@@ -427,7 +465,7 @@ async function generateChartImage() {
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         try {
-          const unit = pollutantUnits[pollutant] || "";
+          const unit = window.pollutantUnits[pollutant] || "";
           const padding = 50; 
           const titleHeight = 80;
           const footerHeight = 100;
@@ -462,8 +500,27 @@ async function generateChartImage() {
           ctx.fillText(`${pollutant}${unit ? " (" + unit + ")" : ""}`, canvasWidth / 2, padding + 40);
 
           // Custom Legend - Larger Font and Dots
+          // Filter legend items: exclude disabled series, but keep "No data available" ones
           const legendDiv = document.getElementById('customLegend');
-          const items = [...legendDiv.querySelectorAll('span')];
+          // Get only direct child spans (the legend items), not nested spans (the dots)
+          const allItems = [...legendDiv.children].filter(el => el.tagName === 'SPAN');
+          
+          // Get the current visibility state from main.js
+          const visibility = window.seriesVisibility || [];
+          
+          console.log('PNG Generation - Total legend items:', allItems.length);
+          console.log('PNG Generation - Visibility array:', visibility);
+          
+          // Filter items: include if visible OR if it has no data (keep for reference)
+          const items = allItems.filter((item, index) => {
+            const hasNoData = item.textContent.includes('(No data available)');
+            const isVisible = visibility[index] !== false; // true or undefined = visible
+            console.log(`Item ${index}: "${item.textContent.trim()}" - hasNoData: ${hasNoData}, isVisible: ${isVisible}, include: ${isVisible || hasNoData}`);
+            return isVisible || hasNoData;
+          });
+          
+          console.log('PNG Generation - Filtered items count:', items.length);
+          
           let legendY = padding + titleHeight + 20;
           const legendRowHeight = 45;
           const maxW = canvasWidth - padding * 2;
@@ -516,14 +573,27 @@ async function generateChartImage() {
           logo.src = 'CIC - Square - Border - Words - Alpha 360x360.png';
 
           const finishGeneration = () => {
-            const footerText = "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk licensed under the Open Government Licence (OGL).";
-            const channelText = "Youtube Channel: youtube.com/@chronicillnesschannel";
-            const footerY = chartY + chartHeight + 80;
-
-            ctx.font = '28px system-ui, sans-serif'; // Larger font
+            ctx.font = '28px system-ui, sans-serif';
             ctx.fillStyle = '#555';
             ctx.textAlign = 'center';
-            ctx.fillText(footerText, canvasWidth / 2, footerY);
+            
+            // Check if footer needs to wrap
+            const fullFooterText = "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk licensed under the Open Government Licence (OGL).";
+            const footerTextWidth = ctx.measureText(fullFooterText).width;
+            
+            let footerY = chartY + chartHeight + 50;
+            
+            if (footerTextWidth > canvasWidth - 40) {
+              // Wrap: split after "gov.uk"
+              const footerLine1 = "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk";
+              const footerLine2 = "licensed under the Open Government Licence (OGL).";
+              ctx.fillText(footerLine1, canvasWidth / 2, footerY);
+              ctx.fillText(footerLine2, canvasWidth / 2, footerY + 35);
+              footerY += 35; // Adjust for wrapped line
+            } else {
+              // Single line
+              ctx.fillText(fullFooterText, canvasWidth / 2, footerY);
+            }
 
             const channelY = footerY + 40;
             const boldText = "Youtube Channel: ";
@@ -535,12 +605,23 @@ async function generateChartImage() {
             const normalWidth = ctx.measureText(normalText).width;
             const totalWidth = boldWidth + normalWidth;
             
-            const startX = (canvasWidth - totalWidth) / 2;
-            ctx.textAlign = 'left';
-            ctx.font = 'bold 28px system-ui, sans-serif';
-            ctx.fillText(boldText, startX, channelY);
-            ctx.font = '28px system-ui, sans-serif';
-            ctx.fillText(normalText, startX + boldWidth, channelY);
+            // Check if channel text fits on one line
+            if (totalWidth > canvasWidth - 40) {
+              // Wrap: put URL on separate line
+              ctx.textAlign = 'center';
+              ctx.font = 'bold 28px system-ui, sans-serif';
+              ctx.fillText(boldText.trim(), canvasWidth / 2, channelY);
+              ctx.font = '28px system-ui, sans-serif';
+              ctx.fillText(normalText, canvasWidth / 2, channelY + 35);
+            } else {
+              // Single line
+              const startX = (canvasWidth - totalWidth) / 2;
+              ctx.textAlign = 'left';
+              ctx.font = 'bold 28px system-ui, sans-serif';
+              ctx.fillText(boldText, startX, channelY);
+              ctx.font = '28px system-ui, sans-serif';
+              ctx.fillText(normalText, startX + boldWidth, channelY);
+            }
             
             const dataURL = canvas.toDataURL('image/png');
             resolve(dataURL);

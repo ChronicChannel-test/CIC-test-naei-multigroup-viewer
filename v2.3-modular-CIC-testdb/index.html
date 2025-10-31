@@ -74,127 +74,86 @@
       </div>
       <!-- Everything above the chart (dropdowns, buttons, group info, etc.) -->
     </div>
-  <details class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
-  <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
-    📘 Quick Start Guide
-  </summary>
+  <details class="my-4 bg-gray-50 rounded-2xl shadow-sm p-4" style="margin-right: 130px;">
+    <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
+      📘 Quick Start Guide
+    </summary>
 
-  <div class="mt-3 space-y-3 text-gray-800 leading-relaxed">
-    <p>
-      <strong>Quick Start Guide:</strong> Select a <strong>pollutant</strong>, choose one or more <strong>groups</strong> to compare, set your <strong>year range</strong>, and view the interactive chart.
-    </p>
+    <div id="quickStartContent" class="space-y-3 text-gray-800 leading-relaxed" style="margin-top: 12px;">
+      <!-- Quick Start Guide will be loaded here from quick-start.html -->
+    </div>
+  </details>
 
- 
-    <h3 class="font-semibold text-blue-700">Essential Steps</h3>
-    <p>
-    <ol class="list-decimal list-inside space-y-2">
-      <li><strong>Select Pollutant:</strong> Choose from PM2.5, NOx, CO₂, etc.</li>
-      <li><strong>Add Groups:</strong> Compare emission sources like "Road Transport" vs "Power Stations"</li>
-      <li><strong>Set Years:</strong> Focus on specific time periods (1970-2023 available)</li>
-      <li><strong>Interact:</strong> Hover over chart points, click legend items to show/hide lines</li>
-      <li><strong>Export & Share:</strong> Download images, export data, or share via URL</li>
-    </ol>
-  </div>
-    <p>
-      Click <strong>"+ Add Group"</strong> to add a new group comparison (e.g., Road Transport, Power Stations, Domestic Combustion).<br>
-      You can add up to <strong>10 groups</strong> to compare at once.<br>
-  To remove a group, click <strong>"− Remove Group"</strong> next to it (this appears when two or more groups are selected).
-    </p>
-    <p class="italic text-sm text-gray-600">
-      💡 Tip: You can re-order the group boxes by clicking and dragging the ⠿ handle next to each group — the chart updates automatically.
-    </p>
+  <style>
+    details[open] {
+      margin-bottom: 2rem;
+    }
+    details[open] > #quickStartContent {
+      border: 2px solid #9ca3af;
+      background: #f9fafb;
+      border-radius: 1rem;
+      padding: 16px 20px;
+      margin-top: 12px;
+    }
+  </style>
 
-    <h3 class="font-semibold text-blue-700">3️⃣ Set the Year Range</h3>
-    <p>
-      Use the <strong>Start Year</strong> and <strong>End Year</strong> dropdowns to focus on a particular time period.<br>
-      The chart will automatically refresh to show data for the chosen range.
-    </p>
-
-    <h3 class="font-semibold text-blue-700">4️⃣ View and Interact with the Chart</h3>
-    <p>
-      Once you've chosen your pollutant, groups, and years, the interactive line chart will appear.<br>
-      <strong>Hover</strong> over any point on the chart to see the exact emission value for that year.<br>
-      The <strong>Y-axis</strong> shows total emissions, including units (e.g., kilotonnes).<br>
-      Each group is shown in a unique colour.
-    </p>
-
-    <h3 class="font-semibold text-blue-700">5️⃣ Use the Legend to Toggle Lines</h3>
-    <p>
-      Above the chart, the legend lists all groups and their corresponding colours.<br>
-      <strong>Click a group name</strong> in the legend to hide or show that group's line on the chart.<br>
-      Faded items indicate hidden or unavailable data.<br>
-      <em>(Groups labelled "(No data available)" are included for reference but contain no plotted values.)</em>
-    </p>
-
-    <h3 class="font-semibold text-blue-700">6️⃣ Smooth or Straight Lines</h3>
-    <p>
-      Click the <strong>"🚫 Disable Smoothing"</strong> button to switch to straight (non-curved) lines.<br>
-      Click again (the button will change to <strong>"✅ Enable Smoothing"</strong>) to re-enable smooth, curved lines.
-    </p>
-
-<h3 class="font-semibold text-blue-700">7️⃣ Download Options</h3>
-<p>You can export both the chart and its underlying data for your own analysis or reporting.</p>
-
-<p>
-  <strong>📊 Download Chart as PNG</strong><br>
-  Click <strong>"⬇️ Download Chart as PNG"</strong> to save the current chart as an image.<br>
-  The exported image includes:
-  <ul class="list-disc list-inside ml-4">
-    <li>The chart itself</li>
-    <li>Custom colour legend</li>
-    <li>Pollutant name and emission unit</li>
-
-  </ul>
-</p>
-
-<p>
-  <strong>📄 Download Data</strong><br>
-  <strong>CSV:</strong> Click "📄 Download Data – CSV" for a spreadsheet-friendly text file.<br>
-  <strong>Excel:</strong> Click "📊 Download Data – Excel" for a formatted Excel workbook.<br>
-  Each file includes:
-  <ul class="list-disc list-inside ml-4">
-    <li>Pollutant name and emission unit in the first line</li>
-    <li>Table with groups as rows and years as columns</li>
-    <li>Footer row with download timestamp</li>
-  </ul>
-</p>
-
-<h3 class="font-semibold text-blue-700">8️⃣ Share Your Chart</h3>
-<p>
-  Click the <strong>Share</strong> button to copy a unique link or chart image.<br>
-  You can easily share your current view with others, or paste the chart image into emails and documents.<br>
-  The shared link will open the viewer with your selected pollutant, groups, and year range.
-</p>
-
-<h3 class="font-semibold text-blue-700">9️⃣ View Group Details</h3>
-<p>
-  Use the <strong>"📘 See Group Info"</strong> section below the group selector to view details of how each group is built.<br>
-  The table shows <strong>Source Names</strong> and <strong>Fuel Types</strong> from the NAEI data that have been combined to create each group.<br>
-  If a group includes all sources or all fuel types, these will be shown as <em>"All Sources"</em> or <em>"All Fuel Types"</em>.
-</p>
-
-<h3 class="font-semibold text-blue-700">🔟 Licensing and Attribution</h3>
-<p>
-  © Crown copyright (Defra & DESNZ) and available under the
-  <strong>Open Government Licence (OGL)</strong>.<br>
-  See links beneath the chart for full details.
-</p>
-</details>
+  <script>
+    // Load Quick Start Guide content
+    fetch('quick-start.html')
+      .then(response => response.text())
+      .then(html => {
+        document.getElementById('quickStartContent').innerHTML = html;
+        
+        // Attach the close button event listener after content is loaded
+        const closeBtn = document.getElementById('closeQuickStart');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', function() {
+            const details = this.closest('details');
+            if (details) {
+              details.removeAttribute('open');
+              // Scroll to the top of the page
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+          });
+        }
+      })
+      .catch(error => {
+        console.error('Failed to load Quick Start Guide:', error);
+        document.getElementById('quickStartContent').innerHTML = '<p class="text-red-600">Failed to load guide content.</p>';
+      });
+  </script>
 
       <div class="button-row">
         <label for="pollutantSelect">Pollutant:</label>
         <select id="pollutantSelect" name="pollutantSelect"><option value="">Select pollutant</option></select>
       </div>
       <div id="groupContainer"></div>
-      <details class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
+      <details id="groupInfoDetails" class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm" style="margin-right: 130px;">
   <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
     📘 See Group Info
   </summary>
 
-  <div id="group-info" class="mt-3 text-gray-800 leading-relaxed overflow-x-auto">
+  <div id="group-info" class="mt-3 text-gray-800 leading-relaxed overflow-x-auto" style="cursor: pointer;">
     <p>Loading group information...</p>
   </div>
 </details>
+
+  <script>
+    // Add click handler for See Group Info - click anywhere to close and scroll to top
+    document.addEventListener('DOMContentLoaded', function() {
+      const groupInfo = document.getElementById('group-info');
+      const groupInfoDetails = document.getElementById('groupInfoDetails');
+      
+      if (groupInfo && groupInfoDetails) {
+        groupInfo.addEventListener('click', function() {
+          if (groupInfoDetails.hasAttribute('open')) {
+            groupInfoDetails.removeAttribute('open');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        });
+      }
+    });
+  </script>
     </div>
 
     <div id="mainContentBottom">
@@ -208,7 +167,7 @@
           <select id="endYear" name="endYear"></select>
         </span>
         <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
-        <button id="downloadBtn" class="control-button">⬇️ Download Chart as PNG</button>
+        <button id="downloadBtn" class="control-button">⬇️ Download Chart Image – PNG</button>
         <button id="downloadCSVBtn">📄 Download Data - CSV</button>
         <button id="downloadXLSXBtn">📊 Download Data - Excel</button>
         <button id="shareBtn">🔗 Share Chart</button>
@@ -221,16 +180,29 @@
       </div>
     </div>
 <footer>
-  © Crown 2025 copyright Defra &amp; DESNZ via 
-  <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener">naei.energysecurity.gov.uk</a> 
-  licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener">Open Government Licence (OGL)</a>.
+  <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via 
+  <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener">naei.energysecurity.gov.uk</a></span>
+  <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener">Open Government Licence (OGL)</a>.</span>
   <br>
   <strong>YouTube Channel:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener">www.youtube.com/@ChronicIllnessChannel</a>
   <br>
   <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-    Version: v2.3 modular CIC-testdb • Build: 2025.10.29
+    Version: v2.3 modular CIC-testdb • Build: 2025.10.31
   </span>
 </footer>
+
+<style>
+  .footer-copyright,
+  .footer-license {
+    white-space: nowrap;
+  }
+  
+  @media (max-width: 900px) {
+    .footer-copyright {
+      display: block;
+    }
+  }
+</style>
 
   </div>
 

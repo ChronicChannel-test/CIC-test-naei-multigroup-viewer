@@ -14,6 +14,8 @@ let colorCache={};
 let availableColors=[...distinctPalette];
 let chart; // global chart instance
 let seriesVisibility = [];
+window.seriesVisibility = seriesVisibility; // Expose for export.js
+let urlUpdateTimer = null; // Debounce timer for URL updates
 
 // Export configuration constants
 const EXPORT_MIN_SCALE = 16;
@@ -77,17 +79,27 @@ function getColorForGroup(name) {
   return chosenColor;
 }
 
-function setupSelectors(){
+function setupSelectors(pollutants, groups){
   // ✅ Use pollutant list from Supabase loadData
   const sel = document.getElementById('pollutantSelect');
   sel.innerHTML = '<option value="">Select pollutant</option>';
-  if (window.allPollutants && window.allPollutants.length) {
-    window.allPollutants.forEach(p => sel.add(new Option(p, p)));
+  if (pollutants && pollutants.length) {
+    const pollutantNames = [...new Set(pollutants.map(p => p.pollutant))]
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b));
+    pollutantNames.forEach(p => sel.add(new Option(p, p)));
   }
 
   // Ensure we have the groups list available from the global window var
-  if (!window.allGroupsList && window.allGroups) {
-    window.allGroupsList = window.allGroups;
+  if (groups && groups.length) {
+    const groupNames = [...new Set(groups.map(g => g.group_title))]
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a.toLowerCase() === 'all') return -1;
+        if (b.toLowerCase() === 'all') return 1;
+        return a.localeCompare(b);
+      });
+    window.allGroupsList = groupNames;
   }
 
 
@@ -108,15 +120,73 @@ function setupSelectors(){
   endSel.value = years[years.length - 1] || '';
 
   sel.addEventListener('change', updateChart);
-  startSel.addEventListener('change', updateChart);
-  endSel.addEventListener('change', updateChart);
+  startSel.addEventListener('change', () => {
+    updateYearDropdowns();
+    updateChart();
+  });
+  endSel.addEventListener('change', () => {
+    updateYearDropdowns();
+    updateChart();
+  });
 
   // Group selectors will be added by the init() function after URL parameter processing
   // This prevents double group creation that causes visual jumping
  }
 
+function updateYearDropdowns() {
+  const startSel = document.getElementById('startYear');
+  const endSel = document.getElementById('endYear');
+  const allYears = (window.globalYears || []).map(y => parseInt(y));
+
+  let currentStart = parseInt(startSel.value);
+  let currentEnd = parseInt(endSel.value);
+
+  // If the start year is greater than or equal to the end year, auto-correct it.
+  if (currentStart >= currentEnd) {
+    // Find the index of the current end year
+    const endIdx = allYears.indexOf(currentEnd);
+    // Set the start year to be one step before the end year, if possible
+    if (endIdx > 0) {
+      currentStart = allYears[endIdx - 1];
+    } else {
+      // If end year is the very first year, we can't go back.
+      // This is an edge case. Let's just ensure start is not equal to end.
+      // A better UX might be to adjust the end year forward instead.
+      // For now, this prevents a crash.
+      if (allYears.length > 1) {
+        currentEnd = allYears[1];
+      }
+    }
+    startSel.value = currentStart;
+  }
+
+  const startVal = startSel.value;
+  const endVal = endSel.value;
+
+  // Repopulate the start year dropdown: must be less than currentEnd
+  startSel.innerHTML = '';
+  allYears.forEach(year => {
+    if (year < parseInt(endVal)) {
+      startSel.add(new Option(year, year));
+    }
+  });
+  startSel.value = startVal;
+
+  // Repopulate the end year dropdown: must be greater than currentStart
+  endSel.innerHTML = '';
+  allYears.forEach(year => {
+    if (year > parseInt(startVal)) {
+      endSel.add(new Option(year, year));
+    }
+  });
+  endSel.value = endVal;
+}
+
 function getSelectedGroups(){ return [...document.querySelectorAll('#groupContainer select')].map(s => s.value).filter(Boolean); }
 function addGroupSelector(defaultValue = "", usePlaceholder = true){
+  const groupName = (defaultValue && typeof defaultValue === 'object')
+    ? defaultValue.group_title
+    : defaultValue;
   const container = document.getElementById('groupContainer');
   const div = document.createElement('div');
   div.className = 'groupRow';
@@ -154,9 +224,9 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
 
   const selected = getSelectedGroups();
   allGroups.forEach(g => {
-    if (!selected.includes(g) || g === defaultValue) sel.add(new Option(g,g));
+    if (!selected.includes(g) || g === groupName) sel.add(new Option(g,g));
   });
-  if (defaultValue) sel.value = defaultValue;
+  if (groupName) sel.value = groupName;
   sel.addEventListener('change', () => { refreshGroupDropdowns(); updateChart(); });
 
   controlWrap.appendChild(sel);
@@ -439,20 +509,87 @@ function addCustomXAxisLabels() {
 
 
 /* ---------------- Chart rendering & legend ---------------- */
+
+/**
+ * Updates the browser's URL with the current chart settings.
+ * This function is debounced to prevent flooding the browser history.
+ */
+function updateUrlFromChartState() {
+  // Ensure the data needed for ID lookups is available.
+  const pollutants = window.allPollutantsData || [];
+  const groups = window.allGroupsData || [];
+  if (!pollutants.length || !groups.length) {
+    console.log("URL update skipped: lookup data not yet available.");
+    return;
+  }
+
+  clearTimeout(urlUpdateTimer);
+  urlUpdateTimer = setTimeout(() => {
+    try {
+      const pollutantName = document.getElementById('pollutantSelect').value;
+      const startYear = document.getElementById('startYear').value;
+      const endYear = document.getElementById('endYear').value;
+      const groupNames = getSelectedGroups();
+
+      if (!pollutantName || !startYear || !endYear || groupNames.length === 0) {
+        return; // Not enough info to create a valid URL
+      }
+
+      // Find pollutant ID
+      const pollutant = pollutants.find(p => p.pollutant === pollutantName);
+      const pollutantId = pollutant ? pollutant.id : null;
+
+      // Find group IDs
+      const groupIds = groupNames.map(name => {
+        const group = groups.find(g => g.group_title === name);
+        return group ? group.id : null;
+      }).filter(id => id !== null);
+
+      if (!pollutantId || groupIds.length !== groupNames.length) {
+        console.warn("Could not map all names to IDs for URL update.");
+        return;
+      }
+
+      if (parseInt(startYear) >= parseInt(endYear)) {
+        console.warn(`URL update skipped: Invalid year range (start=${startYear}, end=${endYear}).`);
+        return;
+      }
+
+      const queryParts = [
+        `pollutant_id=${encodeURIComponent(pollutantId)}`,
+        `group_ids=${groupIds.join(',')}`,
+        `start_year=${encodeURIComponent(startYear)}`,
+        `end_year=${encodeURIComponent(endYear)}`
+      ];
+      
+      const newUrl = `${window.location.pathname}?${queryParts.join('&')}`;
+      
+      window.history.replaceState({ path: newUrl }, '', newUrl);
+
+    } catch (error) {
+      console.error("Failed to update URL from chart state:", error);
+    }
+  }, 400); // 400ms debounce delay
+}
+
+
 function updateChart(){
   const pollutant = document.getElementById('pollutantSelect').value;
   const startYear = +document.getElementById('startYear').value;
   const endYear = +document.getElementById('endYear').value;
-  const groups = getSelectedGroups();
-  if (!pollutant || !startYear || !endYear || !groups.length) return;
+  const selectedGroups = getSelectedGroups();
+  if (!pollutant || !startYear || !endYear || !selectedGroups.length) return;
+
+  // Update the URL with the new state (debounced)
+  updateUrlFromChartState();
 
   // Track chart view analytics
   trackAnalytics('chart_view', {
     pollutant: pollutant,
     start_year: startYear,
     end_year: endYear,
-    groups: groups,
-    groups_count: groups.length,
+    groups: selectedGroups,
+    groups_count: selectedGroups.length,
     year_range: endYear - startYear + 1
   });
 
@@ -464,13 +601,13 @@ function updateChart(){
   const endIdx = yearsAll.indexOf(String(endYear));
   const years = yearsAll.slice(startIdx, endIdx + 1);
   const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
-  const colors = groups.map(g => getColorForGroup(g));
+  const colors = selectedGroups.map(g => getColorForGroup(g));
 
   // Build rows of data (year + series values). Use null for missing.
   const chartRows = years.map((y, rowIdx) => {
     const row = [y];
     const key = keysForYears[rowIdx]; // e.g. 'f2015'
-    groups.forEach(g => {
+    selectedGroups.forEach(g => {
       const dataRow = groupedData[pollutant]?.[g];
       const raw = dataRow ? dataRow[key] : null;
       const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
@@ -483,23 +620,58 @@ function updateChart(){
   if (chartRows.length === 0) return;
 
   // --- Determine which groups actually have data ---
-  const groupHasData = groups.map((g, i) => {
+  const groupHasData = selectedGroups.map((g, i) => {
     return chartRows.some(row => typeof row[i + 1] === 'number');
   });
+
+  // Get unit before creating DataTable (needed for tooltips)
+  const unit = pollutantUnits[pollutant] || "";
 
   // Create DataTable explicitly to guarantee column types
   const dataTable = new google.visualization.DataTable();
   dataTable.addColumn('string', 'Year');           // year as string
-  groups.forEach(g => dataTable.addColumn('number', g)); // explicit numeric series columns
-  dataTable.addRows(chartRows);
+  selectedGroups.forEach(g => {
+    dataTable.addColumn('number', g);              // data column
+    dataTable.addColumn({type: 'string', role: 'tooltip'}); // custom tooltip
+  });
+  
+  // Add rows with custom tooltips for dynamic decimal precision
+  chartRows.forEach(row => {
+    const newRow = [row[0]]; // year
+    for (let i = 1; i < row.length; i++) {
+      const value = row[i];
+      newRow.push(value); // actual value
+      
+      // Generate tooltip with dynamic precision
+      if (value === null || value === undefined) {
+        newRow.push(null);
+      } else {
+        const groupName = selectedGroups[i - 1];
+        let formattedValue;
+        
+        // Use more decimals for very small values
+        if (Math.abs(value) < 0.001 && value !== 0) {
+          formattedValue = value.toFixed(9).replace(/\.?0+$/, ''); // Up to 9 decimals for very small values
+        } else if (Math.abs(value) < 1 && value !== 0) {
+          formattedValue = value.toFixed(6).replace(/\.?0+$/, ''); // Up to 6 decimals, remove trailing zeros
+        } else {
+          formattedValue = value.toFixed(3).replace(/\.?0+$/, ''); // 3 decimals for normal values
+        }
+        
+        const tooltip = `${groupName}\nYear: ${row[0]}\nValue: ${formattedValue}${unit ? ' ' + unit : ''}`;
+        newRow.push(tooltip);
+      }
+    }
+    dataTable.addRow(newRow);
+  });
 
-  const unit = pollutantUnits[pollutant] || "";
   const seriesOptions = {};
-  groups.forEach((g, i) => {
+  selectedGroups.forEach((g, i) => {
     // Use the global seriesVisibility state to determine visibility
     // Ensure the array is initialized if this is the first run or group count changed
-    if (seriesVisibility.length !== groups.length) {
-      seriesVisibility = Array(groups.length).fill(true);
+    if (seriesVisibility.length !== selectedGroups.length) {
+      seriesVisibility = Array(selectedGroups.length).fill(true);
+      window.seriesVisibility = seriesVisibility; // Update window reference
     }
     seriesOptions[i] = seriesVisibility[i]
       ? { color: colors[i], lineWidth: 3, pointSize: 4 }
@@ -578,7 +750,10 @@ function updateChart(){
   // Delay slightly to let layout stabilize (prevents negative sizes)
   setTimeout(() => {
     chart.draw(dataTable, options);
-    chartContainer.classList.add('visible');
+    // Only add visible class when parent is already visible to prevent flash
+    if (document.getElementById('mainContent').classList.contains('loaded')) {
+      chartContainer.classList.add('visible');
+    }
   }, 100);
 
   // update visible title on page
@@ -590,11 +765,12 @@ function updateChart(){
   legendDiv.innerHTML = '';
 
   // Ensure visibility array is correctly sized before building the legend
-  if (seriesVisibility.length !== groups.length) {
-    seriesVisibility = Array(groups.length).fill(true);
+  if (seriesVisibility.length !== selectedGroups.length) {
+    seriesVisibility = Array(selectedGroups.length).fill(true);
+    window.seriesVisibility = seriesVisibility; // Update window reference
   }
 
-  groups.forEach((g, i) => {
+  selectedGroups.forEach((g, i) => {
     const item = document.createElement('span');
     const dot = document.createElement('span');
     dot.style.display = 'inline-block';
@@ -618,6 +794,7 @@ function updateChart(){
       item.addEventListener('click', () => {
         // Toggle the visibility state for the clicked series
         seriesVisibility[i] = !seriesVisibility[i];
+        window.seriesVisibility = seriesVisibility; // Update window reference
         // Trigger a full chart update to redraw everything correctly
         updateChart();
       });
@@ -638,36 +815,84 @@ window.addEventListener('resize', () => {
 
 async function renderInitialView() {
   return new Promise(resolve => {
-    requestAnimationFrame(() => {
-      try {
-        updateChart();
-      } catch (err) {
-        console.error('Initial chart render failed:', err);
-      } finally {
-        setTimeout(resolve, 350);
+    const params = parseUrlParameters();
+    const pollutantSelect = document.getElementById('pollutantSelect');
+    
+    // Use a small timeout to allow the DOM to update with the options from setupSelectors
+    setTimeout(() => {
+      if (params.pollutantName) {
+        pollutantSelect.value = params.pollutantName;
+      } else {
+        // Default to PM2.5 if no pollutant is in the URL
+        if ([...pollutantSelect.options].some(o => o.value === 'PM2.5')) {
+          pollutantSelect.value = 'PM2.5';
+        }
       }
-    });
+
+      // Clear existing group selectors and add new ones based on URL
+      const groupContainer = document.getElementById('groupContainer');
+      groupContainer.innerHTML = ''; // Clear any default selectors
+
+      if (params.groupNames && params.groupNames.length > 0) {
+        params.groupNames.forEach(name => addGroupSelector(name, false));
+      } else {
+        // Add default groups if none are in the URL
+        addGroupSelector('All', false);
+      }
+
+      const startYearSelect = document.getElementById('startYear');
+      const endYearSelect = document.getElementById('endYear');
+      
+      // Set year values from URL params (already validated in parseUrlParameters)
+      if (params.startYear && startYearSelect.querySelector(`option[value="${params.startYear}"]`)) {
+        startYearSelect.value = params.startYear;
+      }
+      if (params.endYear && endYearSelect.querySelector(`option[value="${params.endYear}"]`)) {
+        endYearSelect.value = params.endYear;
+      }
+      
+      updateYearDropdowns();
+      
+      // Don't call updateChart here; revealMainContent will do it.
+      resolve();
+    }, 50);
   });
 }
 
 async function revealMainContent() {
-  const overlay = document.getElementById('loadingOverlay');
-  const content = document.getElementById('mainContent');
-  if (!overlay || !content) return;
-
-  content.style.display = 'block';
-  content.removeAttribute('aria-hidden');
-  requestAnimationFrame(() => content.classList.add('loaded'));
-
-  await renderInitialView();
-
-  overlay.style.opacity = '0';
-
   return new Promise(resolve => {
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    const mainContent = document.getElementById('mainContent');
+    
+    // Make content visible but keep it transparent
+    mainContent.style.display = 'block';
+    mainContent.removeAttribute('aria-hidden');
+    
+    // Render the chart while still hidden (opacity 0)
+    // This prevents the empty chart flash
+    updateChart();
+    
+    // Wait for chart to render, then fade in together
     setTimeout(() => {
-      overlay.style.display = 'none';
-      resolve();
-    }, 400);
+      // Start fade out of loading overlay
+      loadingOverlay.style.opacity = '0';
+      
+      // Start fade in of main content and chart simultaneously
+      requestAnimationFrame(() => {
+        mainContent.classList.add('loaded');
+        // Make chart visible now that parent is ready
+        const chartDiv = document.getElementById('chart_div');
+        if (chartDiv) {
+          chartDiv.classList.add('visible');
+        }
+      });
+      
+      // Clean up loading overlay after fade completes
+      setTimeout(() => {
+        loadingOverlay.style.display = 'none';
+        resolve();
+      }, 400);
+    }, 250); // Give chart time to render
   });
 }
 
@@ -676,267 +901,153 @@ async function revealMainContent() {
 /* ---------------- URL Parameters and Initialization ---------------- */
 function parseUrlParameters() {
   const params = new URLSearchParams(window.location.search);
-  const result = {};
-  
-  // Get pollutant ID
-  if (params.has('pollutant_id')) {
-    result.pollutant_id = params.get('pollutant_id');
+  const pollutantId = params.get('pollutant_id');
+  const groupIds = params.get('group_ids')?.split(',').map(Number).filter(Boolean);
+  const startYearParam = params.get('start_year');
+  const endYearParam = params.get('end_year');
+
+  const pollutants = window.allPollutantsData || [];
+  const groups = window.allGroupsData || [];
+  const availableYears = window.globalYears || [];
+
+  let pollutantName = null;
+  if (pollutantId) {
+    const pollutant = pollutants.find(p => String(p.id) === String(pollutantId));
+    if (pollutant) {
+      pollutantName = pollutant.pollutant;
+    }
   }
-  
-  // Get group IDs (can be comma-separated)
-  if (params.has('group_ids')) {
-    const groupIds = params.get('group_ids');
-    result.group_ids = groupIds.split(',').map(id => id.trim()).filter(id => id);
+
+  let groupNames = [];
+  if (groupIds && groupIds.length > 0) {
+    groupNames = groupIds.map(id => {
+      const group = groups.find(g => String(g.id) === String(id));
+      return group ? group.group_title : null;
+    }).filter(Boolean);
   }
-  
-  // Get year range
-  if (params.has('start_year')) {
-    result.start_year = params.get('start_year');
+
+  // Validate years against available years
+  let startYear = null;
+  let endYear = null;
+
+  if (availableYears.length > 0) {
+    // Check if provided years are valid
+    const isStartYearValid = startYearParam && availableYears.includes(startYearParam);
+    const isEndYearValid = endYearParam && availableYears.includes(endYearParam);
+    
+    if (isStartYearValid && isEndYearValid) {
+      // Both years valid - check if start < end
+      const startIdx = availableYears.indexOf(startYearParam);
+      const endIdx = availableYears.indexOf(endYearParam);
+      
+      if (startIdx < endIdx) {
+        // Valid range
+        startYear = startYearParam;
+        endYear = endYearParam;
+      } else {
+        // Invalid range - use defaults
+        console.warn(`Invalid year range in URL: start=${startYearParam}, end=${endYearParam}. Using defaults.`);
+        startYear = availableYears[0];
+        endYear = availableYears[availableYears.length - 1];
+      }
+    } else if (isStartYearValid) {
+      // Only start year valid
+      startYear = startYearParam;
+      // Find a valid end year after the start
+      const startIdx = availableYears.indexOf(startYearParam);
+      endYear = availableYears[availableYears.length - 1];
+      console.warn(`Invalid end year in URL: ${endYearParam}. Using ${endYear}.`);
+    } else if (isEndYearValid) {
+      // Only end year valid
+      endYear = endYearParam;
+      // Find a valid start year before the end
+      startYear = availableYears[0];
+      console.warn(`Invalid start year in URL: ${startYearParam}. Using ${startYear}.`);
+    } else if (startYearParam || endYearParam) {
+      // Years provided but both invalid
+      console.warn(`Invalid years in URL: start=${startYearParam}, end=${endYearParam}. Using defaults.`);
+      startYear = availableYears[0];
+      endYear = availableYears[availableYears.length - 1];
+    }
+    // If no years provided, leave as null to use dropdown defaults
   }
-  
-  if (params.has('end_year')) {
-    result.end_year = params.get('end_year');
-  }
-  
-  return result;
+
+  return {
+    pollutantName,
+    groupNames,
+    startYear,
+    endYear
+  };
 }
 
-async function init(){
+/**
+ * Setup event listeners for interactive controls
+ */
+function setupEventListeners() {
+  // Smoothing toggle button
+  const toggleSmoothBtn = document.getElementById('toggleSmoothBtn');
+  if (toggleSmoothBtn) {
+    toggleSmoothBtn.addEventListener('click', () => {
+      smoothLines = !smoothLines;
+      window.smoothLines = smoothLines; // Keep window.smoothLines in sync
+      toggleSmoothBtn.textContent = smoothLines ? '🚫 Disable Smoothing' : '✅ Enable Smoothing';
+      updateChart();
+    });
+  }
+
+  // CSV download button
+  const downloadCSVBtn = document.getElementById('downloadCSVBtn');
+  if (downloadCSVBtn) {
+    downloadCSVBtn.addEventListener('click', () => exportData('csv'));
+  }
+
+  // Excel download button
+  const downloadXLSXBtn = document.getElementById('downloadXLSXBtn');
+  if (downloadXLSXBtn) {
+    downloadXLSXBtn.addEventListener('click', () => exportData('xlsx'));
+  }
+}
+
+/**
+ * Main initialization function.
+ * This is the entry point for the application.
+ */
+async function init() {
   try {
-    console.log("🔄 Initializing Supabase data...");
+    // First, load all necessary data from Supabase
+    const { pollutants, groups, yearKeys, pollutantUnits, groupedData } = await window.supabase.loadData();
+
+    // Store data on the window object for global access
+    window.allPollutants = pollutants;
+    window.allGroups = groups;
+    window.globalYearKeys = yearKeys;
+    window.globalYears = yearKeys.map(key => key.substring(1));
+    window.pollutantUnits = pollutantUnits;
+    window.groupedData = groupedData;
     
-    // Track page load
-    trackAnalytics('page_load', {
-      version: 'v2.3 Modular CIC-testdb',
-      load_time: Date.now(),
-      screen_resolution: screen.width + 'x' + screen.height,
-      viewport: window.innerWidth + 'x' + window.innerHeight
-    });
-    
-    // --- Load all data once ---
-    await loadUnits();
-    await loadData();
-    await loadGroupInfo();
+    // Then, set up the UI selectors with the loaded data
+    setupSelectors(pollutants, groups);
 
-    // --- Populate dropdowns ---
-    setupSelectors();
+    // Load group information table
+    await window.supabase.loadGroupInfo();
 
-    // Check if this is a shared URL that needs processing
-    const urlParams = parseUrlParameters();
-    const isSharedUrl = urlParams.pollutant_id || urlParams.group_ids || urlParams.start_year || urlParams.end_year;
-
-    // For normal URLs, do all DOM setup BEFORE showing UI
-    if (!isSharedUrl) {
-      // Set default pollutant
-      const pollutantSelect = document.getElementById("pollutantSelect");
-      if (pollutantSelect.querySelector("option[value=\"PM2.5\"]")) {
-        pollutantSelect.value = "PM2.5";
-      }
-
-      // Add default group selector EARLY (before any UI transitions)
-      const firstGroup = (window.allGroupsList || []).find(g => g.toLowerCase() === "all") || (window.allGroupsList?.[0] || "");
-      if (firstGroup) {
-        addGroupSelector(firstGroup, false);
-      } else {
-        addGroupSelector("", true); // Empty placeholder if no groups available
-      }
-
-      const revealPromise = revealMainContent();
-
-
-      setupSmoothingToggle();
-      setupShareButton();
-      setupInteractionTracking();
-      document.getElementById("downloadCSVBtn").addEventListener("click", () => exportData("csv"));
-      document.getElementById("downloadXLSXBtn").addEventListener("click", () => exportData("xlsx"));
-
-      await revealPromise;
-      return; // Skip URL processing for normal URLs
-    }
-
-    // --- Process shared URL parameters ---    
-    const pollutantSelect = document.getElementById('pollutantSelect');
-    
-    // Set pollutant from URL or default to PM2.5
-    if (urlParams.pollutant_id) {
-      // Find pollutant name by ID
-      const pollutantData = pollutantsData.find(pd => 
-        pd.id === parseInt(urlParams.pollutant_id)
-      );
-      
-      if (pollutantData) {
-        const pollutantName = pollutantData.Pollutant || pollutantData.pollutant;
-        if (pollutantName) {
-          pollutantSelect.value = pollutantName;
-          console.log(`🔗 Loaded pollutant from URL: ${pollutantName} (ID: ${urlParams.pollutant_id})`);
-          
-          // Track shared URL usage
-          trackAnalytics('shared_url_load', {
-            pollutant_id: urlParams.pollutant_id,
-            pollutant_name: pollutantName,
-            group_ids: urlParams.group_ids || 'none',
-            start_year: urlParams.start_year || '',
-            end_year: urlParams.end_year || '',
-            has_year_range: !!(urlParams.start_year && urlParams.end_year)
-          });
-        }
-      }
-    } else {
-      // Default behavior
-      const pm25 = pollutantSelect.querySelector('option[value="PM2.5"]');
-      if (pm25) pollutantSelect.value = "PM2.5";
-      else if (pollutantSelect.options.length > 1) pollutantSelect.selectedIndex = 1;
-    }
-
-    // Handle group selection from URL or use defaults
-    const groupContainer = document.getElementById('groupContainer');
-    
-    if (urlParams.group_ids && urlParams.group_ids.length > 0) {
-      // Load groups from URL parameters
-      console.log(`🔗 Loading groups from URL: ${urlParams.group_ids.join(', ')}`);
-      
-      // Clear any existing group selectors
-      groupContainer.innerHTML = '';
-      
-      // Add group selectors for each ID in URL
-      urlParams.group_ids.forEach(groupId => {
-        const groupData = groupsData.find(gd => gd.id === parseInt(groupId));
-        if (groupData) {
-          const groupName = groupData.Group_Title || groupData.group_title;
-          if (groupName) {
-            addGroupSelector(groupName, false);
-          }
-        }
-      });
-      
-      // If no valid groups were found from IDs, fall back to default
-      if (groupContainer.querySelectorAll('select').length === 0) {
-        console.warn('🚫 No valid groups found from URL IDs, using default');
-        const defaultGroup = (window.allGroupsList || []).find(g => g.toLowerCase() === "all") || (window.allGroupsList?.[0] || "");
-        if (defaultGroup) addGroupSelector(defaultGroup, false);
-        else addGroupSelector("", true);
-      }
-    } else {
-      // Default behavior when no URL groups
-      let firstGroup = (window.allGroupsList || []).find(g => g.toLowerCase() === "all")
-        || (window.allGroupsList?.[0] || "");
-
-      // If group list is empty or doesn't contain "All", fall back to groups discovered in groupedData
-      if (!firstGroup) {
-        // try groups for selected pollutant first
-        const chosenPoll = pollutantSelect.value || window.allPollutants?.[0];
-        const groupsForPoll = chosenPoll ? Object.keys(groupedData[chosenPoll] || {}) : [];
-        firstGroup = groupsForPoll[0] || (Object.values(groupedData).flatMap(p => Object.keys(p))[0] || "");
-      }
-
-      // If still no firstGroup but there's at least one group in window.allGroupsList, use that
-      if (!firstGroup && window.allGroupsList && window.allGroupsList.length) {
-        firstGroup = window.allGroupsList[0];
-      }
-
-      // Add a selector only if there isn't one already
-      if (document.querySelectorAll('#groupContainer select').length === 0) {
-        if (firstGroup) addGroupSelector(firstGroup, false);
-        else addGroupSelector("", true);
-      } else {
-        // If selector exists but has no selection, try to set it
-        const existingSel = document.querySelector('#groupContainer select');
-        if (existingSel && !existingSel.value && firstGroup) existingSel.value = firstGroup;
-      }
-    }
-    
-    // --- Set year range from URL parameters ---
-    const startYearSelect = document.getElementById('startYear');
-    const endYearSelect = document.getElementById('endYear');
-    
-    if (urlParams.start_year && startYearSelect) {
-      const startOption = startYearSelect.querySelector(`option[value="${urlParams.start_year}"]`);
-      if (startOption) {
-        startYearSelect.value = urlParams.start_year;
-        console.log(`🔗 Set start year from URL: ${urlParams.start_year}`);
-      }
-    }
-    
-    if (urlParams.end_year && endYearSelect) {
-      const endOption = endYearSelect.querySelector(`option[value="${urlParams.end_year}"]`);
-      if (endOption) {
-        endYearSelect.value = urlParams.end_year;
-        console.log(`🔗 Set end year from URL: ${urlParams.end_year}`);
-      }
-    }
-
-    // --- Chart will be drawn after UI is shown ---
-
-
-
-    // === SHOW UI for shared URLs - after URL processing ===
-    const revealPromise = revealMainContent();
-
-
-    setupSmoothingToggle();
+    // Set up event listeners for buttons
+    setupEventListeners();
     setupShareButton();
-    setupInteractionTracking();
-    document.getElementById("downloadCSVBtn").addEventListener("click", () => exportData("csv"));
-    document.getElementById("downloadXLSXBtn").addEventListener("click", () => exportData("xlsx"));
 
-    await revealPromise;
-  } catch (err) {
-    console.error("❌ Initialization failed:", err);
-    document.getElementById('loadingOverlay').innerHTML =
-      '<div style="color:#900;font-weight:700">Failed to load Supabase data — check connection or table names.</div>';
-  }
+    // Then, render the initial view based on URL parameters or defaults
+    await renderInitialView();
 
-}
+    // Finally, reveal the main content and draw the chart
+    await revealMainContent();
 
-function setupInteractionTracking() {
-  // Track "How to Use" section interactions
-  const howToUseDetails = document.querySelector('details');
-  if (howToUseDetails) {
-    howToUseDetails.addEventListener('toggle', () => {
-      if (howToUseDetails.open) {
-        trackAnalytics('ui_interaction', {
-          element: 'how_to_use_section',
-          action: 'opened'
-        });
-      }
-    });
-  }
-
-  // Track "Group Info" section interactions
-  const groupInfoDetails = document.querySelectorAll('details')[1]; // Second details element
-  if (groupInfoDetails) {
-    groupInfoDetails.addEventListener('toggle', () => {
-      if (groupInfoDetails.open) {
-        trackAnalytics('ui_interaction', {
-          element: 'group_info_section',
-          action: 'opened'
-        });
-      }
-    });
-  }
-
-  // Track smoothing toggle clicks
-  const smoothBtn = document.getElementById('toggleSmoothBtn');
-  if (smoothBtn) {
-    smoothBtn.addEventListener('click', () => {
-      trackAnalytics('ui_interaction', {
-        element: 'smoothing_toggle',
-        action: 'clicked',
-        new_state: !smoothLines ? 'enabled' : 'disabled'
-      });
-    });
+  } catch (error) {
+    console.error("Initialization failed:", error);
+    const loadingOverlay = document.getElementById('loadingOverlay');
+    loadingOverlay.innerHTML = `<p>Error loading data. Please check the console and refresh the page.</p><p>${error.message}</p>`;
+    loadingOverlay.style.opacity = '1';
   }
 }
 
-function setupSmoothingToggle() {
-  const btn = document.getElementById('toggleSmoothBtn');
-  btn.addEventListener('click', () => {
-    smoothLines = !smoothLines;
-    window.smoothLines = smoothLines; // Keep window.smoothLines in sync
-    btn.textContent = smoothLines ? '🚫 Disable Smoothing' : '✅ Enable Smoothing';
-    updateChart();
-  });
-}
-
-// Initialize the application when DOM is ready
-document.addEventListener('DOMContentLoaded', () => google.charts.setOnLoadCallback(init));
+// Initialise on DOM ready
+document.addEventListener('DOMContentLoaded', init);

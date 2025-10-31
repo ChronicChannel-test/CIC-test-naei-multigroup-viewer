@@ -95,6 +95,14 @@ function generateUserFingerprint() {
   return userFingerprint;
 }
 
+// Create the main export object for this module
+window.supabase = {
+  client: supabase,
+  loadData,
+  loadGroupInfo,
+  trackAnalytics,
+};
+
 /**
  * Track analytics events to Supabase
  * @param {string} eventType - Type of event to track
@@ -179,18 +187,18 @@ async function loadData() {
   const rows = dataResp.data || [];
   
   // Store globally for URL parameter lookups
-  pollutantsData = pollutants;
-  groupsData = groups;
+  window.allPollutantsData = pollutants;
+  window.allGroupsData = groups;
 
   // Build ID -> name maps for joins
   const pollutantIdToName = {};
   pollutants.forEach(p => {
     const id = p.id;
-    const name = p.Pollutant || p.pollutant || p['Pollutant'] || p['pollutant'];
+    const name = p.pollutant;
     if (name) {
       pollutantIdToName[id] = name;
-      // capture unit if present
-      const unit = p["Emission Unit"] || p["emission unit"] || p['Emission Unit'] || p.emission_unit || '';
+      // Capture emission unit
+      const unit = p.emission_unit || '';
       if (unit) pollutantUnits[name] = unit;
     }
   });
@@ -198,7 +206,7 @@ async function loadData() {
   const groupIdToTitle = {};
   groups.forEach(g => {
     const id = g.id;
-    const title = g.Group_Title || g.group_title || g['Group_Title'] || g.group_title;
+    const title = g.group_title;
     if (title) groupIdToTitle[id] = title;
   });
 
@@ -220,7 +228,7 @@ async function loadData() {
     window.globalYearKeys = [];
     groupedData = {};
     console.log('No timeseries rows found in NAEI_2023ds_t_Group_Data');
-    return;
+    return { pollutants, groups };
   }
 
   // Ensure consistent header ordering (f1970 ... f2023)
@@ -233,8 +241,8 @@ async function loadData() {
   // Build groupedData using FK ids and the lookup maps
   groupedData = {};
   rows.forEach(r => {
-    const polId = r.Pollutant_id ?? r.pollutant_id ?? r.PollutantId ?? r.pollutantid;
-    const grpId = r.Group_id ?? r.group_id ?? r.GroupId ?? r.groupid;
+    const polId = r.pollutant_id;
+    const grpId = r.group_id;
     const polName = pollutantIdToName[polId];
     const grpName = groupIdToTitle[grpId];
     if (!polName || !grpName) return;
@@ -255,6 +263,9 @@ async function loadData() {
   }
 
   console.log(`Loaded ${rows.length} timeseries rows; ${allPollutants.length} pollutants; ${allGroups.length} groups`);
+  
+  // Return all the processed data for init() to use
+  return { pollutants, groups, yearKeys: headers, pollutantUnits, groupedData };
 }
 
 /**
@@ -268,7 +279,7 @@ async function loadGroupInfo() {
     if (supabase) {
       const { data: supabaseGroups, error: groupError } = await supabase
         .from('NAEI_global_t_Group')
-        .select('id,Group_Title,SourceName,ActivityName,NFRCode');
+        .select('id,group_title,source_name,activity_name,nfr_code');
 
       if (groupError) {
         console.warn('Failed to load group info from Supabase:', groupError);
@@ -303,8 +314,8 @@ async function loadGroupInfo() {
 
     const nfrMap = {};
     nfrRows.forEach(nfr => {
-      const code = nfr?.NFRCode || nfr?.nfrcode || nfr?.nfr_code;
-      const description = nfr?.Description || nfr?.description;
+      const code = nfr.nfr_code;
+      const description = nfr.description;
       if (code && description) {
         nfrMap[code] = description;
       }
@@ -313,10 +324,10 @@ async function loadGroupInfo() {
     const groupMap = {};
 
     groupRows.forEach(row => {
-      const groupTitle = row?.Group_Title || row?.group_title || row?.Group || row?.group;
-      const sourceName = row?.SourceName || row?.source_name || row?.Source || row?.source;
-      const activityName = row?.ActivityName || row?.activity_name || row?.Activity || row?.activity;
-      const nfrCodeField = row?.NFRCode || row?.nfrcode || row?.nfr_code;
+      const groupTitle = row.group_title;
+      const sourceName = row.source_name;
+      const activityName = row.activity_name;
+      const nfrCodeField = row.nfr_code;
 
       if (!groupTitle) return;
 
@@ -384,19 +395,19 @@ async function loadGroupInfo() {
           validNfrCodes.forEach(code => {
             const description = nfrMap[code];
             if (description && description !== 'NULL') {
-              sourcesHTML += `${code}: ${description}\n`;
+              sourcesHTML += `${code}: ${description}\\n`;
             } else {
-              sourcesHTML += `${code}\n`;
+              sourcesHTML += `${code}\\n`;
             }
           });
           sourcesHTML += `</div>`;
         } else {
           const validSources = g.sources.filter(s => s != null && s !== '' && s !== 'NULL');
-          sourcesHTML = validSources.length ? validSources.join('\n') : 'All Sources';
+          sourcesHTML = validSources.length ? validSources.join('\\n') : 'All Sources';
         }
 
       const validActivities = g.activities.filter(a => a != null && a !== '' && a !== 'NULL');
-      const activitiesText = validActivities.length ? validActivities.join('\n') : 'All Fuel Types';
+      const activitiesText = validActivities.length ? validActivities.join('\\n') : 'All Fuel Types';
 
       html += `
         <tr style="border:1px solid #444;">
@@ -422,3 +433,4 @@ async function loadGroupInfo() {
       "<p class='text-red-600'>⚠️ Could not load group or NFRCodes information.</p>";
   }
 }
+
