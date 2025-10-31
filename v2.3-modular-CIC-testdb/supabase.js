@@ -395,19 +395,19 @@ async function loadGroupInfo() {
           validNfrCodes.forEach(code => {
             const description = nfrMap[code];
             if (description && description !== 'NULL') {
-              sourcesHTML += `${code}: ${description}\\n`;
+              sourcesHTML += `${code}: ${description}\n`;
             } else {
-              sourcesHTML += `${code}\\n`;
+              sourcesHTML += `${code}\n`;
             }
           });
           sourcesHTML += `</div>`;
         } else {
           const validSources = g.sources.filter(s => s != null && s !== '' && s !== 'NULL');
-          sourcesHTML = validSources.length ? validSources.join('\\n') : 'All Sources';
+          sourcesHTML = validSources.length ? validSources.join('\n') : 'All Sources';
         }
 
       const validActivities = g.activities.filter(a => a != null && a !== '' && a !== 'NULL');
-      const activitiesText = validActivities.length ? validActivities.join('\\n') : 'All Fuel Types';
+      const activitiesText = validActivities.length ? validActivities.join('\n') : 'All Fuel Types';
 
       html += `
         <tr style="border:1px solid #444;">
