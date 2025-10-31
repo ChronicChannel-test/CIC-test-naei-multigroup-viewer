@@ -567,6 +567,16 @@ footer a:hover {
 	  
 	    .kofi-button {
 	      width: 35px;      /* Adjust button width */
+	      transition: none; /* Disable transition on mobile */
+    }
+    
+    /* Disable hover expansion on mobile */
+    .kofi-wrapper:hover .kofi-button {
+      width: 35px; /* Keep original width, don't expand */
+    }
+    
+    .kofi-wrapper:hover .kofi-text {
+      opacity: 0; /* Keep text hidden */
     }
   
 	.kofi-button img {
