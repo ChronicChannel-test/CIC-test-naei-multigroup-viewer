@@ -98,6 +98,14 @@
   </style>
 
   <script>
+    // Detect Opera browser and add a class for Opera-specific styling
+    (function() {
+      const isOpera = (!!window.opr && !!window.opr.addons) || !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0;
+      if (isOpera) {
+        document.documentElement.classList.add('opera-browser');
+      }
+    })();
+    
     // Load Quick Start Guide content
     fetch('quick-start.html')
       .then(response => response.text())

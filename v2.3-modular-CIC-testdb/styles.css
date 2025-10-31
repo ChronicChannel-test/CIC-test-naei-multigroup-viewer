@@ -450,7 +450,7 @@ footer a:hover {
 }
 
 .kofi-wrapper:hover .kofi-button {
-  width: 295px; /* Expand to this width on wrapper hover */
+  width: 295px; /* Reset to default max width */
 }
 
 .kofi-icon-svg {
@@ -475,6 +475,16 @@ footer a:hover {
   opacity: 1;
 }
 
+/* Opera-specific fix: make button wider and text smaller to accommodate text properly */
+.opera-browser .kofi-wrapper:hover .kofi-button {
+  width: 295px; /* Reset to default max width for Opera */
+}
+
+@supports (-webkit-appearance: none) {
+  .kofi-button .kofi-text {
+    font-size: 16px;
+  }
+}
 
 /* Mobile styles */
 @media (max-width: 768px) {
@@ -608,6 +618,16 @@ footer a:hover {
   .chart-wrapper {
     width: 100%;
     max-width: 100%;
+  }
+}
+
+@media (max-width: 620px) {
+  .opera-browser .kofi-wrapper:hover .kofi-button {
+    width: 35px; /* Prevent expansion on narrow screens */
+  }
+
+  .opera-browser .kofi-wrapper:hover .kofi-text {
+    opacity: 0; /* Keep text hidden */
   }
 }
 
