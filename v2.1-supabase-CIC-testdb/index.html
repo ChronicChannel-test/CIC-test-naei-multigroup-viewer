@@ -594,7 +594,7 @@ function getColorForGroup(name) {
 
 // --- Replace Google Sheets data load with Supabase ---
 async function loadUnits() {
-  const { data, error } = await supabase.from('NAEI_global_Pollutants').select('*');
+  const { data, error } = await supabase.from('NAEI_global_Pollutants_legacy').select('*');
   if (error) throw error;
   pollutantUnits = {};
   data.forEach(r => {
@@ -611,9 +611,9 @@ async function loadData() {
 
   // Fetch pollutants, groups, and the timeseries table separately.
   const [pollutantsResp, groupsResp, dataResp] = await Promise.all([
-    supabase.from('NAEI_global_Pollutants').select('*'),
-    supabase.from('NAEI_global_t_Group').select('*'),
-    supabase.from('NAEI_2023ds_t_Group_Data').select('*')  // Now fetches all rows due to project setting
+    supabase.from('NAEI_global_Pollutants_legacy').select('*'),
+    supabase.from('NAEI_global_t_Group_legacy').select('*'),
+    supabase.from('NAEI_2023ds_t_Group_Data_legacy').select('*')  // Now fetches all rows due to project setting
   ]);
 
   if (pollutantsResp.error) throw pollutantsResp.error;
@@ -668,7 +668,7 @@ async function loadData() {
     window.globalYears = [];
     window.globalYearKeys = [];
     groupedData = {};
-    console.log('No timeseries rows found in NAEI_2023ds_t_Group_Data');
+    console.log('No timeseries rows found in NAEI_2023ds_t_Group_Data_legacy');
     return;
   }
 
@@ -701,7 +701,7 @@ async function loadData() {
       return a.localeCompare(b);
     });
     window.allGroupsList = allGroups;
-    console.warn('Groups list was empty from NAEI_global_t_Group — falling back to groups found in timeseries rows.');
+    console.warn('Groups list was empty from NAEI_global_t_Group_legacy — falling back to groups found in timeseries rows.');
   }
 
   console.log(`Loaded ${rows.length} timeseries rows; ${allPollutants.length} pollutants; ${allGroups.length} groups`);
@@ -2184,7 +2184,7 @@ async function loadGroupInfo() {
 
     if (supabase) {
       const { data: supabaseGroups, error: groupError } = await supabase
-        .from('NAEI_global_t_Group')
+        .from('NAEI_global_t_Group_legacy')
         .select('id,Group_Title,SourceName,ActivityName,NFRCode');
 
       if (groupError) {
@@ -2195,7 +2195,7 @@ async function loadGroupInfo() {
 
       try {
         const { data: supabaseNfr, error: nfrError } = await supabase
-          .from('NAEI_global_t_NFRCode')
+          .from('NAEI_global_t_NFRCode_legacy')
           .select('*');
 
         if (nfrError) {
