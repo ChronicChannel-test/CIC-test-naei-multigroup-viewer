@@ -704,9 +704,9 @@ function updateChart(){
       viewWindow: { min: 0 },
       textStyle: { fontSize: 12 },
       titleTextStyle: {
-        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 11 : 13, // Adjust font size for landscape mode on mobile
+        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 12 : 14, // Slightly larger font for better readability
         bold: true,
-        wrap: true // Ensure wrapping is enabled
+        wrap: false // Disable wrapping to prevent splitting unnecessarily
       }
     },
     series: seriesOptions,
