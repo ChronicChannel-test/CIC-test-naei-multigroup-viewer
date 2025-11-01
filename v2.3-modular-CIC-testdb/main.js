@@ -707,7 +707,8 @@ function updateChart(){
         fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 12 : 14, // Slightly larger font for better readability
         bold: true,
         wrap: false // Disable wrapping to prevent splitting unnecessarily
-      }
+      },
+      textPosition: 'out', // Ensure title is positioned outside to avoid overlap
     },
     series: seriesOptions,
     curveType: smoothLines ? 'function' : 'none',
