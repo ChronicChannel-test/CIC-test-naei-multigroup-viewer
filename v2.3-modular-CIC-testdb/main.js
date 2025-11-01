@@ -703,7 +703,11 @@ function updateChart(){
       title: `Emissions${unit ? " (" + unit + ")" : ""}`,
       viewWindow: { min: 0 },
       textStyle: { fontSize: 12 },
-      titleTextStyle: { fontSize: 13, bold: true }
+      titleTextStyle: {
+        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 11 : 13, // Adjust font size for landscape mode on mobile
+        bold: true,
+        wrap: true // Ensure wrapping is enabled
+      }
     },
     series: seriesOptions,
     curveType: smoothLines ? 'function' : 'none',
@@ -713,7 +717,7 @@ function updateChart(){
       top: 20,
       left: leftMargin,
       right: 10,
-      bottom: 60,
+      bottom: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 80 : 60, // Add extra bottom padding for landscape mode
       height: '70%'
     }
   };
