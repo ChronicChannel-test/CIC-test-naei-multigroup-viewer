@@ -570,7 +570,7 @@ async function generateChartImage() {
           // --- 5. Draw Logo and Footer, then resolve ---
           const logo = new Image();
           logo.crossOrigin = 'anonymous';
-          logo.src = 'CIC - Square - Border - Words - Alpha 360x360.png';
+          logo.src = 'images/CIC - Square - Border - Words - Alpha 360x360.png';
 
           const finishGeneration = () => {
             ctx.font = '28px system-ui, sans-serif';
@@ -629,7 +629,7 @@ async function generateChartImage() {
 
           logo.onload = () => {
             try {
-              const logoSize = 200; // Larger logo
+              const logoSize = 200; // Adjust logo size
               ctx.drawImage(logo, canvasWidth - logoSize - 30, 30, logoSize, logoSize);
             } catch (e) {
               console.warn('Logo failed to draw, continuing without logo:', e);
