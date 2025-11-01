@@ -596,7 +596,7 @@ async function generateChartImage() {
             }
 
             const channelY = footerY + 40;
-            const boldText = "Youtube: ";
+            const boldText = "Youtube: "; // Reverted text to 'Youtube:'
             const normalText = "youtube.com/@chronicillnesschannel";
             
             ctx.font = 'bold 28px system-ui, sans-serif';
