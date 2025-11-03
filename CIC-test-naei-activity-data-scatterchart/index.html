@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>NAEI Activity Data Scatter Chart</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="../Shared Resources/images/favicon.png">
+  <link rel="apple-touch-icon" href="../Shared Resources/images/favicon.png">
+
+  <!-- Social preview / link preview meta tags -->
+  <meta name="description" content="NAEI Activity Data Scatter Chart">
+  <!-- Open Graph (Facebook, LinkedIn, Slack, etc.) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="NAEI Activity Data Scatter Chart">
+  <meta property="og:description" content="Visualize the relationship between activity data and pollutant emissions from NAEI sources. Interactive scatter charts with PNG export.">
+  <meta property="og:url" content="https://github.com/Chronic-Illness-Channel/naei-activity-data-scatterchart">
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="NAEI Activity Data Scatter Chart">
+  <meta name="twitter:description" content="Visualize activity data vs pollutant emissions from NAEI sources.">
+  <meta name="twitter:site" content="@Chronic_Channel">
+  <meta name="twitter:creator" content="@Chronic_Channel">
+
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  
+  <!-- Shared styles -->
+  <link rel="stylesheet" href="../Shared Resources/common-styles.css">
+  <link rel="stylesheet" href="styles.css">
+  
+  <!-- External libraries -->
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+
+<body>
+  <div id="loadingOverlay">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="loading-text">Loading data, please wait…</div>
+  </div>
+
+  <div id="mainContent" aria-hidden="true">
+    <div id="mainContentTop">
+      <div class="title-row">
+        <div class="sidebar-socials">
+          <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" style="cursor:pointer;">
+            <img id="cicLogo" src="../Shared Resources/images/CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
+          </a>
+          <div class="sidebar-icons">
+            <a href="https://bsky.app/profile/chronicillnesschannel.bsky.social" class="sidebar-link" target="_blank" rel="noopener">
+              <img src="../Shared Resources/images/Bluesky_Logo.svg" alt="Bluesky">
+            </a>
+            <a href="https://twitter.com/Chronic_Channel" class="sidebar-link" target="_blank" rel="noopener">
+              <img src="../Shared Resources/images/Twitter dead bird with X.svg" alt="X (Twitter)">
+            </a>
+            <a href="https://www.facebook.com/ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
+              <img src="../Shared Resources/images/facebook.svg" alt="Facebook">
+            </a>
+            <a href="https://www.youtube.com/@ChronicIllnessChannel" class="sidebar-link" target="_blank" rel="noopener">
+              <img src="../Shared Resources/images/youtube-logo-6.svg" alt="YouTube">
+            </a>
+          </div>
+        </div>
+
+        <h1 class="main-title">
+          <span class="title-part">NAEI Activity Data</span>
+          <span class="title-part">Scatter Chart</span>
+        </h1>
+      </div>
+
+      <!-- Year and Pollutant selection -->
+      <div class="controls-wrapper">
+        <label for="yearSelect">Year:</label>
+        <select id="yearSelect">
+          <option value="">Select year</option>
+        </select>
+
+        <label for="pollutantSelect">Pollutant:</label>
+        <select id="pollutantSelect">
+          <option value="">Select pollutant</option>
+        </select>
+      </div>
+
+      <!-- Group selection -->
+      <div>
+        <h2>Select Groups (up to 10):</h2>
+        <div id="groupContainer"></div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="button-row">
+        <button id="drawBtn">Draw Chart</button>
+        <button id="shareBtn" disabled>🔗 Share</button>
+        <button id="downloadBtn" disabled>📥 Download PNG</button>
+      </div>
+
+      <!-- Chart area -->
+      <div class="chart-wrapper">
+        <div id="chartTitle"></div>
+        <div id="chart_div"></div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <footer style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ccc; text-align: center;">
+      <p style="margin: 10px 0;">
+        Data from 
+        <a href="https://naei.beis.gov.uk/" target="_blank" rel="noopener">UK National Atmospheric Emissions Inventory (NAEI)</a>
+      </p>
+      <p style="margin: 10px 0;">
+        <a href="https://ko-fi.com/chronicillnesschannel" target="_blank" rel="noopener" style="display: inline-flex; align-items: center; gap: 8px; text-decoration: none; color: #29abe0; font-weight: 600;">
+          <img src="../Shared Resources/images/kofi_symbol.png" alt="Ko-fi" style="width: 24px; height: 24px;">
+          Support on Ko-fi
+        </a>
+      </p>
+    </footer>
+  </div>
+
+  <!-- Load shared resources -->
+  <script src="../Shared Resources/supabase-config.js"></script>
+  <script src="../Shared Resources/analytics.js"></script>
+  <script src="../Shared Resources/colors.js"></script>
+  
+  <!-- Load application modules -->
+  <script src="data-loader.js"></script>
+  <script src="chart-renderer.js"></script>
+  <script src="export.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
