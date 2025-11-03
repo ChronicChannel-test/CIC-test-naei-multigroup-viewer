@@ -682,8 +682,33 @@ function updateChart(){
   const maxValue = Math.max(
     ...chartRows.flatMap(r => r.slice(1).filter(v => typeof v === "number"))
   );
-  const labelLength = maxValue ? maxValue.toLocaleString().length : 3;
-  const leftMargin = Math.min(100, Math.max(60, labelLength * 10)); // dynamic left padding
+  
+  // Determine how Google Charts will format the label based on value magnitude
+  let labelString;
+  if (maxValue >= 100) {
+    // Large values: Google Charts shows as integers or 1 decimal
+    labelString = Math.round(maxValue).toString();
+  } else if (maxValue >= 1) {
+    // Medium values: shows 1-2 decimals
+    labelString = maxValue.toFixed(1);
+  } else if (maxValue >= 0.01) {
+    // Small values: shows 2-3 decimals
+    labelString = maxValue.toFixed(3);
+  } else if (maxValue >= 0.0001) {
+    // Very small values: Google Charts typically shows 6 significant figures
+    labelString = maxValue.toFixed(6);
+  } else {
+    // Extremely small values: use scientific notation estimate
+    labelString = maxValue.toExponential(2); // e.g., "1.23e-7"
+  }
+  
+  const labelLength = labelString.length;
+  // Dynamic left margin: scale based on label length
+  // For short labels (1-3 chars): 60px base
+  // For longer labels: add 6px per character beyond 3 (reduced from 7px)
+  const baseMargin = 60;
+  const extraChars = Math.max(0, labelLength - 3);
+  const leftMargin = Math.min(140, baseMargin + (extraChars * 6)); // dynamic left padding
 
   const chartContainer = document.getElementById('chart_div');
 
