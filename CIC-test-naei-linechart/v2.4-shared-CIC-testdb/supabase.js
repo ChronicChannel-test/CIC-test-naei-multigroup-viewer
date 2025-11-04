@@ -4,12 +4,21 @@
  * v2.4 - Now uses shared resources
  */
 
-// Initialize Supabase client using shared configuration
-const supabase = window.SupabaseConfig.initSupabaseClient();
+// Initialize Supabase client and analytics lazily to avoid dependency issues
+let supabase = null;
 let supabaseUnavailableLogged = false;
+let localSessionId = null;
 
-// Analytics session tracking (uses shared Analytics module)
-let sessionId = window.Analytics.getSessionId();
+// Initialize client and session ID when first needed
+function ensureInitialized() {
+  if (!supabase && window.SupabaseConfig) {
+    supabase = window.SupabaseConfig.initSupabaseClient();
+  }
+  if (!localSessionId && window.Analytics) {
+    localSessionId = window.Analytics.getSessionId();
+  }
+  return supabase;
+}
 
 // Global data storage
 let globalRows = [];
@@ -22,14 +31,6 @@ let allGroups = [];
 let pollutantsData = []; // Store raw pollutant data for ID lookups
 let groupsData = []; // Store raw group data for ID lookups
 
-// Create the main export object for this module
-window.supabase = {
-  client: supabase,
-  loadData,
-  loadGroupInfo,
-  trackAnalytics,
-};
-
 /**
  * Track analytics events to Supabase (wrapper for shared Analytics module)
  * @param {string} eventName - Type of event to track
@@ -37,14 +38,21 @@ window.supabase = {
  */
 async function trackAnalytics(eventName, details = {}) {
   // Use shared Analytics module
-  await window.Analytics.trackAnalytics(supabase, eventName, details);
+  const client = ensureInitialized();
+  if (client && window.Analytics) {
+    await window.Analytics.trackAnalytics(client, eventName, details);
+  }
 }
 
 /**
  * Load pollutant units from Supabase
  */
 async function loadUnits() {
-  const { data, error } = await supabase.from('NAEI_global_Pollutants').select('*');
+  const client = ensureInitialized();
+  if (!client) {
+    throw new Error('Supabase client not available');
+  }
+  const { data, error } = await client.from('NAEI_global_Pollutants').select('*');
   if (error) throw error;
   pollutantUnits = {};
   data.forEach(r => {
@@ -57,25 +65,58 @@ async function loadUnits() {
 }
 
 /**
- * Load all data from Supabase (pollutants, groups, timeseries)
+ * Load all data from Supabase (using shared data loader)
  */
 async function loadData() {
-  console.log("Fetching data from Supabase (separate tables for robustness)...");
+  console.log("Loading line chart data using shared data loader...");
 
-  // Fetch pollutants, groups, and the timeseries table separately
-  const [pollutantsResp, groupsResp, dataResp] = await Promise.all([
-    supabase.from('NAEI_global_Pollutants').select('*'),
-    supabase.from('NAEI_global_t_Group').select('*'),
-    supabase.from('NAEI_2023ds_t_Group_Data').select('*')
-  ]);
+  // Check if parent window has shared data loader
+  let sharedLoader = null;
+  try {
+    if (window.parent && window.parent.SharedDataLoader) {
+      sharedLoader = window.parent.SharedDataLoader;
+      console.log("Using parent window's shared data loader");
+    } else if (window.SharedDataLoader) {
+      sharedLoader = window.SharedDataLoader;
+      console.log("Using local shared data loader");
+    }
+  } catch (e) {
+    console.log("Cannot access parent window, using fallback data loading");
+  }
 
-  if (pollutantsResp.error) throw pollutantsResp.error;
-  if (groupsResp.error) throw groupsResp.error;
-  if (dataResp.error) throw dataResp.error;
+  let pollutants, groups, rows;
 
-  const pollutants = pollutantsResp.data || [];
-  const groups = groupsResp.data || [];
-  const rows = dataResp.data || [];
+  if (sharedLoader && sharedLoader.isDataLoaded()) {
+    // Use cached data from shared loader
+    console.log("Using cached data from shared loader");
+    const cachedData = sharedLoader.getCachedData();
+    pollutants = cachedData.pollutants;
+    groups = cachedData.groups;
+    rows = cachedData.timeseries;
+  } else if (sharedLoader) {
+    // Load data through shared loader
+    console.log("Loading data through shared loader");
+    try {
+      const sharedData = await sharedLoader.loadSharedData();
+      pollutants = sharedData.pollutants;
+      groups = sharedData.groups;
+      rows = sharedData.timeseries;
+    } catch (error) {
+      console.error("Failed to load through shared loader, falling back to direct loading:", error);
+      // Fallback to direct loading
+      const result = await loadDataDirectly();
+      pollutants = result.pollutants;
+      groups = result.groups;
+      rows = result.rows;
+    }
+  } else {
+    // Fallback to direct loading
+    console.log("No shared loader available, loading data directly");
+    const result = await loadDataDirectly();
+    pollutants = result.pollutants;
+    groups = result.groups;
+    rows = result.rows;
+  }
   
   // Store globally for URL parameter lookups
   window.allPollutantsData = pollutants;
@@ -167,8 +208,9 @@ async function loadGroupInfo() {
     let groupRows = [];
     let nfrRows = [];
 
-    if (supabase) {
-      const { data: supabaseGroups, error: groupError } = await supabase
+    const client = ensureInitialized();
+    if (client) {
+      const { data: supabaseGroups, error: groupError } = await client
         .from('NAEI_global_t_Group')
         .select('id,group_title,source_name,activity_name,nfr_code');
 
@@ -179,7 +221,7 @@ async function loadGroupInfo() {
       }
 
       try {
-        const { data: supabaseNfr, error: nfrError } = await supabase
+        const { data: supabaseNfr, error: nfrError } = await client
           .from('NAEI_global_t_NFRCode')
           .select('*');
 
@@ -323,5 +365,48 @@ async function loadGroupInfo() {
     document.getElementById('group-info').innerHTML =
       "<p class='text-red-600'>⚠️ Could not load group or NFRCodes information.</p>";
   }
+}
+
+/**
+ * Fallback function for direct data loading (when shared loader fails)
+ */
+async function loadDataDirectly() {
+  console.log("Fetching data directly from Supabase...");
+
+  const client = ensureInitialized();
+  if (!client) {
+    throw new Error('Supabase client not available');
+  }
+
+  // Fetch pollutants, groups, and the timeseries table separately
+  const [pollutantsResp, groupsResp, dataResp] = await Promise.all([
+    client.from('NAEI_global_Pollutants').select('*'),
+    client.from('NAEI_global_t_Group').select('*'),
+    client.from('NAEI_2023ds_t_Group_Data').select('*')
+  ]);
+
+  if (pollutantsResp.error) throw pollutantsResp.error;
+  if (groupsResp.error) throw groupsResp.error;
+  if (dataResp.error) throw dataResp.error;
+
+  return {
+    pollutants: pollutantsResp.data || [],
+    groups: groupsResp.data || [],
+    rows: dataResp.data || []
+  };
+}
+
+// Create the main export object for this module (defined after all functions)
+try {
+  window.supabaseModule = {
+    get client() { return ensureInitialized(); },
+    loadData,
+    loadDataDirectly,
+    loadGroupInfo,
+    trackAnalytics,
+  };
+  console.log('supabaseModule initialized successfully');
+} catch (error) {
+  console.error('Failed to initialize supabaseModule:', error);
 }
 

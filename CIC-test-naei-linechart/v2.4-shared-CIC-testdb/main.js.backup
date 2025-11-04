@@ -4,14 +4,21 @@
  * v2.4 - Now uses shared color module
  */
 
-// Load Google Charts
-google.charts.load('current', {packages:['corechart']});
-
 // Global chart instance and state
 let chart; // global chart instance
 let seriesVisibility = [];
 window.seriesVisibility = seriesVisibility; // Expose for export.js
 let urlUpdateTimer = null; // Debounce timer for URL updates
+let googleChartsReady = false;
+let chartRenderCallback = null; // Callback for when chart finishes rendering
+let initialLoadComplete = false; // Track if initial chart load is done (prevent resize redraw)
+
+// Load Google Charts and set up callback
+google.charts.load('current', {packages:['corechart']});
+google.charts.setOnLoadCallback(() => {
+  googleChartsReady = true;
+  console.log('Google Charts loaded successfully for line chart');
+});
 
 // Export configuration constants
 const EXPORT_MIN_SCALE = 16;
@@ -21,6 +28,32 @@ const EXPORT_MAX_PIXELS = 100_000_000;
 // Chart options
 let smoothLines = true; // default to smooth (curved) lines
 window.smoothLines = smoothLines; // Expose for export.js
+
+// Listen for messages from parent
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'overlayHidden') {
+    console.log('✅ Received overlayHidden message from parent - enabling resize handler');
+    initialLoadComplete = true;
+  } else if (event.data && event.data.type === 'resizeComplete') {
+    console.log(`✅ Parent confirmed resize to ${event.data.height}px - waiting for reflow...`);
+    
+    // Wait for browser to reflow the iframe before measuring dimensions
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // Force reflow by accessing dimensions
+        const currentHeight = document.documentElement.offsetHeight;
+        const currentWidth = document.documentElement.offsetWidth;
+        console.log(`📐 After reflow - iframe dimensions: ${currentWidth}x${currentHeight}`);
+        
+        // Now render the chart
+        if (window.pendingRender) {
+          window.pendingRender();
+          window.pendingRender = null;
+        }
+      });
+    });
+  }
+});
 
 /**
  * Compute a safe export scale that respects EXPORT_MAX_DIM and EXPORT_MAX_PIXELS.
@@ -528,9 +561,18 @@ function updateUrlFromChartState() {
         `end_year=${encodeURIComponent(endYear)}`
       ];
       
-      const newUrl = `${window.location.pathname}?${queryParts.join('&')}`;
-      
-      window.history.replaceState({ path: newUrl }, '', newUrl);
+      // If we're in an iframe, send URL update to parent
+      if (window.parent && window.parent !== window) {
+        const newUrl = `?chart=1&${queryParts.join('&')}`;
+        window.parent.postMessage({
+          type: 'updateUrl',
+          url: newUrl
+        }, '*');
+      } else {
+        // Standalone mode - update our own URL
+        const newUrl = `${window.location.pathname}?${queryParts.join('&')}`;
+        window.history.replaceState({ path: newUrl }, '', newUrl);
+      }
 
     } catch (error) {
       console.error("Failed to update URL from chart state:", error);
@@ -540,6 +582,22 @@ function updateUrlFromChartState() {
 
 
 function updateChart(){
+  // Create stack trace to see where this is being called from
+  const stack = new Error().stack;
+  const caller = stack?.split('\n')[2]?.trim() || 'unknown caller';
+  console.log('🎨 updateChart() called from:', caller);
+  console.log('📚 Full stack trace:', stack);
+  
+  // Wait for Google Charts to be ready
+  if (!googleChartsReady) {
+    console.log('Google Charts not ready yet for line chart, waiting...');
+    google.charts.setOnLoadCallback(() => {
+      googleChartsReady = true;
+      updateChart();
+    });
+    return;
+  }
+
   const pollutant = document.getElementById('pollutantSelect').value;
   const startYear = +document.getElementById('startYear').value;
   const endYear = +document.getElementById('endYear').value;
@@ -550,7 +608,7 @@ function updateChart(){
   updateUrlFromChartState();
 
   // Track chart view analytics
-  trackAnalytics('chart_view', {
+  window.supabaseModule.trackAnalytics('chart_view', {
     pollutant: pollutant,
     start_year: startYear,
     end_year: endYear,
@@ -721,10 +779,22 @@ function updateChart(){
   // Add a 'ready' event listener that will fire after every draw,
   // ensuring custom labels are always present.
   google.visualization.events.addListener(chart, 'ready', addCustomXAxisLabels);
+  
+  // Add listener for chart render completion (for loading management)
+  google.visualization.events.addListener(chart, 'ready', () => {
+    if (chartRenderCallback) {
+      console.log('Line chart finished rendering');
+      chartRenderCallback();
+      chartRenderCallback = null; // Clear callback after use
+    }
+  });
 
   // Compute safe width/height to avoid negative SVG dimensions
   const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
   const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+  
+  console.log(`📊 Chart container size: ${chartContainer.offsetWidth}x${chartContainer.offsetHeight} (using ${safeWidth}x${safeHeight})`);
+  console.log(`📐 Iframe size: ${window.innerWidth}x${window.innerHeight}`);
   options.width = safeWidth;
   options.height = safeHeight;
 
@@ -749,6 +819,30 @@ function updateChart(){
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
       chartContainer.classList.add('visible');
+    }
+    
+    // After chart is drawn, update iframe height if we're in an iframe and overlay is hidden
+    // For desktop: don't send height updates, just fit within viewport
+    // For mobile: send actual content height
+    if (window.parent && window.parent !== window && initialLoadComplete && window.innerWidth < 768) {
+      setTimeout(() => {
+        // Mobile only - report actual content height
+        const contentHeight = document.body.scrollHeight;
+        const buffer = 50;
+        const newHeight = Math.ceil(contentHeight) + buffer;
+        const currentHeight = window.innerHeight;
+        
+        if (Math.abs(newHeight - currentHeight) > 20) {
+          console.log(`� Mobile - updating iframe height from ${currentHeight}px to ${newHeight}px`);
+          window.parent.postMessage({
+            type: 'iframeHeight',
+            chart: 'line',
+            height: newHeight
+          }, '*');
+        }
+      }, 250);
+    } else if (window.parent && window.parent !== window && window.innerWidth >= 768) {
+      console.log(`�️ Desktop - chart constrained to viewport, no height update needed`);
     }
   }, 100);
 
@@ -804,9 +898,55 @@ function updateChart(){
   refreshButtons();
 }
 
+// Track last resize dimensions to avoid redundant redraws
+let lastResizeWidth = window.innerWidth;
+let lastResizeHeight = window.innerHeight;
+
 window.addEventListener('resize', () => {
+  // Don't trigger chart redraws during initial load
+  if (!initialLoadComplete) {
+    console.log('⏸️ Resize event ignored during initial load');
+    return;
+  }
+  
   clearTimeout(window._resizeTimer);
-  window._resizeTimer = setTimeout(updateChart, 200);
+  window._resizeTimer = setTimeout(() => {
+    const currentWidth = window.innerWidth;
+    const currentHeight = window.innerHeight;
+    
+    const widthChanged = Math.abs(currentWidth - lastResizeWidth) > 10;
+    const heightChanged = Math.abs(currentHeight - lastResizeHeight) > 10;
+    
+    // Desktop: Only redraw on width changes (height is fixed to viewport)
+    // Mobile: Redraw on any significant dimension change
+    const isDesktop = window.innerWidth >= 768;
+    
+    if (widthChanged) {
+      console.log(`🔄 Width changed from ${lastResizeWidth} to ${currentWidth} - redrawing chart`);
+      lastResizeWidth = currentWidth;
+      lastResizeHeight = currentHeight;
+      updateChart();
+      return;
+    }
+    
+    if (!isDesktop && heightChanged) {
+      // Mobile only: allow height-based redraws
+      console.log(`🔄 Mobile height changed from ${lastResizeHeight} to ${currentHeight} - redrawing chart`);
+      lastResizeWidth = currentWidth;
+      lastResizeHeight = currentHeight;
+      updateChart();
+      return;
+    }
+    
+    if (isDesktop && heightChanged) {
+      console.log(`✅ Desktop height change ignored (${lastResizeHeight} → ${currentHeight}) - chart fits viewport`);
+      lastResizeHeight = currentHeight;
+      return;
+    }
+    
+    // No significant changes
+    console.log(`⏭️ No significant size change detected`);
+  }, 300); // Increased debounce to 300ms for smoother resizing
 });
 
 async function renderInitialView() {
@@ -857,38 +997,88 @@ async function renderInitialView() {
 
 async function revealMainContent() {
   return new Promise(resolve => {
-    const loadingOverlay = document.getElementById('loadingOverlay');
     const mainContent = document.getElementById('mainContent');
     
-    // Make content visible but keep it transparent
+    // Make content visible immediately (we're in iframe, parent handles loading)
     mainContent.style.display = 'block';
     mainContent.removeAttribute('aria-hidden');
+    mainContent.classList.add('loaded'); // Add loaded class immediately
     
-    // Render the chart while still hidden (opacity 0)
-    // This prevents the empty chart flash
-    updateChart();
+    // Estimate expected height before rendering chart
+    // This allows parent to resize iframe BEFORE we render, preventing size mismatch
+    const estimatedHeight = 1400; // Conservative estimate for chart with controls
     
-    // Wait for chart to render, then fade in together
-    setTimeout(() => {
-      // Start fade out of loading overlay
-      loadingOverlay.style.opacity = '0';
+    if (window.parent && window.parent !== window) {
+      console.log(`📏 Sending estimated iframe height: ${estimatedHeight}px (before rendering)`);
+      window.parent.postMessage({
+        type: 'iframeHeight',
+        chart: 'line',
+        height: estimatedHeight
+      }, '*');
       
-      // Start fade in of main content and chart simultaneously
-      requestAnimationFrame(() => {
-        mainContent.classList.add('loaded');
-        // Make chart visible now that parent is ready
-        const chartDiv = document.getElementById('chart_div');
-        if (chartDiv) {
-          chartDiv.classList.add('visible');
+      // Set up a pending render function that will be called when resize is confirmed
+      window.pendingRender = () => {
+        console.log('🎨 Starting chart render after resize confirmed');
+        
+        // Log all available dimension information
+        console.log('📐 === DIMENSION DEBUG ===');
+        console.log('📐 window.innerWidth:', window.innerWidth);
+        console.log('📐 window.innerHeight:', window.innerHeight);
+        console.log('📐 document.documentElement.clientWidth:', document.documentElement.clientWidth);
+        console.log('📐 document.documentElement.clientHeight:', document.documentElement.clientHeight);
+        console.log('📐 document.body.clientWidth:', document.body.clientWidth);
+        console.log('📐 document.body.clientHeight:', document.body.clientHeight);
+        
+        const chartContainer = document.getElementById('chart_div');
+        if (chartContainer) {
+          console.log('📐 chartContainer.offsetWidth:', chartContainer.offsetWidth);
+          console.log('📐 chartContainer.offsetHeight:', chartContainer.offsetHeight);
+          console.log('📐 chartContainer.clientWidth:', chartContainer.clientWidth);
+          console.log('📐 chartContainer.clientHeight:', chartContainer.clientHeight);
+          const computedStyle = window.getComputedStyle(chartContainer);
+          console.log('📐 chartContainer computed width:', computedStyle.width);
+          console.log('📐 chartContainer computed height:', computedStyle.height);
+          console.log('📐 chartContainer computed display:', computedStyle.display);
+          console.log('📐 chartContainer computed visibility:', computedStyle.visibility);
         }
-      });
-      
-      // Clean up loading overlay after fade completes
-      setTimeout(() => {
-        loadingOverlay.style.display = 'none';
-        resolve();
-      }, 400);
-    }, 250); // Give chart time to render
+        console.log('📐 === END DIMENSION DEBUG ===');
+        
+        // Now render the chart at the correct size
+        updateChart();
+        
+        // Wait for chart to actually render in the DOM
+        setTimeout(() => {
+          console.log('Line chart rendering complete');
+          
+          // Make chart visible
+          const chartDiv = document.getElementById('chart_div');
+          if (chartDiv) {
+            chartDiv.classList.add('visible');
+          }
+          
+          // Wait longer to ensure Google Chart is fully painted and stable
+          setTimeout(() => {
+            console.log('Line chart fully loaded and visible');
+            
+            // Chart is rendered - send chartReady immediately
+            // No need to send another height update, iframe size is already correct
+            console.log('📤 Sending chartReady message to parent...');
+            window.parent.postMessage({
+              type: 'chartReady',
+              chart: 'line'
+            }, '*');
+            
+            // DON'T enable resize handler yet - wait for parent to confirm overlay is hidden
+            console.log('⏳ Waiting for overlay to be hidden before enabling resize handler...');
+            resolve();
+          }, 200); // Longer delay to ensure Google Chart is fully stable
+        }, 350); // Wait for chart render
+      };
+    } else {
+      // Not in iframe, render immediately
+      updateChart();
+      resolve();
+    }
   });
 }
 
@@ -1010,8 +1200,22 @@ function setupEventListeners() {
  */
 async function init() {
   try {
+    // Wait for supabaseModule to be available (with timeout)
+    let attempts = 0;
+    const maxAttempts = 50; // 5 seconds total
+    while ((!window.supabaseModule || !window.supabaseModule.loadData) && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      attempts++;
+    }
+    
+    if (!window.supabaseModule || !window.supabaseModule.loadData) {
+      throw new Error('supabaseModule not available after waiting. Check console for loading errors.');
+    }
+    
+    console.log('supabaseModule found, proceeding with initialization...');
+    
     // First, load all necessary data from Supabase
-    const { pollutants, groups, yearKeys, pollutantUnits, groupedData } = await window.supabase.loadData();
+    const { pollutants, groups, yearKeys, pollutantUnits, groupedData } = await window.supabaseModule.loadData();
 
     // Store data on the window object for global access
     window.allPollutants = pollutants;
@@ -1025,7 +1229,7 @@ async function init() {
     setupSelectors(pollutants, groups);
 
     // Load group information table
-    await window.supabase.loadGroupInfo();
+    await window.supabaseModule.loadGroupInfo();
 
     // Set up event listeners for buttons
     setupEventListeners();
@@ -1036,14 +1240,22 @@ async function init() {
 
     // Finally, reveal the main content and draw the chart
     await revealMainContent();
+    
+    // Chart ready signal is now sent from revealMainContent after loading overlay fades
 
   } catch (error) {
     console.error("Initialization failed:", error);
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    loadingOverlay.innerHTML = `<p>Error loading data. Please check the console and refresh the page.</p><p>${error.message}</p>`;
-    loadingOverlay.style.opacity = '1';
+    // Loading overlay removed - error handling via console and main index.html
+    alert(`Error loading line chart: ${error.message}. Please check the console and refresh the page.`);
   }
 }
+
+// Listen for parent window messages
+// Listen for parent window messages (if needed for future features)
+window.addEventListener('message', (event) => {
+  // Message handling can be added here for future features
+  // Charts now handle their own loading completion
+});
 
 // Initialise on DOM ready
 document.addEventListener('DOMContentLoaded', init);

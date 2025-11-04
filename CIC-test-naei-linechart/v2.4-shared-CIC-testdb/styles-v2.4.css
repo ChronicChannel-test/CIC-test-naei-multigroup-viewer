@@ -4,42 +4,6 @@
  * This file contains only linechart-specific overrides and additions
  */
 
-/* Ko-fi button specific styling */
-.kofi-wrapper {
-  margin-top: 12px;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.kofi-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #FF5E5B;
-  color: white;
-  text-decoration: none;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  transition: background 0.2s;
-  white-space: nowrap;
-}
-
-.kofi-button:hover {
-  background: #e54b47;
-}
-
-.kofi-icon-svg {
-  display: flex;
-  align-items: center;
-}
-
-.kofi-text {
-  line-height: 1;
-}
-
 /* Footer styling */
 .footer-links {
   display: flex;
@@ -69,11 +33,6 @@
 
 /* Responsive adjustments for footer */
 @media (max-width: 768px) {
-  .kofi-button {
-    font-size: 12px;
-    padding: 6px 12px;
-  }
-  
   .footer-links {
     flex-direction: column;
     align-items: center;

@@ -3,9 +3,10 @@
 /* Base styles */
 body { 
   font-family: system-ui, sans-serif; 
-  margin: 20px; 
+  margin: 20px 10px 0 10px;
+  padding-bottom: 0;
   color: #000; 
-  background: #fff; 
+  background: #fff;
 }
 
 label { 
@@ -272,9 +273,8 @@ button, .add-btn, .remove-btn, .dragHandle {
 
 .chart-wrapper {
   width: calc(100% - 140px);
-  padding: 8px;
-  margin: 0;
-  margin-right: auto;
+  padding: 4px 4px 0 4px;
+  margin: 0 auto 0 0;
   border: 1px solid #ccc;
   border-radius: 6px;
   box-sizing: border-box;
@@ -339,15 +339,17 @@ button, .add-btn, .remove-btn, .dragHandle {
   position: fixed; 
   top: 0; 
   left: 0; 
-  width: 100%; 
-  height: 100%; 
+  width: 100vw; 
+  height: 100vh; 
   display: flex; 
   flex-direction: column; 
   align-items: center; 
   justify-content: center; 
   background: rgba(255,255,255,0.98); 
   z-index: 9999; 
-  transition: opacity .35s ease; 
+  transition: opacity .35s ease;
+  margin: 0;
+  padding: 0;
 }
 
 .spinner { 
@@ -356,7 +358,11 @@ button, .add-btn, .remove-btn, .dragHandle {
   border-radius: 50%; 
   background: conic-gradient(#E6194B 0deg 120deg, #F58231 120deg 240deg, #FFE119 240deg 360deg); 
   animation: spin 1.25s linear infinite; 
-  box-shadow: 0 0 12px rgba(0,0,0,0.08); 
+  box-shadow: 0 0 12px rgba(0,0,0,0.08);
+  outline: none;
+  border: none;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 @keyframes spin { 
@@ -365,9 +371,10 @@ button, .add-btn, .remove-btn, .dragHandle {
 }
 
 .loading-text { 
-  margin-top: 12px; 
+  margin-top: 16px; 
   color: #333; 
-  font-weight: 600; 
+  font-weight: 600;
+  text-align: center;
 }
 
 /* Main content */
@@ -375,6 +382,8 @@ button, .add-btn, .remove-btn, .dragHandle {
   display: none; 
   opacity: 0; 
   transition: opacity .4s ease; 
+  margin-bottom: 0; /* Remove any bottom margin */
+  padding-bottom: 0; /* Remove any bottom padding */
 }
 
 #mainContentTop { 
@@ -486,10 +495,15 @@ footer a:hover {
   }
 }
 
-/* Mobile styles */
+/* Mobile and tablet styles */
+
 @media (max-width: 768px) {
   body {
     margin: 15px;
+  }
+  
+  .kofi-button .kofi-text {
+    font-size: 0.7rem !important; /* Smaller font size on mobile */
   }
 }
 
@@ -619,9 +633,8 @@ footer a:hover {
     width: 100%;
     max-width: 100%;
   }
-}
 
-@media (max-width: 620px) {
+  /* Opera-specific ko-fi rules */
   .opera-browser .kofi-wrapper:hover .kofi-button {
     width: 35px; /* Prevent expansion on narrow screens */
   }

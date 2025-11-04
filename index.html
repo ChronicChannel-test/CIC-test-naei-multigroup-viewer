@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en" style="background: #f8bbd0;"> <!-- pink for debug -->
+<head>
+  <meta charset="utf-8" />
+  <title>NAEI Multi-Group Pollutant Viewer v3.0 Shared</title>
+  <link rel="icon" type="image/png" sizes="64x64" href="Shared Resources/images/favicon.png">
+  <link rel="apple-touch-icon" href="Shared Resources/images/favicon.png">
+
+  <!-- Social preview / link preview meta tags -->
+  <meta name="description" content="NAEI Data Viewer - Interactive charts for UK emissions data">
+  <!-- Open Graph (Facebook, LinkedIn, Slack, etc.) -->
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="NAEI Data Viewer">
+  <meta property="og:description" content="Interactive charts for analyzing UK National Atmospheric Emissions Inventory data">
+  <meta property="og:url" content="https://github.com/Chronic-Illness-Channel/naei-multigroup-viewer">
+  <meta property="og:image" content="Shared Resources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
+  <meta property="og:image:width" content="1120">
+  <meta property="og:image:height" content="630">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="NAEI Data Viewer">
+  <meta name="twitter:description" content="Interactive charts for UK emissions data">
+  <meta name="twitter:image" content="Shared Resources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
+  <meta name="twitter:site" content="@Chronic_Channel">
+  <meta name="twitter:creator" content="@Chronic_Channel">
+
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  
+  <!-- Load Supabase and shared resources -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="Shared Resources/supabase-config.js"></script>
+  <!-- Shared Data Loader -->
+  <script src="Shared Resources/shared-data-loader.js"></script>
+  
+  <!-- Google Charts for charting -->
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  
+  <!-- XLSX for Excel export -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>  <style>
+    /* Chart containers with fade-in effect */
+    .chart-container {
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      padding: 0;
+    }
+    
+    .chart-container.ready {
+      opacity: 1;
+    }
+    
+    /* Full-screen loading overlay */
+    #main-loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: white;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.5s ease;
+    }
+    
+    #main-loading-overlay .main-spinner {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: conic-gradient(#E6194B 0deg 120deg, #F58231 120deg 240deg, #FFE119 240deg 360deg);
+      animation: spin 1.25s linear infinite;
+      margin-bottom: 20px;
+    }
+    
+    #main-loading-overlay .main-loading-text {
+      color: #374151;
+      font-size: 18px;
+      font-weight: 500;
+    }
+    
+    #chart_div, #scatter_chart_div {
+      width: 100%;
+      min-height: 400px;
+    }
+    
+    .spinner {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: conic-gradient(#E6194B 0deg 120deg, #F58231 120deg 240deg, #FFE119 240deg 360deg);
+      animation: spin 1.25s linear infinite;
+      box-shadow: 0 0 12px rgba(0,0,0,0.08);
+      outline: none;
+      border: none;
+      margin: 0 auto 20px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    /* Sidebar Social Media Styles (from chart v2.4) */
+    #cicLogo {
+      width: 110px;
+      height: auto;
+      display: block;
+    }
+
+    .sidebar-socials {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      width: 110px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      z-index: 100;
+    }
+
+    .sidebar-icons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+
+    .sidebar-link {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 40px;
+      height: 40px;
+    }
+
+    .sidebar-link img {
+      display: block;
+      height: 40px;
+      width: 40px;
+      object-fit: contain;
+    }
+
+    a[href*="facebook.com"] img {
+      width: 36px;
+      height: 36px;
+    }
+
+    .kofi-wrapper {
+      width: 40px;
+      height: 40px;
+      position: relative;
+      margin-top: 13px;
+    }
+
+    .kofi-button {
+      display: flex;
+      flex-direction: row-reverse;
+      align-items: center;
+      background-color: #ff9301;
+      border-radius: 8px;
+      height: 40px;
+      color: white;
+      text-decoration: none;
+      overflow: hidden;
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 40px;
+      transition: width 0.4s ease-in-out;
+    }
+
+    .kofi-wrapper:hover .kofi-button {
+      width: 295px;
+    }
+
+    .kofi-icon-svg {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 40px;
+      min-width: 40px;
+      flex-shrink: 0;
+    }
+
+    .kofi-text {
+      white-space: nowrap;
+      padding-right: 0px;
+      padding-left: 0px; 
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out 0.1s;
+    }
+
+    .kofi-wrapper:hover .kofi-text {
+      opacity: 1;
+    }
+
+    .opera-browser .kofi-wrapper:hover .kofi-button {
+      width: 295px;
+    }
+
+    @supports (-webkit-appearance: none) {
+      .kofi-button .kofi-text {
+        font-size: 16px;
+      }
+    }
+    
+    /* Mobile responsive styles */
+    @media (max-width: 620px) {
+      .sidebar-socials {
+        position: static;
+        width: 100%;
+        flex-direction: row;
+        align-items: flex-start;
+        margin: 16px 20px;
+        gap: 12px;
+        top: auto;
+        right: auto;
+      }
+
+      #cicLogo {
+        width: 90px;
+      }
+
+      .sidebar-icons {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        grid-template-rows: repeat(2, 1fr);
+        gap: 8px;
+        margin-top: 0;
+        width: auto;
+      }
+      
+      .kofi-wrapper {
+        margin-top: 0;
+        margin-left: 0px;
+        align-self: flex-start;
+        width: 35px;
+        height: 35px;
+      }
+      
+      .kofi-button, .kofi-icon-svg {
+        height: 35px;
+      }
+      
+      .kofi-button {
+        width: 35px;
+        transition: none;
+      }
+      
+      .kofi-wrapper:hover .kofi-button {
+        width: 35px;
+      }
+      
+      .kofi-wrapper:hover .kofi-text {
+        opacity: 0;
+      }
+    
+      .kofi-button img {
+        position: relative;
+        transform: translateX(3px);
+      }
+
+      .sidebar-link {
+        width: 35px;
+        height: 35px;
+        margin-bottom: 0;
+      }
+
+      .sidebar-link img {
+        width: 35px;
+        height: 35px;
+      }
+
+      a[href*="facebook.com"] img {
+        width: 32px;
+        height: 32px;
+      }
+    }
+  </style>
+</head>
+
+<body style="background: #c8e6c9;"> <!-- green for debug -->
+
+  <!-- Full-screen loading overlay -->
+  <div id="main-loading-overlay">
+    <div class="main-spinner"></div>
+    <div class="main-loading-text">Loading data, please wait...</div>
+  </div>
+
+  <!-- CIC Logo and Social Media Sidebar -->
+  <div class="sidebar-socials">
+    <a href="https://chronic-illness-channel.github.io" target="_blank">
+      <img id="cicLogo" src="Shared Resources/images/CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
+    </a>
+    <div class="sidebar-icons">
+      <a href="https://youtube.com/@chronichannelillness" target="_blank" class="sidebar-link">
+        <img src="Shared Resources/images/youtube-logo-6.svg" alt="YouTube">
+      </a>
+      <a href="https://bsky.app/profile/chronicillnesschannel.bsky.social" target="_blank" class="sidebar-link">
+        <img src="Shared Resources/images/Bluesky_Logo.svg" alt="Bluesky">
+      </a>
+      <a href="https://twitter.com/chronic_channel" target="_blank" class="sidebar-link">
+        <img src="Shared Resources/images/Twitter dead bird with X.svg" alt="Twitter/X">
+      </a>
+      <a href="https://facebook.com/chronicillnesschannel" target="_blank" class="sidebar-link">
+        <img src="Shared Resources/images/facebook.svg" alt="Facebook">
+      </a>
+    </div>
+    <div class="kofi-wrapper">
+      <a href="https://ko-fi.com/chronicillnesschannel" target="_blank" class="kofi-button">
+        <span class="kofi-icon-svg">
+          <img src="Shared Resources/images/kofi_symbol.svg" alt="Ko-fi" style="width: 28px; height: 28px; display: block; object-fit: contain;">
+        </span>
+        <span class="kofi-text">Support Chronic Illness Channel</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center">
+          <div>
+            <h1 class="text-xl font-bold text-gray-900">NAEI Multi-Group Pollutant Viewer</h1>
+            <p class="text-sm text-gray-500">Interactive charts for UK emissions data</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Chart Selection/Loading States (COMMENTED OUT - may use later) -->
+  <!--
+  <div id="selector" class="max-w-4xl mx-auto px-4 py-8">
+    <div class="text-center">
+      <h2 class="text-2xl font-bold text-gray-900 mb-4">Select a Chart Type</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
+        <button onclick="selectChart('1')" class="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-2 border-transparent hover:border-blue-200">
+          <div class="text-4xl mb-3">📈</div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Line Chart</h3>
+          <p class="text-gray-600 text-sm">Compare emissions trends over time across multiple groups and pollutants</p>
+        </button>
+        
+        <button onclick="selectChart('2')" class="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-2 border-transparent hover:border-blue-200">
+          <div class="text-4xl mb-3">📊</div>
+          <h3 class="text-lg font-semibold text-gray-900 mb-2">Scatter Chart</h3>
+          <p class="text-gray-600 text-sm">Visualize the relationship between activity data and pollutant emissions</p>
+        </button>
+      </div>
+    </div>
+  </div>
+  -->
+
+  <!-- Chart interface -->
+
+  <!-- Main Chart Interface - visible from start but behind overlay -->
+  <div id="chart-interface" style="opacity: 0; margin: 0;">
+    <!-- Tab Navigation -->
+    <div class="bg-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="border-b border-gray-200">
+          <nav class="-mb-px flex space-x-8">
+            <button id="tab-1" onclick="switchChart('1')" class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+              📈 Line Chart
+            </button>
+            <button id="tab-2" onclick="switchChart('2')" class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+              📊 Scatter Chart  
+            </button>
+          </nav>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chart Content -->
+  <div class="relative" style="margin: 0; padding: 0; background: #fff59d;"> <!-- light yellow for debug -->
+      <!-- Chart Area -->
+  <div class="w-full" style="margin: 0; padding: 0; background: #b2dfdb;"> <!-- teal for debug -->
+        <!-- Line Chart Container -->
+        <div id="chart-1" class="chart-container" style="background: #ffe082;"> <!-- yellow for debug -->
+          <iframe 
+            id="linechart-iframe"
+            src="linechart.html" 
+            frameborder="0" 
+            scrolling="no"
+            style="width: 100%; min-height: 800px; border: none; background: rgba(179,229,252,0.7); display: block; overflow: hidden;" <!-- blue for debug, semi-transparent -->
+            title="NAEI Line Chart">
+          </iframe>
+        </div>
+        
+        <!-- Scatter Chart Container -->
+        <div id="chart-2" class="chart-container hidden">
+          <iframe 
+            id="scatterchart-iframe"
+            src="scatterchart.html" 
+            frameborder="0" 
+            scrolling="no"
+            style="width: 100%; min-height: 800px; border: none; background: white; display: block; overflow: hidden;"
+            title="NAEI Activity Data Scatter Chart">
+          </iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer (outside chart area) -->
+  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; background: #ff8a80;"> <!-- red for debug -->
+    <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via 
+    <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
+    <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
+    <br>
+    <strong>YouTube:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">www.youtube.com/@ChronicIllnessChannel</a>
+    <br>
+    <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
+      Version: v3.0 Shared CIC-testdb (Line: v2.4, Scatter: v1.0) • Build: 2025.11.04
+    </span>
+  </footer>
+
+  <style>
+    .footer-copyright,
+    .footer-license {
+      white-space: nowrap;
+    }
+    
+    @media (max-width: 900px) {
+      .footer-copyright {
+        display: block;
+      }
+    }
+  </style>
+
+  <script>
+    // Chart routing system with tabbed interface
+    let currentChart = null;
+    
+    // Load shared resources
+    window.addEventListener('DOMContentLoaded', function() {
+      // Load shared analytics, colors, and configuration
+      loadScript('Shared Resources/analytics.js');
+      loadScript('Shared Resources/colors.js');
+    });
+    
+    function loadScript(src) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      });
+    }
+    let chartsLoaded = {};
+
+    function getChartParam() {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('chart');
+    }
+
+    function hasRequiredParams() {
+      const params = new URLSearchParams(window.location.search);
+      return params.has('pollutant_id');
+    }
+
+    function getDefaultUrl(chartId) {
+      // Handle both local and GitHub Pages URLs
+      let baseUrl = window.location.pathname;
+      if (!baseUrl.endsWith('/')) {
+        baseUrl += '/';
+      }
+      
+      // For GitHub Pages, we need the repo name, but for local dev the server
+      // is already serving from inside the repo directory
+      const isGitHubPages = window.location.hostname.includes('github.io');
+      if (isGitHubPages && !baseUrl.includes('CIC-test-naei-multigroup-viewer')) {
+        baseUrl = '/CIC-test-naei-multigroup-viewer/';
+      }
+      
+      if (chartId === '1' || !chartId) {
+        // Line chart defaults: PM2.5 (id=5), All group (id=1), 1970-2023
+        return `${baseUrl}?chart=1&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+      } else if (chartId === '2') {
+        // Scatter chart defaults: PM2.5 (id=5), Ecodesign+Gas groups (ids 25,37), most recent year (2023)
+        return `${baseUrl}?chart=2&pollutant_id=5&group_ids=25,37&year=2023`;
+      }
+      
+      return baseUrl;
+    }
+
+    function selectChart(chartId) {
+      // Show loading
+      document.getElementById('loading').classList.remove('hidden');
+      
+      // Set default URL and load chart interface
+      const defaultUrl = getDefaultUrl(chartId);
+      window.history.replaceState({}, '', defaultUrl);
+      
+      setTimeout(async () => {
+        await loadChartInterface(chartId);
+      }, 500);
+    }
+
+    async function loadChartInterface(chartId) {
+      try {
+        console.log('Loading chart interface for chart', chartId);
+        
+        // Preload shared data 
+        console.log('Preloading shared data...');
+        await window.SharedDataLoader.loadSharedData();
+        console.log('Shared data loaded successfully');
+        
+        // Simple delay to let everything initialize
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Reveal the interface
+        await fadeToCompleteInterface(chartId);
+        
+        console.log('Chart interface loaded successfully');
+      } catch (error) {
+        console.error('Error loading chart interface:', error);
+        
+        // Fallback: show interface anyway
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('white-overlay').style.display = 'none';
+        document.getElementById('chart-interface').classList.remove('hidden');
+        updateTabStates();
+        showChart(chartId);
+      }
+    }
+
+    async function fadeToCompleteInterface(chartId) {
+      console.log('Starting fade to complete interface');
+      
+      // Set the active chart
+      currentChart = chartId;
+      
+      // Ensure chart containers are ready
+      const chart1 = document.getElementById('chart-1');
+      const chart2 = document.getElementById('chart-2');
+      
+      chart1.style.display = 'block';
+      chart2.style.display = 'block';
+      
+      // Short delay to ensure positioning (v2.3 style)
+      await new Promise(resolve => setTimeout(resolve, 250));
+      
+      // Start fade out of loading overlay and white overlay together
+      const loading = document.getElementById('loading');
+      const whiteOverlay = document.getElementById('white-overlay');
+      
+      loading.style.opacity = '0';
+      whiteOverlay.style.opacity = '0';
+      
+      // Reveal interface and charts simultaneously 
+      requestAnimationFrame(() => {
+        document.getElementById('chart-interface').classList.remove('hidden');
+        updateTabStates();
+        showChart(chartId);
+        
+        // Mark charts as ready
+        chart1.classList.add('ready');
+        chart2.classList.add('ready');
+      });
+      
+      // Clean up after transition completes (v2.3 timing)
+      setTimeout(() => {
+        loading.classList.add('hidden');
+        whiteOverlay.style.display = 'none';
+        console.log('Fade to complete interface finished');
+      }, 400);
+    }
+
+    // Simplified chart loading - no complex coordination needed
+
+    function switchChart(chartId) {
+      if (currentChart === chartId) return;
+      
+      // Update URL
+      const currentParams = new URLSearchParams(window.location.search);
+      currentParams.set('chart', chartId);
+      const newUrl = window.location.pathname + '?' + currentParams.toString();
+      window.history.pushState({}, '', newUrl);
+      
+      currentChart = chartId;
+      updateTabStates();
+      showChart(chartId);
+    }
+
+    function updateTabStates() {
+      // Update tab appearance
+      document.querySelectorAll('[id^="tab-"]').forEach(tab => {
+        const tabChart = tab.id.split('-')[1];
+        if (tabChart === currentChart) {
+          tab.className = 'py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600';
+        } else {
+          tab.className = 'py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors';
+        }
+      });
+    }
+
+    function showChart(chartId) {
+      // Hide all charts
+      document.querySelectorAll('.chart-container').forEach(container => {
+        container.classList.add('hidden');
+      });
+      
+      // Show selected chart
+      const chartContainer = document.getElementById(`chart-${chartId}`);
+      chartContainer.classList.remove('hidden');
+      
+      // Fade in the chart container
+      setTimeout(() => {
+        chartContainer.style.opacity = '1';
+        
+        // Ensure iframe is loaded and visible
+        const iframe = chartContainer.querySelector('iframe');
+        if (iframe && !iframe.getAttribute('data-loaded')) {
+          iframe.setAttribute('data-loaded', 'true');
+          // Reload iframe if needed to ensure it displays properly
+          const src = iframe.src;
+          iframe.src = '';
+          setTimeout(() => {
+            iframe.src = src;
+          }, 50);
+        }
+      }, 100);
+    }
+
+    // Simplified initialization for iframe-based charts
+    
+    // Simple loading overlay control - MESSAGE BASED APPROACH
+    let overlayHidden = false;
+    
+    // Track which charts are ready
+    let lineChartReady = false;
+    let scatterChartReady = false;
+    
+    // Function to constrain iframe height based on scroll position
+    function applyIframeHeightConstraint(iframe) {
+      if (!iframe) return;
+      
+      const naturalHeight = parseInt(iframe.dataset.naturalHeight || 0);
+      if (!naturalHeight) return;
+      
+      // For now, always use natural height - no constraining
+      // This allows full scrolling to see entire chart including footer
+      console.log(`Setting iframe height to natural: ${naturalHeight}px`);
+      iframe.style.height = naturalHeight + 'px';
+      
+      // Debug: Check actual measurements
+      setTimeout(() => {
+        const rect = iframe.getBoundingClientRect();
+        const footer = document.querySelector('footer');
+        const footerRect = footer ? footer.getBoundingClientRect() : null;
+        console.log(`Iframe bottom: ${rect.bottom}px`);
+        if (footerRect) {
+          console.log(`Footer top: ${footerRect.top}px`);
+          console.log(`Gap: ${footerRect.top - rect.bottom}px`);
+          
+          // NEW: Detailed element inspection
+          console.log('🔍 === ELEMENT HIERARCHY DEBUG ===');
+          
+          // Get all elements and their positions
+          const chartContainer = document.getElementById('chart-1');
+          const relative = chartContainer?.parentElement;
+          const wFull = relative?.parentElement;
+          const chartInterface = document.getElementById('chart-interface');
+          
+          console.log('📦 iframe parent chain:');
+          console.log('  - #chart-1:', chartContainer?.getBoundingClientRect().bottom, 'padding:', window.getComputedStyle(chartContainer).padding);
+          console.log('  - .relative:', relative?.getBoundingClientRect().bottom, 'padding:', window.getComputedStyle(relative).padding, 'margin:', window.getComputedStyle(relative).margin);
+          console.log('  - .w-full:', wFull?.getBoundingClientRect().bottom, 'padding:', window.getComputedStyle(wFull).padding, 'margin:', window.getComputedStyle(wFull).margin);
+          console.log('  - #chart-interface:', chartInterface?.getBoundingClientRect().bottom, 'padding:', window.getComputedStyle(chartInterface).padding, 'margin:', window.getComputedStyle(chartInterface).margin);
+          console.log('  - footer:', footerRect.top);
+          console.log('🔍 === END HIERARCHY DEBUG ===');
+        }
+      }, 100);
+    }
+    
+    // Apply constraints on scroll
+    let scrollTimeout;
+    window.addEventListener('scroll', function() {
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const lineIframe = document.getElementById('linechart-iframe');
+        const scatterIframe = document.getElementById('scatterchart-iframe');
+        
+        if (lineIframe && lineIframe.dataset.naturalHeight) {
+          applyIframeHeightConstraint(lineIframe);
+        }
+        if (scatterIframe && scatterIframe.dataset.naturalHeight) {
+          applyIframeHeightConstraint(scatterIframe);
+        }
+      }, 10);
+    });
+    
+    // Apply constraints on window resize
+    window.addEventListener('resize', function() {
+      const lineIframe = document.getElementById('linechart-iframe');
+      const scatterIframe = document.getElementById('scatterchart-iframe');
+      
+      if (lineIframe && lineIframe.dataset.naturalHeight) {
+        applyIframeHeightConstraint(lineIframe);
+      }
+      if (scatterIframe && scatterIframe.dataset.naturalHeight) {
+        applyIframeHeightConstraint(scatterIframe);
+      }
+    });
+    
+    // Set up message listener IMMEDIATELY (before DOM is ready)
+    console.log('🎯 Setting up message listener...');
+    window.addEventListener('message', function(event) {
+      console.log('🔥 Parent received message:', event.data);
+      
+      // Handle URL updates from iframes
+      if (event.data && event.data.type === 'updateUrl') {
+        console.log('🔗 Updating URL to:', event.data.url);
+        window.history.replaceState({ path: event.data.url }, '', event.data.url);
+      }
+      
+      if (event.data && event.data.type === 'chartReady' && !overlayHidden) {
+        console.log('📨 Chart ready message received');
+        console.log('🎯 Chart type:', event.data.chart);
+        
+        // Track which charts are ready
+        if (event.data.chart === 'line') {
+          lineChartReady = true;
+          console.log('✅ Line chart is ready');
+        } else if (event.data.chart === 'scatter') {
+          scatterChartReady = true;
+          console.log('✅ Scatter chart is ready');
+        }
+        
+        // Hide overlay when both charts are ready
+        if (lineChartReady && scatterChartReady) {
+          console.log('✅ Both charts ready - hiding overlay');
+          window.hideLoadingOverlay();
+        } else {
+          console.log(`⏳ Waiting for: ${!lineChartReady ? 'line chart ' : ''}${!scatterChartReady ? 'scatter chart' : ''}`);
+        }
+      }
+      
+      // Handle iframe height updates for seamless scrolling
+      if (event.data && event.data.type === 'iframeHeight') {
+        const iframe = event.data.chart === 'line' 
+          ? document.getElementById('linechart-iframe')
+          : document.getElementById('scatterchart-iframe');
+        
+        if (iframe && event.data.height) {
+          // Store the natural content height
+          iframe.dataset.naturalHeight = event.data.height;
+          
+          // Apply height constraint based on scroll position
+          applyIframeHeightConstraint(iframe);
+          
+          // Only send resizeComplete during initial load (before overlay is hidden)
+          // After that, just resize without confirmation
+          if (!overlayHidden) {
+            setTimeout(() => {
+              console.log(`✅ Resize complete, notifying ${event.data.chart} iframe`);
+              if (iframe.contentWindow) {
+                iframe.contentWindow.postMessage({ 
+                  type: 'resizeComplete',
+                  height: event.data.height 
+                }, '*');
+              }
+            }, 50); // Small delay to ensure resize has been applied
+          }
+        }
+      }
+      
+      // Also handle debug messages
+      if (event.data && event.data.type === 'debug') {
+        console.log('🐛 Debug message from iframe:', event.data.message);
+      }
+      
+      // Handle test messages
+      if (event.data && event.data.type === 'test') {
+        console.log('✅ Test message received:', event.data.message);
+      }
+    });
+    
+    // Test the message listener immediately
+    setTimeout(() => {
+      console.log('🧪 Testing message listener with self-message...');
+      window.postMessage({ type: 'test', message: 'Self test message' }, '*');
+    }, 100);
+    
+    // DEBUG: Comprehensive loading element check
+    function debugAllLoadingElements() {
+      console.log('🔍 === COMPREHENSIVE LOADING ELEMENT DEBUG ===');
+      
+      // Check for all possible loading-related elements
+      const loadingSelectors = [
+        '#main-loading-overlay',
+        '#loading', 
+        '.spinner',
+        '.main-spinner',
+        '[class*="loading"]',
+        '[id*="loading"]',
+        '[class*="spinner"]'
+      ];
+      
+      loadingSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        console.log(`🔍 ${selector}: Found ${elements.length} elements`);
+        elements.forEach((el, index) => {
+          console.log(`  - Element ${index + 1}: id="${el.id}", class="${el.className}", display="${window.getComputedStyle(el).display}", opacity="${window.getComputedStyle(el).opacity}"`);
+        });
+      });
+      
+      console.log('🔍 === END LOADING ELEMENT DEBUG ===');
+    }
+    
+    // Run debug after DOM loads
+    setTimeout(debugAllLoadingElements, 200);
+    
+    // Hide loading overlay function - make it global for iframe onload
+    window.hideLoadingOverlay = function() {
+      if (overlayHidden) {
+        console.log('⚠️ hideLoadingOverlay called but already hidden');
+        return;
+      }
+      overlayHidden = true;
+      
+      console.log('💫 Hiding loading overlay...');
+      const overlay = document.getElementById('main-loading-overlay');
+      const chartInterface = document.getElementById('chart-interface');
+      
+      console.log('🔍 Overlay element:', !!overlay);
+      console.log('🔍 Chart interface element:', !!chartInterface);
+      
+      if (overlay) {
+        console.log('🔍 Overlay current display:', overlay.style.display);
+        console.log('🔍 Overlay current opacity:', overlay.style.opacity);
+        console.log('🔍 Overlay computed display:', window.getComputedStyle(overlay).display);
+        console.log('🔍 Overlay computed opacity:', window.getComputedStyle(overlay).opacity);
+      }
+      
+      if (chartInterface) {
+        console.log('🔍 Chart interface opacity before:', chartInterface.style.opacity);
+        // Fade in the chart interface
+        chartInterface.style.opacity = '1';
+        console.log('🔍 Chart interface opacity after:', chartInterface.style.opacity);
+      }
+      
+      if (overlay) {
+        console.log('📉 Setting overlay opacity to 0...');
+        overlay.style.opacity = '0';
+        
+        setTimeout(() => {
+          console.log('🗑️ Removing overlay from DOM...');
+          if (overlay.parentNode) {
+            overlay.parentNode.removeChild(overlay);
+            console.log('✅ Overlay removed successfully');
+          } else {
+            console.log('⚠️ Overlay has no parent node');
+          }
+          
+          // Double-check what's visible now
+          const remainingOverlay = document.getElementById('main-loading-overlay');
+          console.log('🔍 Overlay still exists after removal:', !!remainingOverlay);
+          
+          // Run comprehensive debug to see what loading elements remain
+          console.log('🔍 Running post-removal debug...');
+          debugAllLoadingElements();
+          
+          // Notify iframes that overlay is fully hidden and they can respond to resizes
+          console.log('📢 Notifying iframes that overlay is hidden...');
+          const lineIframe = document.getElementById('linechart-iframe');
+          const scatterIframe = document.getElementById('scatterchart-iframe');
+          if (lineIframe && lineIframe.contentWindow) {
+            lineIframe.contentWindow.postMessage({ type: 'overlayHidden' }, '*');
+          }
+          if (scatterIframe && scatterIframe.contentWindow) {
+            scatterIframe.contentWindow.postMessage({ type: 'overlayHidden' }, '*');
+          }
+          
+        }, 500);
+      }
+    };
+    
+    // Debug: Check if spinner is animating
+    window.addEventListener('DOMContentLoaded', function() {
+      const spinner = document.querySelector('.main-spinner');
+      if (spinner) {
+        console.log('Spinner element found, checking animation...');
+        const computedStyle = window.getComputedStyle(spinner);
+        console.log('Spinner animation:', computedStyle.animation);
+        console.log('Spinner transform:', computedStyle.transform);
+        
+        // Check again after 100ms to see if transform changes
+        setTimeout(() => {
+          const newStyle = window.getComputedStyle(spinner);
+          console.log('Spinner transform after 100ms:', newStyle.transform);
+        }, 100);
+      }
+    });
+    
+    // Initialize when DOM ready
+    window.addEventListener('DOMContentLoaded', function() {
+      console.log('Main page DOM loaded');
+      const urlParams = new URLSearchParams(window.location.search);
+      const chartParam = urlParams.get('chart') || '1';
+      console.log('Switching to chart:', chartParam);
+      switchChart(chartParam);
+      
+      // Comprehensive iframe debugging
+      const lineIframe = document.getElementById('linechart-iframe');
+      const scatterIframe = document.getElementById('scatterchart-iframe');
+      
+      if (lineIframe) {
+        console.log('Line chart iframe found, src:', lineIframe.src);
+        
+        lineIframe.addEventListener('load', () => {
+          console.log('Line chart iframe loaded event fired');
+          console.log('⏰ Waiting for chartReady message from iframe...');
+          
+          // Debug iframe script execution
+          setTimeout(() => {
+            console.log('🔍 Checking if iframe scripts loaded...');
+            try {
+              const iframeDoc = lineIframe.contentDocument || lineIframe.contentWindow.document;
+              console.log('🔍 Iframe document readyState:', iframeDoc.readyState);
+              console.log('🔍 Iframe body exists:', !!iframeDoc.body);
+              
+              // Check if scripts are present
+              const scripts = iframeDoc.querySelectorAll('script');
+              console.log('🔍 Number of scripts found in iframe:', scripts.length);
+              
+              if (scripts.length === 0) {
+                console.log('⚠️ NO SCRIPTS IN IFRAME - This is abnormal!');
+                console.log('🔍 Checking iframe HTML source...');
+                console.log('🔍 First 500 chars of iframe HTML:', iframeDoc.documentElement.innerHTML.substring(0, 500));
+                
+                // The iframe HTML is not loading scripts - possible iframe security issue
+                // Let's force a reload
+                console.log('🔄 Attempting iframe reload...');
+                lineIframe.src = lineIframe.src; // Force reload
+              } else {
+                // List script details
+                scripts.forEach((script, index) => {
+                  console.log(`🔍 Script ${index + 1}:`, {
+                    src: script.src || 'inline',
+                    hasContent: !!script.textContent.trim(),
+                    type: script.type || 'text/javascript'
+                  });
+                });
+              }
+              
+            } catch (e) {
+              console.log('🔍 Cannot access iframe document (security restrictions):', e.message);
+            }
+          }, 1000);
+        });
+        
+        lineIframe.addEventListener('error', (e) => {
+          console.error('Line chart iframe error:', e);
+          // Hide overlay even on error
+          setTimeout(() => {
+            console.log('Error: Hiding overlay due to iframe error');
+            hideLoadingOverlay();
+          }, 2000);
+        });
+      }
+      
+      if (scatterIframe) {
+        console.log('Scatter chart iframe found, src:', scatterIframe.src);
+        scatterIframe.addEventListener('load', () => {
+          console.log('Scatter chart iframe loaded');
+        });
+      }
+    });
+  </script>
+</body>
+</html>

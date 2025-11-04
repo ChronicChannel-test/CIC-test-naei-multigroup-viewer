@@ -3,12 +3,17 @@
  * Handles Google Charts scatter chart rendering
  */
 
-// Load Google Charts
-google.charts.load('current', {packages: ['corechart']});
-
 let chart = null;
 let currentChartData = null;
 let currentOptions = null;
+let googleChartsReady = false;
+
+// Load Google Charts and set up callback
+google.charts.load('current', {packages: ['corechart']});
+google.charts.setOnLoadCallback(() => {
+  googleChartsReady = true;
+  console.log('Google Charts loaded successfully');
+});
 
 /**
  * Draw scatter chart
@@ -17,8 +22,18 @@ let currentOptions = null;
  * @param {Array} groupIds - Array of selected group IDs
  */
 function drawScatterChart(year, pollutantId, groupIds) {
+  // Wait for Google Charts to be ready
+  if (!googleChartsReady) {
+    console.log('Google Charts not ready yet, waiting...');
+    google.charts.setOnLoadCallback(() => {
+      googleChartsReady = true;
+      drawScatterChart(year, pollutantId, groupIds);
+    });
+    return;
+  }
+
   // Get data points
-  const dataPoints = window.DataLoader.getScatterData(year, pollutantId, groupIds);
+  const dataPoints = window.supabaseModule.getScatterData(year, pollutantId, groupIds);
   
   if (dataPoints.length === 0) {
     showMessage('No data available for the selected year, pollutant, and groups.', 'error');
@@ -28,14 +43,14 @@ function drawScatterChart(year, pollutantId, groupIds) {
   // Prepare Google DataTable
   const data = new google.visualization.DataTable();
   data.addColumn('number', 'Activity Data');
-  data.addColumn('number', window.DataLoader.getPollutantName(pollutantId));
+  data.addColumn('number', window.supabaseModule.getPollutantName(pollutantId));
   data.addColumn({type: 'string', role: 'tooltip'});
   data.addColumn({type: 'string', role: 'style'});
 
   // Add data rows with colors
   dataPoints.forEach(point => {
     const color = window.Colors.getColorForGroup(point.groupName);
-    const tooltip = `${point.groupName}\nActivity: ${point.activityData.toLocaleString()}\n${window.DataLoader.getPollutantName(pollutantId)}: ${point.pollutantValue.toLocaleString()}`;
+    const tooltip = `${point.groupName}\nActivity: ${point.activityData.toLocaleString()}\n${window.supabaseModule.getPollutantName(pollutantId)}: ${point.pollutantValue.toLocaleString()}`;
     
     data.addRow([
       point.activityData,
@@ -46,8 +61,8 @@ function drawScatterChart(year, pollutantId, groupIds) {
   });
 
   // Chart options
-  const pollutantName = window.DataLoader.getPollutantName(pollutantId);
-  const pollutantUnit = window.DataLoader.getPollutantUnit(pollutantId);
+  const pollutantName = window.supabaseModule.getPollutantName(pollutantId);
+  const pollutantUnit = window.supabaseModule.getPollutantUnit(pollutantId);
   const activityUnit = window.DataLoader.getPollutantUnit(window.DataLoader.activityDataId);
 
   currentOptions = {
@@ -85,6 +100,15 @@ function drawScatterChart(year, pollutantId, groupIds) {
   const chartDiv = document.getElementById('chart_div');
   if (!chart) {
     chart = new google.visualization.ScatterChart(chartDiv);
+    
+    // Add listener for chart render completion (for loading management)
+    google.visualization.events.addListener(chart, 'ready', () => {
+      if (window.chartRenderCallback) {
+        console.log('Scatter chart finished rendering');
+        window.chartRenderCallback();
+        window.chartRenderCallback = null; // Clear callback after use
+      }
+    });
   }
   
   chart.draw(data, currentOptions);

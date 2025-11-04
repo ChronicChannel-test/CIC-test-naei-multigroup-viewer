@@ -23,7 +23,7 @@ function exportData(format = 'csv') {
   }
 
   // Track export analytics
-  trackAnalytics('data_export', {
+  window.supabaseModule.window.supabaseModule.trackAnalytics('data_export', {
     format: format,
     pollutant: pollutant,
     start_year: startYear,
@@ -161,7 +161,7 @@ function setupShareButton() {
     if (!shareUrl) return;
     
     // Track share usage
-    trackAnalytics('share_button_click', {
+    window.supabaseModule.trackAnalytics('share_button_click', {
       pollutant: document.getElementById('pollutantSelect').value,
       group_count: getSelectedGroups().length,
       start_year: document.getElementById('startYear')?.value || '',
@@ -261,7 +261,7 @@ function showShareDialog(shareUrl) {
       btn.textContent = '✅ Copied!';
       btn.style.background = '#4CAF50';
       
-      trackAnalytics('share_url_copied', {
+      window.supabaseModule.trackAnalytics('share_url_copied', {
         pollutant: pollutantName,
         group_count: selectedGroups.length,
         start_year: startYear,
@@ -300,7 +300,7 @@ function showShareDialog(shareUrl) {
         btn.textContent = '✅ Copied!';
         btn.style.background = '#4CAF50';
         
-        trackAnalytics('share_png_copied', {
+        window.supabaseModule.trackAnalytics('share_png_copied', {
           pollutant: pollutantName,
           group_count: selectedGroups.length,
           start_year: startYear,
@@ -358,7 +358,7 @@ function showShareDialog(shareUrl) {
     const body = encodeURIComponent(emailBody);
     const mailto = `mailto:?subject=${subject}&body=${body}`;
     
-    trackAnalytics('share_email_opened', {
+    window.supabaseModule.trackAnalytics('share_email_opened', {
       pollutant: pollutantName,
       group_count: selectedGroups.length,
       start_year: startYear,
@@ -570,7 +570,7 @@ async function generateChartImage() {
           // --- 5. Draw Logo and Footer, then resolve ---
           const logo = new Image();
           logo.crossOrigin = 'anonymous';
-          logo.src = 'images/CIC - Square - Border - Words - Alpha 360x360.png';
+          logo.src = '/CIC-test-naei-multigroup-viewer/Shared Resources/images/CIC - Square - Border - Words - Alpha 360x360.png';
 
           const finishGeneration = () => {
             ctx.font = '28px system-ui, sans-serif';

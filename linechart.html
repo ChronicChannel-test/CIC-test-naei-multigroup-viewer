@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <title>NAEI Multi-Group Pollutant Line Chart</title>
-  <link rel="icon" type="image/png" sizes="64x64" href="../../Shared Resources/images/favicon.png">
-  <link rel="apple-touch-icon" href="../../Shared Resources/images/favicon.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="Shared Resources/images/favicon.png">
+  <link rel="apple-touch-icon" href="Shared Resources/images/favicon.png">
 
   <!-- Social preview / link preview meta tags -->
   <meta name="description" content="NAEI Multi-Group Pollutant Line Chart">
@@ -28,10 +28,35 @@
   <link rel="image_src" href="images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <link rel="stylesheet" href="../../Shared Resources/common-styles.css">
-  <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="styles-v2.4.css">
+  
+  <!-- IMMEDIATE SCRIPT TEST - BEFORE ALL OTHER SCRIPTS -->
+  <script>
+    console.log('🚨 FIRST SCRIPT IN HEAD - IMMEDIATE EXECUTION TEST');
+    
+    // Try to send message immediately
+    try {
+      window.parent.postMessage({
+        type: 'debug',
+        message: 'First script in head executed!'
+      }, '*');
+      console.log('✅ First script postMessage sent');
+    } catch (e) {
+      console.error('❌ First script postMessage failed:', e);
+    }
+  </script>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <link rel="stylesheet" href="Shared Resources/common-styles.css">
+  <link rel="stylesheet" href="CIC-test-naei-linechart/v2.4-shared-CIC-testdb/styles.css">
+  <link rel="stylesheet" href="CIC-test-naei-linechart/v2.4-shared-CIC-testdb/styles-v2.4.css">
   <style>
+    /* Extend white chart background lower for Year label */
+    #chart_div {
+      padding-bottom: 32px !important;
+      background: white !important;
+    }
     /* Hide social media sidebar when embedded in iframe */
     .sidebar-socials {
       display: none !important;
@@ -49,14 +74,38 @@
     
     /* Clean white background */
     body {
-      background: white !important;
-      margin: 0 !important;
-      padding: 20px !important;
+  background: #ffd54f !important; /* orange for debug */
+  margin: 0 0 0 0 !important; /* Remove all margins, especially bottom */
+  padding: 20px !important;
+  overflow: visible !important; /* Allow content to flow naturally */
     }
     
     /* Remove any gray lines/borders */
     hr, .border, .border-t, .border-b {
       display: none !important;
+    }
+    
+    /* Optimize for iframe embedding */
+    #mainContent {
+      max-width: 100% !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      opacity: 1 !important;
+      transition: none !important; /* Remove any transitions in iframe context */
+    }
+    
+    /* Remove scrolling from iframe - let parent page handle it */
+    html, body {
+      overflow: visible !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+    }
+    
+    /* Ensure no phantom space */
+    html {
+      margin: 0 !important;
+      padding: 0 !important;
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -65,40 +114,13 @@
 </head>
 
 <body>
-  <div id="loadingOverlay">
-    <div class="spinner" aria-hidden="true"></div>
-    <div class="loading-text">Loading chart...</div>
-  </div>
-
-  <div id="mainContent" aria-hidden="true">
+  <div id="mainContent" style="background: #4fc3f7;"> <!-- blue for debug -->
     <div id="mainContentTop">
       <div class="title-row">
         <h2 class="main-title"><span class="title-part title-part-1">NAEI Multi-Group</span> <span class="title-part title-part-2">Pollutant Line Chart</span></h2>
       </div>
       <!-- Everything above the chart (dropdowns, buttons, group info, etc.) -->
     </div>
-  <details class="my-4 bg-gray-50 rounded-2xl shadow-sm p-4" style="margin-right: 130px;">
-    <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
-      📘 Quick Start Guide
-    </summary>
-
-    <div id="quickStartContent" class="space-y-3 text-gray-800 leading-relaxed" style="margin-top: 12px;">
-      <!-- Quick Start Guide will be loaded here from quick-start.html -->
-    </div>
-  </details>
-
-  <style>
-    details[open] {
-      margin-bottom: 2rem;
-    }
-    details[open] > #quickStartContent {
-      border: 2px solid #9ca3af;
-      background: #f9fafb;
-      border-radius: 1rem;
-      padding: 16px 20px;
-      margin-top: 12px;
-    }
-  </style>
 
   <script>
     // Detect Opera browser and add a class for Opera-specific styling
@@ -108,30 +130,6 @@
         document.documentElement.classList.add('opera-browser');
       }
     })();
-    
-    // Load Quick Start Guide content
-    fetch('quick-start.html')
-      .then(response => response.text())
-      .then(html => {
-        document.getElementById('quickStartContent').innerHTML = html;
-        
-        // Attach the close button event listener after content is loaded
-        const closeBtn = document.getElementById('closeQuickStart');
-        if (closeBtn) {
-          closeBtn.addEventListener('click', function() {
-            const details = this.closest('details');
-            if (details) {
-              details.removeAttribute('open');
-              // Scroll to the top of the page
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }
-          });
-        }
-      })
-      .catch(error => {
-        console.error('Failed to load Quick Start Guide:', error);
-        document.getElementById('quickStartContent').innerHTML = '<p class="text-red-600">Failed to load guide content.</p>';
-      });
   </script>
 
       <div class="button-row">
@@ -187,20 +185,39 @@
       <div class="chart-wrapper">
         <div id="chartTitle" aria-hidden="false"></div>
         <div id="customLegend" aria-hidden="true"></div>
-        <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
+        <div style="position: relative;">
+          <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
+            <!-- White extension for axis label background -->
+            <div id="chart-bg-extension" style="position: absolute; left: 0; right: 0; height: 40px; background: white; bottom: -40px; z-index: 0;"></div>
+        </div>
       </div>
     </div>
 
   </div>
 
   <!-- Shared Resources -->
-  <script src="../../Shared Resources/supabase-config.js"></script>
-  <script src="../../Shared Resources/analytics.js"></script>
-  <script src="../../Shared Resources/colors.js"></script>
+  <script src="Shared Resources/supabase-config.js"></script>
+  <script src="Shared Resources/analytics.js"></script>
+  <script src="Shared Resources/colors.js"></script>
   
   <!-- Application Modules -->
-  <script src="supabase.js"></script>
-  <script src="main.js"></script>
-  <script src="export.js"></script>
+  <script src="CIC-test-naei-linechart/v2.4-shared-CIC-testdb/supabase.js"></script>
+  <script src="CIC-test-naei-linechart/v2.4-shared-CIC-testdb/main.js"></script>
+  <script src="CIC-test-naei-linechart/v2.4-shared-CIC-testdb/export.js"></script>
+  
+  <!-- Parent window communication -->
+  <script>
+    // IMMEDIATE EXECUTION TEST
+    console.log('🚀 IFRAME SCRIPT STARTING');
+    
+    // Send chart ready message to parent
+    console.log('📤 Sending immediate debug message to parent...');
+    window.parent.postMessage({
+      type: 'debug',
+      message: 'Iframe script executed successfully!'
+    }, '*');
+    
+    console.log('✅ Iframe script setup complete');
+  </script>
 </body>
 </html>
