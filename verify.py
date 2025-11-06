@@ -1,29 +1,28 @@
-
 import asyncio
 from playwright.async_api import async_playwright
-import os
 
 async def main():
     async with async_playwright() as p:
         browser = await p.chromium.launch()
         page = await browser.new_page()
 
-        # Construct the file path to the HTML file
-        # The script is in the root, and the HTML is also in the root
-        file_path = "file://" + os.path.abspath("linechart.html")
+        # Listen for console messages
+        page.on("console", lambda msg: print(f"CONSOLE: {msg.text}"))
+        # Listen for page errors
+        page.on("pageerror", lambda err: print(f"PAGE ERROR: {err}"))
 
-        print(f"Navigating to {file_path}")
-        await page.goto(file_path)
+        await page.goto('file:///app/CIC-test-naei-linechart/v2.4-shared-CIC-testdb/index.html')
 
-        # Wait for the chart to be rendered
-        await page.wait_for_selector('#chart_div svg')
-
-        # Take a screenshot
-        screenshot_path = "linechart_verification.png"
-        await page.screenshot(path=screenshot_path)
-        print(f"Screenshot saved to {screenshot_path}")
+        try:
+            # Wait longer for the selector
+            await page.wait_for_selector('#chart_div svg', timeout=60000)
+            print("SUCCESS: Chart SVG found!")
+            await page.screenshot(path='screenshot.png')
+        except Exception as e:
+            print(f"ERROR: Failed to find chart SVG. {e}")
+            # Take a screenshot anyway to see what the page looks like
+            await page.screenshot(path='screenshot_error.png')
 
         await browser.close()
 
-if __name__ == "__main__":
-    asyncio.run(main())
+asyncio.run(main())

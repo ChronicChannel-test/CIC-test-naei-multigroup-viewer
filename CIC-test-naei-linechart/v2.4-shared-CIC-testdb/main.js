@@ -491,310 +491,519 @@ function addCustomXAxisLabels() {
   try {
     const chartContainer = document.getElementById('chart_div');
     const svg = chartContainer ? chartContainer.querySelector('svg') : null;
-    if (!svg || !chart) {
+    if (!svg) {
+      console.warn('[CustomYearTicks] SVG not found in chart_div');
+      return;
+    }
+    if (!chart) {
+      console.warn('[CustomYearTicks] Chart instance not found');
       return;
     }
 
     const chartLayout = chart.getChartLayoutInterface();
-    const chartArea = chartLayout.getChartAreaBoundingBox();
-    if (!chartArea || chartArea.width <= 0) {
-        return; // Chart not ready
+    if (!chartLayout || !chartLayout.getChartAreaBoundingBox) {
+      console.warn('[CustomYearTicks] Chart layout not ready for custom labels. chartLayout:', chartLayout);
+      return;
     }
-    const labelY = chartArea.top + chartArea.height + 20; // Y position for year ticks
+    const chartArea = chartLayout.getChartAreaBoundingBox();
+    const labelY = chartArea.top + chartArea.height + 15; // Position BELOW chart area, before "Year" label
     const ns = 'http://www.w3.org/2000/svg';
 
-    // --- Remove previous custom labels ---
-    const existingLabels = svg.querySelectorAll('[data-custom-label-group="true"]');
-    existingLabels.forEach(el => el.remove());
-
-    // --- Data setup for labels ---
     const startYear = +document.getElementById('startYear').value;
     const endYear = +document.getElementById('endYear').value;
     const yearsAll = window.globalYears || [];
     const startIdx = yearsAll.indexOf(String(startYear));
     const endIdx = yearsAll.indexOf(String(endYear));
-    if (startIdx === -1 || endIdx === -1) return;
+    if (startIdx === -1 || endIdx === -1) {
+      console.warn('[CustomYearTicks] Invalid start/end year index');
+      return;
+    }
     const years = yearsAll.slice(startIdx, endIdx + 1);
 
-    // --- Calculate which ticks to show ---
+    // Get the initial list of years to show from the tick calculator
     const chartWidth = chartArea.width;
-    const labelsToShow = calculateYearTicks(years, chartWidth);
+    let labelsToShow = calculateYearTicks(years, chartWidth);
 
-    // --- Create SVG group for all labels ---
-    const labelGroup = document.createElementNS(ns, 'g');
-    labelGroup.setAttribute('data-custom-label-group', 'true');
-    labelGroup.style.pointerEvents = 'none'; // Prevent labels from capturing mouse events
+    // Refine the list of labels to prevent overlap near the end.
+    const minSpacing = 40; // Minimum pixels between labels
+    if (labelsToShow.length >= 2) {
+      const lastYear = labelsToShow[labelsToShow.length - 1];
+      const penultimateYear = labelsToShow[labelsToShow.length - 2];
 
-    // --- Create and add year tick labels ---
-    const minSpacing = 45; // Min pixel spacing
-    const renderedLabels = [];
+      const lastYearIndex = years.indexOf(lastYear);
+      const penultimateYearIndex = years.indexOf(penultimateYear);
 
-    labelsToShow.forEach((year, index) => {
-        const yearIndex = years.indexOf(year);
-        if (yearIndex === -1) return;
+      // Check if both years are valid and get their pixel locations
+      if (lastYearIndex !== -1 && penultimateYearIndex !== -1) {
+        const lastX = chartLayout.getXLocation(lastYearIndex);
+        const penultimateX = chartLayout.getXLocation(penultimateYearIndex);
+        console.log('[CustomYearTicks] lastX:', lastX, 'penultimateX:', penultimateX);
 
-        const x = chartLayout.getXLocation(yearIndex);
-
-        // Overlap check with previously rendered label
-        if (index > 0) {
-            const prevLabel = renderedLabels[renderedLabels.length - 1];
-            if (x - prevLabel.x < minSpacing) {
-                return; // Skip this label, it's too close
-            }
+        // If the penultimate label is too close to the last one, remove it
+        if ((lastX - penultimateX) < minSpacing) {
+          labelsToShow.splice(labelsToShow.length - 2, 1);
         }
+      }
+    }
 
-        const text = document.createElementNS(ns, 'text');
-        text.setAttribute('x', x);
-        text.setAttribute('y', labelY);
-        text.setAttribute('text-anchor', 'middle');
-        text.setAttribute('font-family', 'Arial, sans-serif');
-        text.setAttribute('font-size', '12');
-        text.setAttribute('fill', '#444');
-        text.textContent = year;
-
-        labelGroup.appendChild(text);
-        renderedLabels.push({ x: x });
+    // Remove previous custom year labels before drawing new ones (only if they exist)
+    const existingLabels = svg.querySelectorAll('[data-custom-year], [data-custom-year-label], [data-custom-label-group]');
+    if (existingLabels.length > 0) {
+      existingLabels.forEach(el => el.remove());
+    }
+    
+    // Hide ALL potential Google Charts "Year" labels more aggressively
+    const allTexts = svg.querySelectorAll('text');
+    allTexts.forEach(text => {
+      const content = text.textContent.trim().toLowerCase();
+      // Hide if it's "year" and not our custom label
+      if (content === 'year' && !text.hasAttribute('data-custom-year-label')) {
+        text.style.display = 'none';
+        text.style.visibility = 'hidden';
+        text.setAttribute('opacity', '0');
+      }
     });
 
-    // --- Create and add the 'Year' title ---
-    const yearTitle = document.createElementNS(ns, 'text');
-    const yearTitleY = labelY + 22; // Position below the ticks
-    yearTitle.setAttribute('x', chartArea.left + chartArea.width / 2);
-    yearTitle.setAttribute('y', yearTitleY);
-    yearTitle.setAttribute('text-anchor', 'middle');
-    yearTitle.setAttribute('font-family', 'Arial, sans-serif');
-    yearTitle.setAttribute('font-size', '13');
-    yearTitle.setAttribute('font-weight', 'bold');
-    yearTitle.setAttribute('fill', '#333');
-    yearTitle.textContent = 'Year';
-    labelGroup.appendChild(yearTitle);
+    // Create a group for all custom labels
+    const unclippedGroup = document.createElementNS(ns, 'g');
+    unclippedGroup.setAttribute('data-custom-label-group', 'true');
+    unclippedGroup.setAttribute('clip-path', 'none'); // Ensure no clipping
 
-    // --- Append the group to the SVG ---
-    svg.appendChild(labelGroup);
+    // Create and add the year labels
+    labelsToShow.forEach(year => {
+      const yearIndex = years.indexOf(year);
+      if (yearIndex === -1) return;
+      
+      const x = chartLayout.getXLocation(yearIndex);
+      const text = document.createElementNS(ns, 'text');
+      text.setAttribute('x', x);
+      text.setAttribute('y', labelY);
+      text.setAttribute('text-anchor', 'middle');
+      text.setAttribute('font-family', 'Arial, sans-serif');
+      text.setAttribute('font-size', '12');
+      text.setAttribute('fill', '#666');
+      text.setAttribute('data-custom-year', 'true');
+      text.textContent = year;
+      unclippedGroup.appendChild(text);
+    });
+
+    // Add 'Year' label centered below the year ticks
+    const yearLabel = document.createElementNS(ns, 'text');
+    const yearLabelY = labelY + 20;
+    yearLabel.setAttribute('x', chartArea.left + chartArea.width / 2);
+    yearLabel.setAttribute('y', yearLabelY);
+    yearLabel.setAttribute('text-anchor', 'middle');
+    yearLabel.setAttribute('font-family', 'Arial, sans-serif');
+    yearLabel.setAttribute('font-size', '13');
+    yearLabel.setAttribute('font-weight', 'bold');
+    yearLabel.setAttribute('fill', '#666');
+    yearLabel.setAttribute('data-custom-year-label', 'true');
+    yearLabel.textContent = 'Year';
+    unclippedGroup.appendChild(yearLabel);
     
-    // --- Adjust container height if needed ---
-    const svgHeight = parseFloat(svg.getAttribute('height'));
-    const requiredHeight = yearTitleY + 10;
-    if (requiredHeight > svgHeight) {
-        svg.setAttribute('height', requiredHeight);
+    // Trim white background rectangles BEFORE appending labels
+    const bgRects = svg.querySelectorAll('rect[fill="#ffffff"], rect[fill="white"], rect[fill="rgb(255, 255, 255)"]');
+    bgRects.forEach(rect => {
+      const y = parseFloat(rect.getAttribute('y') || '0');
+      const height = parseFloat(rect.getAttribute('height') || '0');
+      const rectBottom = y + height;
+      const chartBottom = chartArea.top + chartArea.height;
+      
+      // If rect extends below the chart area, trim it to the chart bottom
+      if (rectBottom > chartBottom + 2) { // +2px tolerance
+        const newHeight = Math.max(0, chartBottom - y);
+        rect.setAttribute('height', newHeight.toString());
+      }
+    });
+    
+    // Append the group to SVG
+    svg.appendChild(unclippedGroup);
+    
+    // Expand SVG height to accommodate labels (with extra padding)
+    const finalRequiredHeight = yearLabelY + 15; // Extra 5px padding
+    const currentHeight = parseFloat(svg.getAttribute('height') || '0');
+    if (finalRequiredHeight > currentHeight) {
+      svg.setAttribute('height', finalRequiredHeight.toString());
     }
-    // Ensure parent containers can show the new labels
-    chartContainer.style.overflow = 'visible';
-    svg.style.overflow = 'visible';
-    const chartWrapper = document.querySelector('.chart-wrapper');
-    if (chartWrapper) {
-      chartWrapper.style.overflow = 'visible';
-      chartWrapper.style.paddingBottom = '30px';
+    svg.style.overflow = 'visible'; // Ensure SVG doesn't clip
+    
+    // Also expand the container div
+    const chartDiv = svg.parentElement;
+    if (chartDiv) {
+      chartDiv.style.height = finalRequiredHeight + 'px';
+      chartDiv.style.overflow = 'visible';
     }
-
   } catch (e) {
-    console.warn('Could not add custom year labels:', e);
+    console.warn('[CustomYearTicks] Could not add custom year labels:', e);
   }
 }
 
-// Global render lock to prevent race conditions
-let isRendering = false;
 
-function updateChart() {
-    if (isRendering) {
-        console.warn('Blocked concurrent render of chart.');
-        return;
-    }
-    isRendering = true;
-    console.log('🎨 updateChart() called');
-
-    if (!googleChartsReady) {
-        google.charts.setOnLoadCallback(() => {
-            googleChartsReady = true;
-            isRendering = false; // Reset lock before retrying
-            updateChart();
-        });
-        return;
-    }
+function updateChart(){
+  // Create stack trace to see where this is being called from
+  const stack = new Error().stack;
+  const caller = stack?.split('\n')[2]?.trim() || 'unknown caller';
+  console.log('🎨 updateChart() called from:', caller);
+  console.log('📚 Full stack trace:', stack);
   
-    const pollutant = document.getElementById('pollutantSelect').value;
-    const startYear = +document.getElementById('startYear').value;
-    const endYear = +document.getElementById('endYear').value;
-    const selectedGroups = getSelectedGroups();
-
-    if (!pollutant || !startYear || !endYear || !selectedGroups.length) {
-        isRendering = false; // Release lock if not ready to draw
-        return;
-    }
-
-    updateUrlFromChartState();
-    window.supabaseModule.trackAnalytics('chart_view', {
-        pollutant: pollutant,
-        start_year: startYear,
-        end_year: endYear,
-        groups: selectedGroups,
-        groups_count: selectedGroups.length,
-        year_range: endYear - startYear + 1
+  // Wait for Google Charts to be ready
+  if (!googleChartsReady) {
+    console.log('Google Charts not ready yet for line chart, waiting...');
+    google.charts.setOnLoadCallback(() => {
+      googleChartsReady = true;
+      updateChart();
     });
-    window.Colors.resetColorSystem();
+    return;
+  }
 
-    const yearsAll = window.globalYears || [];
-    const yearKeys = window.globalYearKeys || [];
-    const startIdx = yearsAll.indexOf(String(startYear));
-    const endIdx = yearsAll.indexOf(String(endYear));
-    const years = yearsAll.slice(startIdx, endIdx + 1);
-    const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
-    const colors = selectedGroups.map(g => window.Colors.getColorForGroup(g));
+  const pollutant = document.getElementById('pollutantSelect').value;
+  const startYear = +document.getElementById('startYear').value;
+  const endYear = +document.getElementById('endYear').value;
+  const selectedGroups = getSelectedGroups();
 
-    const chartRows = years.map((y, rowIdx) => {
-      const row = [y];
-      const key = keysForYears[rowIdx];
-      selectedGroups.forEach(g => {
-        const dataRow = groupedData[pollutant]?.[g];
-        const raw = dataRow ? dataRow[key] : null;
-        const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
-        row.push(Number.isNaN(val) ? null : val);
-      });
-      return row;
-    });
-
-    if (chartRows.length === 0) {
-        isRendering = false;
-        return;
+  // If essential selections aren’t ready yet, retry briefly (handles race with URL parsing/DOM updates)
+  if (!pollutant || !startYear || !endYear || !selectedGroups.length) {
+    window.__updateRetryCount = (window.__updateRetryCount || 0) + 1;
+    const missing = [];
+    if (!pollutant) missing.push('pollutant');
+    if (!startYear) missing.push('startYear');
+    if (!endYear) missing.push('endYear');
+    if (!selectedGroups.length) missing.push('groups');
+    console.log('⏳ updateChart deferred (' + window.__updateRetryCount + ') – waiting for: ' + missing.join(', '));
+    if (window.__updateRetryCount <= 20) {
+      setTimeout(updateChart, 75);
+      return;
+    } else {
+      console.warn('updateChart gave up waiting for selections; not drawing.');
+      window.__updateRetryCount = 0;
+      return;
     }
+  }
+  // Reset retry counter once ready
+  window.__updateRetryCount = 0;
 
-    const groupHasData = selectedGroups.map((g, i) => chartRows.some(row => typeof row[i + 1] === 'number'));
-    const unit = pollutantUnits[pollutant] || "";
+  // Update the URL with the new state (debounced)
+  updateUrlFromChartState();
 
-    const dataTable = new google.visualization.DataTable();
-    dataTable.addColumn('string', 'Year');
+  // Track chart view analytics
+  window.supabaseModule.trackAnalytics('chart_view', {
+    pollutant: pollutant,
+    start_year: startYear,
+    end_year: endYear,
+    groups: selectedGroups,
+    groups_count: selectedGroups.length,
+    year_range: endYear - startYear + 1
+  });
+
+  window.Colors.resetColorSystem();
+  // Use the global year keys to determine which years to display
+  const yearsAll = window.globalYears || [];
+  const yearKeys = window.globalYearKeys || [];
+  const startIdx = yearsAll.indexOf(String(startYear));
+  const endIdx = yearsAll.indexOf(String(endYear));
+  const years = yearsAll.slice(startIdx, endIdx + 1);
+  const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
+  const colors = selectedGroups.map(g => window.Colors.getColorForGroup(g));
+
+  // Build rows of data (year + series values). Use null for missing.
+  const chartRows = years.map((y, rowIdx) => {
+    const row = [y];
+    const key = keysForYears[rowIdx]; // e.g. 'f2015'
     selectedGroups.forEach(g => {
-      dataTable.addColumn('number', g);
-      dataTable.addColumn({type: 'string', role: 'tooltip'});
+      const dataRow = groupedData[pollutant]?.[g];
+      const raw = dataRow ? dataRow[key] : null;
+      const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
+      row.push(Number.isNaN(val) ? null : val);
     });
+    return row;
+  });
 
-    chartRows.forEach(row => {
-      const newRow = [row[0]];
-      for (let i = 1; i < row.length; i++) {
-        const value = row[i];
-        newRow.push(value);
-        if (value === null || value === undefined) {
-          newRow.push(null);
+  // guard against empty data
+  if (chartRows.length === 0) return;
+
+  // --- Determine which groups actually have data ---
+  const groupHasData = selectedGroups.map((g, i) => {
+    return chartRows.some(row => typeof row[i + 1] === 'number');
+  });
+
+  // Get unit before creating DataTable (needed for tooltips)
+  const unit = pollutantUnits[pollutant] || "";
+
+  // Create DataTable explicitly to guarantee column types
+  const dataTable = new google.visualization.DataTable();
+  dataTable.addColumn('string', 'Year');           // year as string
+  selectedGroups.forEach(g => {
+    dataTable.addColumn('number', g);              // data column
+    dataTable.addColumn({type: 'string', role: 'tooltip'}); // custom tooltip
+  });
+  
+  // Add rows with custom tooltips for dynamic decimal precision
+  chartRows.forEach(row => {
+    const newRow = [row[0]]; // year
+    for (let i = 1; i < row.length; i++) {
+      const value = row[i];
+      newRow.push(value); // actual value
+      
+      // Generate tooltip with dynamic precision
+      if (value === null || value === undefined) {
+        newRow.push(null);
+      } else {
+        const groupName = selectedGroups[i - 1];
+        let formattedValue;
+        
+        // Use more decimals for very small values
+        if (Math.abs(value) < 0.001 && value !== 0) {
+          formattedValue = value.toFixed(9).replace(/\.?0+$/, ''); // Up to 9 decimals for very small values
+        } else if (Math.abs(value) < 1 && value !== 0) {
+          formattedValue = value.toFixed(6).replace(/\.?0+$/, ''); // Up to 6 decimals, remove trailing zeros
         } else {
-          const groupName = selectedGroups[i - 1];
-          let formattedValue;
-          if (Math.abs(value) < 0.001 && value !== 0) formattedValue = value.toFixed(9).replace(/\.?0+$/, '');
-          else if (Math.abs(value) < 1 && value !== 0) formattedValue = value.toFixed(6).replace(/\.?0+$/, '');
-          else formattedValue = value.toFixed(3).replace(/\.?0+$/, '');
-          const tooltip = `${groupName}\nYear: ${row[0]}\nValue: ${formattedValue}${unit ? ' ' + unit : ''}`;
-          newRow.push(tooltip);
+          formattedValue = value.toFixed(3).replace(/\.?0+$/, ''); // 3 decimals for normal values
         }
+        
+        const tooltip = groupName + '\nYear: ' + row[0] + '\nValue: ' + formattedValue + (unit ? ' ' + unit : '');
+        newRow.push(tooltip);
       }
-      dataTable.addRow(newRow);
-    });
-  
-    const seriesOptions = {};
-    selectedGroups.forEach((g, i) => {
-      if (seriesVisibility.length !== selectedGroups.length) seriesVisibility = Array(selectedGroups.length).fill(true);
-      seriesOptions[i] = seriesVisibility[i] ? { color: colors[i], lineWidth: 3, pointSize: 4 } : { color: colors[i], lineWidth: 0, pointSize: 0 };
-    });
-  
-    const maxValue = Math.max(...chartRows.flatMap(r => r.slice(1).filter(v => typeof v === "number")));
-    let labelString;
-    if (maxValue >= 100) labelString = Math.round(maxValue).toString();
-    else if (maxValue >= 1) labelString = maxValue.toFixed(1);
-    else if (maxValue >= 0.01) labelString = maxValue.toFixed(3);
-    else if (maxValue >= 0.0001) labelString = maxValue.toFixed(6);
-    else labelString = maxValue.toExponential(2);
-    const labelLength = labelString.length;
-    const baseMargin = 60;
-    const extraChars = Math.max(0, labelLength - 3);
-    const leftMargin = Math.min(140, baseMargin + (extraChars * 6));
+    }
+    dataTable.addRow(newRow);
+  });
 
-    const chartContainer = document.getElementById('chart_div');
+  const seriesOptions = {};
+  selectedGroups.forEach((g, i) => {
+    // Use the global seriesVisibility state to determine visibility
+    // Ensure the array is initialized if this is the first run or group count changed
+    if (seriesVisibility.length !== selectedGroups.length) {
+      seriesVisibility = Array(selectedGroups.length).fill(true);
+      window.seriesVisibility = seriesVisibility; // Update window reference
+    }
+    seriesOptions[i] = seriesVisibility[i]
+      ? { color: colors[i], lineWidth: 3, pointSize: 4 }
+      : { color: colors[i], lineWidth: 0, pointSize: 0 };
+  });
+
+  // Estimate left margin dynamically based on Y-axis label width
+  const maxValue = Math.max(
+    ...chartRows.flatMap(r => r.slice(1).filter(v => typeof v === "number"))
+  );
+  
+  // Determine how Google Charts will format the label based on value magnitude
+  let labelString;
+  if (maxValue >= 100) {
+    // Large values: Google Charts shows as integers or 1 decimal
+    labelString = Math.round(maxValue).toString();
+  } else if (maxValue >= 1) {
+    // Medium values: shows 1-2 decimals
+    labelString = maxValue.toFixed(1);
+  } else if (maxValue >= 0.01) {
+    // Small values: shows 2-3 decimals
+    labelString = maxValue.toFixed(3);
+  } else if (maxValue >= 0.0001) {
+    // Very small values: Google Charts typically shows 6 significant figures
+    labelString = maxValue.toFixed(6);
+  } else {
+    // Extremely small values: use scientific notation estimate
+    labelString = maxValue.toExponential(2); // e.g., "1.23e-7"
+  }
+  
+  const labelLength = labelString.length;
+  // Dynamic left margin: scale based on label length
+  // For short labels (1-3 chars): 60px base
+  // For longer labels: add 6px per character beyond 3 (reduced from 7px)
+  const baseMargin = 60;
+  const extraChars = Math.max(0, labelLength - 3);
+  const leftMargin = Math.min(140, baseMargin + (extraChars * 6)); // dynamic left padding
+
+  // Set a fixed height for the chart container to prevent layout shifts
+  const chartContainer = document.getElementById('chart_div');
+  if (chartContainer) {
     chartContainer.style.minHeight = '500px';
+  }
 
-    const options = {
-      title: '',
-      width: '100%',
-      height: '100%', // Use 100% to fill container
-      legend: 'none',
-      animation: { duration: 200, easing: 'out', startup: true },
-      hAxis: {
-        title: '', // Custom title is SVG
-        textPosition: 'none', // Hide default year ticks
-        gridlines: { color: '#e0e0e0' },
-        baselineColor: '#666'
+  const options = {
+    title: '',
+    width: '100%',
+    legend: 'none',
+    // Configure animations - enable them but with a very short duration
+    animation: {
+      duration: 100,
+      easing: 'out',
+      startup: true
+    },
+    // Configure chart area and axes
+    chartArea: { 
+      width: '85%', 
+      height: '80%',
+      top: 40,
+      bottom: 60,
+      left: 100,
+      right: 40
+    },
+    hAxis: {
+      title: '', // Title is now handled by a custom DOM element
+      textPosition: 'none', // Hide the default labels entirely
+      titleTextStyle: { 
+        fontSize: 13, 
+        bold: true 
       },
-      vAxis: {
-        title: `Emissions${unit ? " (" + unit + ")" : ""}`,
-        viewWindow: { min: 0 },
-        textStyle: { fontSize: 12 },
-        titleTextStyle: { fontSize: 14, bold: true, wrap: false },
-        textPosition: 'out',
+      gridlines: { 
+        color: '#e0e0e0'
       },
-      series: seriesOptions,
-      curveType: smoothLines ? 'function' : 'none',
-      lineWidth: 3,
-      pointSize: 4,
-      chartArea: {
-        top: 20,
-        left: leftMargin,
-        right: 20,
-        bottom: 60,
-        width: '100%',
-        height: '80%'
-      }
-    };
+      baselineColor: '#666'
+    },
+    vAxis: {
+      title: 'Emissions' + (unit ? ' (' + unit + ')' : ''),
+      viewWindow: { 
+        min: 0 
+      },
+      textStyle: { 
+        fontSize: 12 
+      },
+      titleTextStyle: {
+        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 12 : 14,
+        bold: true,
+        wrap: false
+      },
+      textPosition: 'out', // Ensure title is positioned outside to avoid overlap
+    },
+    series: seriesOptions,
+    curveType: smoothLines ? 'function' : 'none',
+    lineWidth: 3,
+    pointSize: 4,
+    chartArea: {
+      top: 20,
+      left: leftMargin,
+      right: 10,
+      bottom: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 80 : 60 // Add extra bottom padding for landscape mode
+    }
+  };
+  
 
-    chart = new google.visualization.LineChart(chartContainer);
+  // draw chart and show pollutant as visible page title
+  chart = new google.visualization.LineChart(chartContainer);
 
-    google.visualization.events.addListener(chart, 'ready', () => {
-        addCustomXAxisLabels();
-        isRendering = false; // Release lock AFTER drawing is ready
+  // Add a 'ready' event listener that will fire after every draw,
+  // ensuring custom labels are always present.
+  google.visualization.events.addListener(chart, 'ready', addCustomXAxisLabels);
 
-        if (window.parent && window.parent !== window) {
-            setTimeout(() => {
-                const bodyHeight = document.body.scrollHeight;
-                const buffer = 20;
-                const newHeight = Math.ceil(bodyHeight) + buffer;
-                window.parent.postMessage({
-                    type: 'iframeHeight',
-                    chart: 'line',
-                    height: newHeight
-                }, '*');
-            }, 50);
-        }
-    });
+  // On mobile, show only first and last year for clarity
+  const isMobile = window.innerWidth < 600;
+  if (isMobile) {
+    options.hAxis.slantedText = true;
+    options.hAxis.slantedTextAngle = 90;
+  }
+    // Ensure a small right chart padding so the chart fills most of the container
+  if (options.chartArea) {
+    // Reduce the minimum right padding; previously set to 80px which left a large gap.
+    options.chartArea.right = Math.max(options.chartArea.right || 10, 20);
+    if (isMobile) {
+      options.chartArea.width = '70%';
+    }
+  }
 
-    const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
-    const safeHeight = Math.max(chartContainer.offsetHeight || 0, 400);
-    options.width = safeWidth;
-    options.height = safeHeight;
+  // Compute safe width/height to avoid negative SVG dimensions
+  const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
+  const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+  options.width = safeWidth;
+  options.height = safeHeight;
+    // Ensure a small right chart padding so the chart fills most of the container
+  if (options.chartArea) {
+    // Reduce the minimum right padding; previously set to 80px which left a large gap.
+    options.chartArea.right = Math.max(options.chartArea.right || 10, 20);
+    if (isMobile) {
+      options.chartArea.width = '70%';
+    }
+  }
 
+  // Delay slightly to let layout stabilize (prevents negative sizes)
+  setTimeout(() => {
     chart.draw(dataTable, options);
+    // Only add visible class when parent is already visible to prevent flash
+    if (document.getElementById('mainContent').classList.contains('loaded')) {
+      chartContainer.classList.add('visible');
+    }
 
-    const titleEl = document.getElementById('chartTitle');
-    titleEl.textContent = `${pollutant}${unit ? " (" + unit + ")" : ""}`;
+    // After chart is drawn, send content height to parent
+    if (window.parent && window.parent !== window) {
+      setTimeout(() => {
+        // Use body.scrollHeight which measures actual content
+        const bodyHeight = document.body.scrollHeight;
+        const buffer = 30; // Minimal buffer for axis labels
+        const newHeight = Math.ceil(bodyHeight) + buffer;
+        const currentHeight = window.innerHeight;
+        console.log('📏 Height calculation: body.scrollHeight=', bodyHeight, 'final=', newHeight);
+        if (Math.abs(newHeight - currentHeight) > 20) {
+          console.log('📐 Height update:', currentHeight, 'to', newHeight);
+          window.parent.postMessage({
+            type: 'iframeHeight',
+            chart: 'line',
+            height: newHeight
+          }, '*');
+        }
+      }, 250);
+    }
+  }, 100);
 
-    const legendDiv = document.getElementById('customLegend');
-    legendDiv.innerHTML = '';
-    selectedGroups.forEach((g, i) => {
-      const item = document.createElement('span');
-      const dot = document.createElement('span');
-      dot.style.cssText = `display:inline-block;width:12px;height:12px;border-radius:50%;background-color:${colors[i]}`;
-      item.appendChild(dot);
-      const labelText = document.createTextNode(g + (groupHasData[i] ? '' : ' (No data)'));
-      item.appendChild(labelText);
-      item.style.opacity = (!groupHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
-      if (!groupHasData[i]) item.title = 'No data available';
-      if (groupHasData[i]) {
-        item.addEventListener('click', () => {
-          seriesVisibility[i] = !seriesVisibility[i];
-          updateChart();
-        });
-      }
-      legendDiv.appendChild(item);
-    });
+  // update visible title on page
+  const titleEl = document.getElementById('chartTitle');
+  titleEl.textContent = pollutant + (unit ? " (" + unit + ")" : "");
 
-    refreshGroupDropdowns();
-    refreshButtons();
+  // build custom legend (interactive)
+  const legendDiv = document.getElementById('customLegend');
+  legendDiv.innerHTML = '';
+
+  // Ensure visibility array is correctly sized before building the legend
+  if (seriesVisibility.length !== selectedGroups.length) {
+    seriesVisibility = Array(selectedGroups.length).fill(true);
+    window.seriesVisibility = seriesVisibility; // Update window reference
+  }
+
+  selectedGroups.forEach((g, i) => {
+    const item = document.createElement('span');
+    const dot = document.createElement('span');
+    dot.style.display = 'inline-block';
+    dot.style.width = '12px';
+    dot.style.height = '12px';
+    dot.style.borderRadius = '50%';
+    dot.style.backgroundColor = colors[i];
+    item.appendChild(dot);
+
+    const labelText = document.createTextNode(g + (groupHasData[i] ? '' : ' (No data available)'));
+    item.appendChild(labelText);
+
+    // Fade if no data, or if the series is toggled off
+    item.style.opacity = (!groupHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
+    if (!groupHasData[i]) {
+      item.title = 'No data available';
+    }
+
+    // Toggle visibility only if data exists
+    if (groupHasData[i]) {
+      item.addEventListener('click', () => {
+        // Toggle the visibility state for the clicked series
+        seriesVisibility[i] = !seriesVisibility[i];
+        window.seriesVisibility = seriesVisibility; // Update window reference
+        // Trigger a full chart update to redraw everything correctly
+        updateChart();
+      });
+    }
+
+    legendDiv.appendChild(item);
+  });
+
+  // ensure controls reflect available choices
+  refreshGroupDropdowns();
+  refreshButtons();
 }
+
+// Backward compatibility: some older code paths may still call drawChart()
+// Ensure it simply delegates to the modern updateChart() with readiness guards
+function drawChart() {
+  try {
+    return updateChart();
+  } catch (e) {
+    console.error('drawChart fallback failed:', e);
+  }
+}
+
 
 // Track last resize dimensions to avoid redundant redraws
 let lastResizeWidth = window.innerWidth;
