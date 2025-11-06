@@ -658,6 +658,38 @@ footer a:hover {
   gap: 8px;
 }
 
+/* Error Notification Styles */
+.error-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background-color: #f44336; /* Red */
+  color: white;
+  padding: 15px 40px 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  z-index: 10000;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+  font-family: system-ui, sans-serif;
+  font-size: 16px;
+  max-width: 400px;
+  word-wrap: break-word;
+}
+
+.error-notification .close-button {
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 5px;
+}
+
 .chart-actions-container {
   display: flex;
   align-items: center;

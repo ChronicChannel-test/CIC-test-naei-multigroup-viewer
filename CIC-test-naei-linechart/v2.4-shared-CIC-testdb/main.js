@@ -30,6 +30,47 @@ google.charts.setOnLoadCallback(() => {
   } catch (e) { /* no-op */ }
 })();
 
+/**
+ * Creates and displays a dismissible error notification.
+ * @param {string} message - The error message to display.
+ */
+function showError(message) {
+  try {
+    // Create the notification element
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-notification';
+    errorDiv.textContent = message;
+
+    // Create the close button
+    const closeButton = document.createElement('button');
+    closeButton.textContent = '×';
+    closeButton.className = 'close-button';
+    closeButton.onclick = () => {
+      errorDiv.style.opacity = '0';
+      setTimeout(() => {
+        if (errorDiv.parentNode) {
+          errorDiv.parentNode.removeChild(errorDiv);
+        }
+      }, 300); // Allow fade out transition to complete
+    };
+
+    errorDiv.appendChild(closeButton);
+
+    // Add to the body
+    document.body.appendChild(errorDiv);
+
+    // Fade in the notification
+    setTimeout(() => {
+      errorDiv.style.opacity = '1';
+    }, 10);
+
+  } catch (e) {
+    console.error("Failed to show error notification:", e);
+    // Fallback to alert if the notification system fails
+    alert(message);
+  }
+}
+
 // Export configuration constants
 const EXPORT_MIN_SCALE = 16;
 const EXPORT_MAX_DIM = 16000;
@@ -496,6 +537,10 @@ function addCustomXAxisLabels() {
     if (!svg || !chart) return;
 
     const chartLayout = chart.getChartLayoutInterface();
+    if (!chartLayout || !chartLayout.getChartAreaBoundingBox) {
+      console.warn("Chart layout not ready for custom labels.");
+      return;
+    }
     const chartArea = chartLayout.getChartAreaBoundingBox();
     const labelY = chartArea.top + chartArea.height + 20;
     const ns = 'http://www.w3.org/2000/svg';
@@ -508,21 +553,37 @@ function addCustomXAxisLabels() {
     if (startIdx === -1 || endIdx === -1) return;
     const years = yearsAll.slice(startIdx, endIdx + 1);
 
-    // Use calculateYearTicks to determine which years to show
+    // Get the initial list of years to show from the tick calculator
     const chartWidth = chartArea.width;
-    const labelsToShow = calculateYearTicks(years, chartWidth);
+    let labelsToShow = calculateYearTicks(years, chartWidth);
 
-    const positions = [];
-    const labels = [];
+    // Refine the list of labels to prevent overlap near the end.
     const minSpacing = 40; // Minimum pixels between labels
+    if (labelsToShow.length >= 2) {
+      const lastYear = labelsToShow[labelsToShow.length - 1];
+      const penultimateYear = labelsToShow[labelsToShow.length - 2];
 
-    // First pass: collect all positions
-    for (const year of labelsToShow) {
+      const lastYearIndex = years.indexOf(lastYear);
+      const penultimateYearIndex = years.indexOf(penultimateYear);
+
+      // Check if both years are valid and get their pixel locations
+      if (lastYearIndex !== -1 && penultimateYearIndex !== -1) {
+        const lastX = chartLayout.getXLocation(lastYearIndex);
+        const penultimateX = chartLayout.getXLocation(penultimateYearIndex);
+
+        // If the penultimate label is too close to the last one, remove it
+        if ((lastX - penultimateX) < minSpacing) {
+          labelsToShow.splice(labelsToShow.length - 2, 1);
+        }
+      }
+    }
+
+    // Create and add the final, filtered labels to the SVG
+    labelsToShow.forEach(year => {
       const yearIndex = years.indexOf(year);
-      if (yearIndex === -1) continue;
+      if (yearIndex === -1) return;
       
       const x = chartLayout.getXLocation(yearIndex);
-      positions.push(x);
 
       const text = document.createElementNS(ns, 'text');
       text.setAttribute('x', x);
@@ -535,23 +596,9 @@ function addCustomXAxisLabels() {
       text.setAttribute('data-custom-year', 'true');
       text.textContent = year;
 
-      labels.push({ element: text, x: x, year: year });
-    }
-
-    // If the penultimate label is too close to the final label, drop it
-    if (labels.length >= 2) {
-      const lastIdx = labels.length - 1;
-      const lastX = parseFloat(labels[lastIdx].x || labels[lastIdx].element.getAttribute('x'));
-      const prevX = parseFloat(labels[lastIdx - 1].x || labels[lastIdx - 1].element.getAttribute('x'));
-      if ((lastX - prevX) < minSpacing) {
-        labels.splice(lastIdx - 1, 1);
-      }
-    }
-
-    // Add all labels to the SVG
-    labels.forEach(label => {
-      svg.appendChild(label.element);
+      svg.appendChild(text);
     });
+
   } catch (e) {
     console.warn('Could not add custom year labels:', e);
   }
@@ -832,9 +879,9 @@ function updateChart(){
       right: 40
     },
     hAxis: {
-      title: 'Year',
+      title: '', // Title is now handled by a custom DOM element
       textStyle: { 
-        color: '#666' // Visible Google Charts labels (debug: ensure years visible)
+        color: 'transparent' // Hide default labels; we use custom ones
       },
       titleTextStyle: { 
         fontSize: 13, 
@@ -843,12 +890,7 @@ function updateChart(){
       gridlines: { 
         color: '#e0e0e0'
       },
-      baselineColor: '#666',
-      // Let Google Charts handle the view window
-      viewWindow: {
-        min: 1970,
-        max: 2023
-      }
+      baselineColor: '#666'
     },
     vAxis: {
       title: `Emissions${unit ? ' (' + unit + ')' : ''}`,
@@ -882,14 +924,12 @@ function updateChart(){
   // draw chart and show pollutant as visible page title
   chart = new google.visualization.LineChart(chartContainer);
 
-  // Add a 'ready' event listener that will fire after every draw,
-  // ensuring custom labels are always present.
-  google.visualization.events.addListener(chart, 'ready', function() {
-    addCustomYearLabel(chart, chartContainer);
-  });
-
-  // Wrap custom X-axis labels with a safe fallback to Google labels
+  // Single 'ready' event listener to handle all post-draw actions
   google.visualization.events.addListener(chart, 'ready', () => {
+    // 1. Add custom year axis title
+    addCustomYearLabel(chart, chartContainer);
+
+    // 2. Add custom year tick labels, with a fallback
     let customOk = false;
     try {
       if (typeof addCustomXAxisLabels === 'function') {
@@ -900,21 +940,20 @@ function updateChart(){
       console.warn('Custom X-axis labels failed:', e);
       customOk = false;
     }
-    // If custom labels failed, redraw once with default Google labels visible
+
+    // Fallback: If custom labels failed, redraw once with default Google labels
     if (!customOk && !window.__labelFallback) {
       window.__labelFallback = true;
       try {
-        options.hAxis.textStyle = options.hAxis.textStyle || {};
-        options.hAxis.textStyle.color = '#666';
-        chart.draw(dataTable, options);
+        const fallbackOptions = { ...options };
+        fallbackOptions.hAxis.textStyle = { color: '#666' };
+        chart.draw(dataTable, fallbackOptions);
       } finally {
         setTimeout(() => { window.__labelFallback = false; }, 0);
       }
     }
-  });
-  
-  // Add listener for chart render completion (for loading management)
-  google.visualization.events.addListener(chart, 'ready', () => {
+
+    // 3. Notify that the chart has finished rendering (for loading management)
     if (chartRenderCallback) {
       console.log('Line chart finished rendering');
       chartRenderCallback();
@@ -1463,8 +1502,8 @@ async function init() {
 
   } catch (error) {
     console.error("Initialization failed:", error);
-    // Loading overlay removed - error handling via console and main index.html
-    alert(`Error loading line chart: ${error.message}. Please check the console and refresh the page.`);
+    // Use the new non-blocking error notification
+    showError(`Error loading line chart: ${error.message}. Please check the console and refresh the page.`);
   }
 }
 
