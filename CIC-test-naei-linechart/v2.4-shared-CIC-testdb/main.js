@@ -556,17 +556,22 @@ function addCustomXAxisLabels() {
       existingLabels.forEach(el => el.remove());
     }
     
-    // Also hide any Google Charts "Year" label
+    // Hide ALL potential Google Charts "Year" labels more aggressively
     const allTexts = svg.querySelectorAll('text');
     allTexts.forEach(text => {
-      if (text.textContent.trim().toLowerCase() === 'year' && !text.hasAttribute('data-custom-year-label')) {
+      const content = text.textContent.trim().toLowerCase();
+      // Hide if it's "year" and not our custom label
+      if (content === 'year' && !text.hasAttribute('data-custom-year-label')) {
         text.style.display = 'none';
+        text.style.visibility = 'hidden';
+        text.setAttribute('opacity', '0');
       }
     });
 
     // Create a group for all custom labels
     const unclippedGroup = document.createElementNS(ns, 'g');
     unclippedGroup.setAttribute('data-custom-label-group', 'true');
+    unclippedGroup.setAttribute('clip-path', 'none'); // Ensure no clipping
 
     // Create and add the year labels
     labelsToShow.forEach(year => {
@@ -600,29 +605,37 @@ function addCustomXAxisLabels() {
     yearLabel.textContent = 'Year';
     unclippedGroup.appendChild(yearLabel);
     
-    // Append the group to SVG
-    svg.appendChild(unclippedGroup);
-    
-    // Expand SVG height to accommodate labels
-    const finalRequiredHeight = yearLabelY + 10;
-    svg.setAttribute('height', finalRequiredHeight.toString());
-    svg.style.overflow = 'visible'; // Ensure SVG doesn't clip
-    
-    // Remove any white background rectangles that might cover the border
-    const bgRects = svg.querySelectorAll('rect[fill="#ffffff"], rect[fill="white"]');
+    // Trim white background rectangles BEFORE appending labels
+    const bgRects = svg.querySelectorAll('rect[fill="#ffffff"], rect[fill="white"], rect[fill="rgb(255, 255, 255)"]');
     bgRects.forEach(rect => {
       const y = parseFloat(rect.getAttribute('y') || '0');
       const height = parseFloat(rect.getAttribute('height') || '0');
-      // If rect extends below the original chart area, adjust it
-      if (y + height > chartArea.top + chartArea.height) {
-        rect.setAttribute('height', (chartArea.top + chartArea.height - y).toString());
+      const rectBottom = y + height;
+      const chartBottom = chartArea.top + chartArea.height;
+      
+      // If rect extends below the chart area, trim it to the chart bottom
+      if (rectBottom > chartBottom + 2) { // +2px tolerance
+        const newHeight = Math.max(0, chartBottom - y);
+        rect.setAttribute('height', newHeight.toString());
       }
     });
+    
+    // Append the group to SVG
+    svg.appendChild(unclippedGroup);
+    
+    // Expand SVG height to accommodate labels (with extra padding)
+    const finalRequiredHeight = yearLabelY + 15; // Extra 5px padding
+    const currentHeight = parseFloat(svg.getAttribute('height') || '0');
+    if (finalRequiredHeight > currentHeight) {
+      svg.setAttribute('height', finalRequiredHeight.toString());
+    }
+    svg.style.overflow = 'visible'; // Ensure SVG doesn't clip
     
     // Also expand the container div
     const chartDiv = svg.parentElement;
     if (chartDiv) {
       chartDiv.style.height = finalRequiredHeight + 'px';
+      chartDiv.style.overflow = 'visible';
     }
   } catch (e) {
     console.warn('[CustomYearTicks] Could not add custom year labels:', e);
