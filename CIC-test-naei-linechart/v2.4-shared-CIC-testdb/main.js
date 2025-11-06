@@ -487,6 +487,10 @@ function getDragAfterElement(container, y){
   }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
+/**
+ * Adds custom year labels to the X-axis of the chart.
+ * This function is called after every chart draw/redraw.
+ */
 function addCustomXAxisLabels() {
   try {
     const chartContainer = document.getElementById('chart_div');
@@ -880,9 +884,42 @@ function updateChart(){
   // draw chart and show pollutant as visible page title
   chart = new google.visualization.LineChart(chartContainer);
 
-  // Add a 'ready' event listener that will fire after every draw,
-  // ensuring custom labels are always present.
-  google.visualization.events.addListener(chart, 'ready', addCustomXAxisLabels);
+  // Single 'ready' event listener to handle all post-draw actions
+  google.visualization.events.addListener(chart, 'ready', () => {
+    // 1. Add custom year axis title
+    addCustomYearLabel(chart, chartContainer);
+
+    // 2. Add custom year tick labels with a single delayed execution (v2.2 approach)
+    // This prevents flickering by only adding labels once, not repeatedly
+    setTimeout(() => {
+      try {
+        if (typeof addCustomXAxisLabels === 'function') {
+          addCustomXAxisLabels();
+        }
+      } catch (e) {
+        console.warn('Custom X-axis labels failed:', e);
+      }
+    }, 150); // 150ms delay matches v2.2
+
+    // Fallback: If custom labels failed, redraw once with default Google labels
+    if (!customOk && !window.__labelFallback) {
+      window.__labelFallback = true;
+      try {
+        const fallbackOptions = { ...options };
+        fallbackOptions.hAxis.textStyle = { color: '#666' };
+        chart.draw(dataTable, fallbackOptions);
+      } finally {
+        setTimeout(() => { window.__labelFallback = false; }, 0);
+      }
+    }
+
+    // 3. Notify that the chart has finished rendering (for loading management)
+    if (chartRenderCallback) {
+      console.log('Line chart finished rendering');
+      chartRenderCallback();
+      chartRenderCallback = null; // Clear callback after use
+    }
+  });
 
   // On mobile, show only first and last year for clarity
   const isMobile = window.innerWidth < 600;
@@ -899,28 +936,23 @@ function updateChart(){
     }
   }
 
-  // Compute safe width/height to avoid negative SVG dimensions
-  const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
-  const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
-  options.width = safeWidth;
-  options.height = safeHeight;
-    // Ensure a small right chart padding so the chart fills most of the container
-  if (options.chartArea) {
-    // Reduce the minimum right padding; previously set to 80px which left a large gap.
-    options.chartArea.right = Math.max(options.chartArea.right || 10, 20);
-    if (isMobile) {
-      options.chartArea.width = '70%';
-    }
-  }
-
   // Delay slightly to let layout stabilize (prevents negative sizes)
   setTimeout(() => {
+    // Compute safe width/height to avoid negative SVG dimensions
+    const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
+    const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+
+    console.log('Chart container size:', chartContainer.offsetWidth, 'x', chartContainer.offsetHeight, '(using', safeWidth, 'x', safeHeight + ')');
+    console.log('Iframe size:', window.innerWidth, 'x', window.innerHeight);
+    options.width = safeWidth;
+    options.height = safeHeight;
+
     chart.draw(dataTable, options);
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
       chartContainer.classList.add('visible');
     }
-
+    
     // After chart is drawn, send content height to parent
     if (window.parent && window.parent !== window) {
       setTimeout(() => {
@@ -1004,6 +1036,40 @@ function drawChart() {
   }
 }
 
+// Add custom Year label after chart is drawn
+function addCustomYearLabel(chart, chartContainer) {
+  try {
+    let label = document.getElementById('custom-year-label');
+    if (!label) {
+        label = document.createElement('div');
+        label.id = 'custom-year-label';
+        label.textContent = 'Year';
+        label.style.position = 'absolute';
+        label.style.fontFamily = 'Arial, sans-serif';
+        label.style.fontSize = '13px';
+        label.style.color = '#333';
+        label.style.fontWeight = 'bold';
+        label.style.pointerEvents = 'none';
+        chartContainer.appendChild(label);
+    }
+    
+    const chartLayout = chart.getChartLayoutInterface();
+    const chartArea = chartLayout.getChartAreaBoundingBox();
+    
+    label.style.left = chartArea.left + chartArea.width / 2 - 20 + 'px';
+    // Move label below the axis tick labels
+    label.style.top = (chartArea.top + chartArea.height + 30) + 'px';
+    
+  } catch (error) {
+    console.error('Error in addCustomYearLabel:', error);
+  }
+
+  // Add padding to the chart-wrapper to make sure the custom labels are not being cut off
+  const chartWrapper = document.querySelector('.chart-wrapper');
+  if (chartWrapper) {
+    chartWrapper.style.paddingBottom = '30px';
+  }
+}
 
 // Track last resize dimensions to avoid redundant redraws
 let lastResizeWidth = window.innerWidth;
