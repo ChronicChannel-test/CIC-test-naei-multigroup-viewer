@@ -26,7 +26,7 @@ google.charts.setOnLoadCallback(() => {
     const build = 'v2.4-embed-gate-2025-11-04T20:26Z';
     window.__LINECHART_BUILD__ = build;
     document.documentElement.setAttribute('data-linechart-build', build);
-    console.log(`🧩 Linechart build loaded: ${build}`);
+    console.log('🧩 Linechart build loaded: ' + build);
   } catch (e) { /* no-op */ }
 })();
 
@@ -86,7 +86,7 @@ window.addEventListener('message', (event) => {
     console.log('✅ Received overlayHidden message from parent - enabling resize handler');
     initialLoadComplete = true;
   } else if (event.data && event.data.type === 'resizeComplete') {
-    console.log(`✅ Parent confirmed resize to ${event.data.height}px - waiting for reflow...`);
+    console.log('✅ Parent confirmed resize to ' + event.data.height + 'px - waiting for reflow...');
     
     // Wait for browser to reflow the iframe before measuring dimensions
     requestAnimationFrame(() => {
@@ -94,7 +94,7 @@ window.addEventListener('message', (event) => {
         // Force reflow by accessing dimensions
         const currentHeight = document.documentElement.offsetHeight;
         const currentWidth = document.documentElement.offsetWidth;
-        console.log(`📐 After reflow - iframe dimensions: ${currentWidth}x${currentHeight}`);
+        console.log('📐 After reflow - iframe dimensions: ' + currentWidth + 'x' + currentHeight);
         
         // Now render the chart
         if (window.pendingRender) {
@@ -160,7 +160,7 @@ function computeSafeExportScale(origW, origH, desiredScale) {
   const maxAreaScale = Math.sqrt(EXPORT_MAX_PIXELS / (origW * origH));
   const allowed = Math.max(1, Math.min(desiredScale, maxDimScale, maxAreaScale));
   if (allowed < desiredScale) {
-    console.warn(`Export scale ${desiredScale} reduced to ${allowed} to avoid huge canvas (${Math.round(origW*allowed)}x${Math.round(origH*allowed)})`);
+    console.warn('Export scale ' + desiredScale + ' reduced to ' + allowed + ' to avoid huge canvas (' + Math.round(origW*allowed) + 'x' + Math.round(origH*allowed) + ')');
     try {
       window.__export_debug = window.__export_debug || {};
       window.__export_debug.lastClamped = { origW, origH, desiredScale, allowed };
@@ -660,7 +660,7 @@ function updateChart(){
     if (!startYear) missing.push('startYear');
     if (!endYear) missing.push('endYear');
     if (!selectedGroups.length) missing.push('groups');
-    console.log(`⏳ updateChart deferred (${window.__updateRetryCount}) – waiting for: ${missing.join(', ')}`);
+    console.log('⏳ updateChart deferred (' + window.__updateRetryCount + ') – waiting for: ' + missing.join(', '));
     if (window.__updateRetryCount <= 20) {
       setTimeout(updateChart, 75);
       return;
@@ -887,7 +887,6 @@ function updateChart(){
         console.warn('Custom X-axis labels failed:', e);
       }
     }, 150); // 150ms delay matches v2.2
-```
 
     // Fallback: If custom labels failed, redraw once with default Google labels
     if (!customOk && !window.__labelFallback) {
@@ -1305,7 +1304,7 @@ function parseUrlParameters() {
         endYear = endYearParam;
       } else {
         // Invalid range - use defaults
-        console.warn(`Invalid year range in URL: start=${startYearParam}, end=${endYearParam}. Using defaults.`);
+        console.warn('Invalid year range in URL: start=' + startYearParam + ', end=' + endYearParam + '. Using defaults.');
         startYear = availableYears[0];
         endYear = availableYears[availableYears.length - 1];
       }
@@ -1315,16 +1314,16 @@ function parseUrlParameters() {
       // Find a valid end year after the start
       const startIdx = availableYears.indexOf(startYearParam);
       endYear = availableYears[availableYears.length - 1];
-      console.warn(`Invalid end year in URL: ${endYearParam}. Using ${endYear}.`);
+      console.warn('Invalid end year in URL: ' + endYearParam + '. Using ' + endYear + '.');
     } else if (isEndYearValid) {
       // Only end year valid
       endYear = endYearParam;
       // Find a valid start year before the end
       startYear = availableYears[0];
-      console.warn(`Invalid start year in URL: ${startYearParam}. Using ${startYear}.`);
+      console.warn('Invalid start year in URL: ' + startYearParam + '. Using ' + startYear + '.');
     } else if (startYearParam || endYearParam) {
       // Years provided but both invalid
-      console.warn(`Invalid years in URL: start=${startYearParam}, end=${endYearParam}. Using defaults.`);
+      console.warn('Invalid years in URL: start=' + startYearParam + ', end=' + endYearParam + '. Using defaults.');
       startYear = availableYears[0];
       endYear = availableYears[availableYears.length - 1];
     }
@@ -1379,7 +1378,7 @@ function updateUrlFromChartState() {
       }
 
       if (parseInt(startYear) >= parseInt(endYear)) {
-        console.warn(`URL update skipped: Invalid year range (start=${startYear}, end=${endYear}).`);
+        console.warn('URL update skipped: Invalid year range (start=' + startYear + ', end=' + endYear + ').');
         return;
       }
 
