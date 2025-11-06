@@ -880,9 +880,7 @@ function updateChart(){
     },
     hAxis: {
       title: '', // Title is now handled by a custom DOM element
-      textStyle: { 
-        color: 'transparent' // Hide default labels; we use custom ones
-      },
+      textPosition: 'none', // Hide the default labels entirely
       titleTextStyle: { 
         fontSize: 13, 
         bold: true 
