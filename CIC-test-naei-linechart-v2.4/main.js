@@ -933,11 +933,13 @@ function updateChart(){
     }
   }
 
-  // Delay slightly to let layout stabilize (prevents negative sizes)
-  setTimeout(() => {
+  // Use requestAnimationFrame to ensure layout is stable before drawing
+  requestAnimationFrame(() => {
     // Compute safe width/height to avoid negative SVG dimensions
     const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
-    const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+    // Set height based on width to maintain aspect ratio and prevent jumping
+    const aspectRatio = 0.6;
+    const safeHeight = safeWidth * aspectRatio;
 
     console.log('Chart container size:', chartContainer.offsetWidth, 'x', chartContainer.offsetHeight, '(using', safeWidth, 'x', safeHeight + ')');
     console.log('Iframe size:', window.innerWidth, 'x', window.innerHeight);
@@ -969,7 +971,7 @@ function updateChart(){
         }
       }, 250);
     }
-  }, 100);
+  });
 
   // update visible title on page
   const titleEl = document.getElementById('chartTitle');
