@@ -1079,26 +1079,27 @@ function drawChart() {
 // Add custom Year label after chart is drawn
 function addCustomYearLabel(chart, chartContainer) {
   try {
-    const existing = document.getElementById('custom-year-label');
-    if (existing) existing.remove();
+    let label = document.getElementById('custom-year-label');
+    if (!label) {
+        label = document.createElement('div');
+        label.id = 'custom-year-label';
+        label.textContent = 'Year';
+        label.style.position = 'absolute';
+        label.style.fontFamily = 'Arial, sans-serif';
+        label.style.fontSize = '13px';
+        label.style.color = '#333';
+        label.style.fontWeight = 'bold';
+        label.style.pointerEvents = 'none';
+        chartContainer.appendChild(label);
+    }
     
     const chartLayout = chart.getChartLayoutInterface();
     const chartArea = chartLayout.getChartAreaBoundingBox();
     
-    const label = document.createElement('div');
-    label.id = 'custom-year-label';
-    label.textContent = 'Year';
-    label.style.position = 'absolute';
     label.style.left = chartArea.left + chartArea.width / 2 - 20 + 'px';
     // Move label below the axis tick labels
     label.style.top = (chartArea.top + chartArea.height + 30) + 'px';
-    label.style.fontFamily = 'Arial, sans-serif';
-    label.style.fontSize = '13px';
-    label.style.color = '#333';
-    label.style.fontWeight = 'bold';
-    label.style.pointerEvents = 'none';
     
-    chartContainer.appendChild(label);
   } catch (error) {
     console.error('Error in addCustomYearLabel:', error);
   }
