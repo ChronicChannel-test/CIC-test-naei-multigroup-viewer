@@ -650,6 +650,12 @@ function updateChart(){
   console.log('🎨 updateChart() called from:', caller);
   console.log('📚 Full stack trace:', stack);
   
+  // BLOCK: Don't draw while resize is in progress
+  if (resizeInProgress) {
+    console.log('⏸️ Resize in progress - blocking updateChart(), will retry after resize completes');
+    return;
+  }
+  
   // Wait for Google Charts to be ready
   if (!googleChartsReady) {
     console.log('Google Charts not ready yet for line chart, waiting...');
@@ -832,14 +838,12 @@ function updateChart(){
       easing: 'out',
       startup: true
     },
-    // Configure chart area and axes
-    chartArea: { 
-      width: '85%', 
-      height: '80%',
-      top: 40,
-      bottom: 60,
-      left: 100,
-      right: 40
+    // Configure chart area and axes with balanced spacing
+    chartArea: {
+      top: 50,
+      left: leftMargin,
+      right: 10,
+      bottom: 80 // Enough space for custom year labels + axis title
     },
     hAxis: {
       title: '', // Title is now handled by a custom DOM element
@@ -871,13 +875,7 @@ function updateChart(){
     series: seriesOptions,
     curveType: smoothLines ? 'function' : 'none',
     lineWidth: 3,
-    pointSize: 4,
-    chartArea: {
-      top: 20,
-      left: leftMargin,
-      right: 10,
-      bottom: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 80 : 60 // Add extra bottom padding for landscape mode
-    }
+    pointSize: 4
   };
   
 
@@ -933,20 +931,33 @@ function updateChart(){
     }
   }
 
-  // Use requestAnimationFrame to ensure layout is stable before drawing
+  // Use DOUBLE requestAnimationFrame to ensure layout is fully reflowed before drawing
+  // This prevents the chart from reading stale container dimensions during resize
   requestAnimationFrame(() => {
-    // Compute safe width/height to avoid negative SVG dimensions
-    const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
-    // Set height based on width to maintain aspect ratio and prevent jumping
-    const aspectRatio = 0.6;
-    const safeHeight = safeWidth * aspectRatio;
+    requestAnimationFrame(() => {
+      // FINAL CHECK: Don't draw if resize is still in progress
+      if (resizeInProgress) {
+        console.log('⏸️ RAF reached but resize still in progress - aborting draw');
+        return;
+      }
+      
+      // Compute safe width/height to avoid negative SVG dimensions
+      const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
+      // Set height based on width to maintain aspect ratio and prevent jumping
+      const aspectRatio = 0.6;
+      const safeHeight = safeWidth * aspectRatio;
 
-    console.log('Chart container size:', chartContainer.offsetWidth, 'x', chartContainer.offsetHeight, '(using', safeWidth, 'x', safeHeight + ')');
-    console.log('Iframe size:', window.innerWidth, 'x', window.innerHeight);
-    options.width = safeWidth;
-    options.height = safeHeight;
+      console.log('📊 DRAWING CHART:');
+      console.log('  - Container size:', chartContainer.offsetWidth, 'x', chartContainer.offsetHeight);
+      console.log('  - Using dimensions:', safeWidth, 'x', safeHeight);
+      console.log('  - Iframe window:', window.innerWidth, 'x', window.innerHeight);
+      console.log('  - Resize in progress:', resizeInProgress);
+      options.width = safeWidth;
+      options.height = safeHeight;
 
     chart.draw(dataTable, options);
+    console.log('✅ Chart.draw() completed');
+    
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
       chartContainer.classList.add('visible');
@@ -971,7 +982,8 @@ function updateChart(){
         }
       }, 250);
     }
-  });
+    }); // end inner RAF
+  }); // end outer RAF
 
   // update visible title on page
   const titleEl = document.getElementById('chartTitle');
@@ -1038,28 +1050,44 @@ function drawChart() {
 
 // Track last resize dimensions to avoid redundant redraws
 let lastResizeWidth = window.innerWidth;
+let resizeInProgress = false;
 
 window.addEventListener('resize', () => {
   // Don't trigger chart redraws during initial load
   if (!initialLoadComplete) {
-    console.log('Resize event ignored during initial load');
+    console.log('🔄 Resize event ignored during initial load');
     return;
   }
   
+  // Don't process new resize events while one is already in progress
+  if (resizeInProgress) {
+    console.log('🔄 Resize already in progress - ignoring additional resize event');
+    return;
+  }
+  
+  console.log('🔄 RESIZE EVENT - Current width:', window.innerWidth, 'Last width:', lastResizeWidth);
+  
   clearTimeout(window._resizeTimer);
+  resizeInProgress = true;
+  
   window._resizeTimer = setTimeout(() => {
     const currentWidth = window.innerWidth;
+    console.log('🔄 Debounce timer fired - Current width:', currentWidth, 'Last width:', lastResizeWidth);
     
     const widthChanged = Math.abs(currentWidth - lastResizeWidth) > 10;
     
     // Only redraw on width changes
     if (widthChanged) {
-      console.log('Width changed from', lastResizeWidth, 'to', currentWidth, '- redrawing');
+      console.log('🎨 Width changed from', lastResizeWidth, 'to', currentWidth, '- TRIGGERING REDRAW');
       lastResizeWidth = currentWidth;
+      resizeInProgress = false;
       updateChart();
       return;
+    } else {
+      console.log('⏭️ Width change too small (<10px) - skipping redraw');
+      resizeInProgress = false;
     }
-  }, 300); // Increased debounce to 300ms for smoother resizing
+  }, 300); // Debounce waits for resize to stop
 });
 
 async function renderInitialView() {
