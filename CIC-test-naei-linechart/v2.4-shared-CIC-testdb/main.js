@@ -591,19 +591,6 @@ function addCustomXAxisLabels() {
       unclippedGroup.appendChild(text);
     });
 
-    // Add 'Year' label centered below the year ticks
-    const yearLabel = document.createElementNS(ns, 'text');
-    const yearLabelY = labelY + 20;
-    yearLabel.setAttribute('x', chartArea.left + chartArea.width / 2);
-    yearLabel.setAttribute('y', yearLabelY);
-    yearLabel.setAttribute('text-anchor', 'middle');
-    yearLabel.setAttribute('font-family', 'Arial, sans-serif');
-    yearLabel.setAttribute('font-size', '13');
-    yearLabel.setAttribute('font-weight', 'bold');
-    yearLabel.setAttribute('fill', '#666');
-    yearLabel.setAttribute('data-custom-year-label', 'true');
-    yearLabel.textContent = 'Year';
-    unclippedGroup.appendChild(yearLabel);
     
     // Trim white background rectangles BEFORE appending labels
     const bgRects = svg.querySelectorAll('rect[fill="#ffffff"], rect[fill="white"], rect[fill="rgb(255, 255, 255)"]');
@@ -643,13 +630,7 @@ function addCustomXAxisLabels() {
 }
 
 
-function updateChart(){
-  // Create stack trace to see where this is being called from
-  const stack = new Error().stack;
-  const caller = stack?.split('\n')[2]?.trim() || 'unknown caller';
-  console.log('🎨 updateChart() called from:', caller);
-  console.log('📚 Full stack trace:', stack);
-  
+function updateChart() {
   // Wait for Google Charts to be ready
   if (!googleChartsReady) {
     console.log('Google Charts not ready yet for line chart, waiting...');
@@ -822,98 +803,76 @@ function updateChart(){
     chartContainer.style.minHeight = '500px';
   }
 
+  const isMobile = window.innerWidth < 600;
   const options = {
     title: '',
     width: '100%',
     legend: 'none',
-    // Configure animations - enable them but with a very short duration
     animation: {
       duration: 100,
       easing: 'out',
       startup: true
     },
-    // Configure chart area and axes
-    chartArea: { 
-      width: '85%', 
+    chartArea: {
+      width: isMobile ? '70%' : '85%',
       height: '80%',
-      top: 40,
-      bottom: 60,
-      left: 100,
-      right: 40
+      top: 20,
+      left: leftMargin,
+      right: 20,
+      bottom: isMobile && window.innerHeight < window.innerWidth ? 80 : 60
     },
     hAxis: {
-      title: '', // Title is now handled by a custom DOM element
-      textPosition: 'none', // Hide the default labels entirely
-      titleTextStyle: { 
-        fontSize: 13, 
-        bold: true 
-      },
-      gridlines: { 
-        color: '#e0e0e0'
-      },
-      baselineColor: '#666'
+      title: 'Year',
+      textPosition: 'none',
+      titleTextStyle: { fontSize: 13, bold: true },
+      gridlines: { color: '#e0e0e0' },
+      baselineColor: '#666',
+      slantedText: isMobile,
+      slantedTextAngle: isMobile ? 90 : 0
     },
     vAxis: {
       title: 'Emissions' + (unit ? ' (' + unit + ')' : ''),
-      viewWindow: { 
-        min: 0 
-      },
-      textStyle: { 
-        fontSize: 12 
-      },
+      viewWindow: { min: 0 },
+      textStyle: { fontSize: 12 },
       titleTextStyle: {
-        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 12 : 14,
-        bold: true,
-        wrap: false
+        fontSize: isMobile && window.innerHeight < window.innerWidth ? 12 : 14,
+        bold: true
       },
-      textPosition: 'out', // Ensure title is positioned outside to avoid overlap
     },
     series: seriesOptions,
     curveType: smoothLines ? 'function' : 'none',
     lineWidth: 3,
     pointSize: 4,
-    chartArea: {
-      top: 20,
-      left: leftMargin,
-      right: 10,
-      bottom: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 80 : 60 // Add extra bottom padding for landscape mode
-    }
   };
   
 
   // draw chart and show pollutant as visible page title
   chart = new google.visualization.LineChart(chartContainer);
 
-  // Single 'ready' event listener to handle all post-draw actions
+  // Add a single 'ready' event listener to handle all post-draw actions.
   google.visualization.events.addListener(chart, 'ready', () => {
-    // 1. Add custom year axis title
-    addCustomYearLabel(chart, chartContainer);
+    // Add custom X-axis labels. This is the primary cause of layout changes.
+    addCustomXAxisLabels();
 
-    // 2. Add custom year tick labels with a single delayed execution (v2.2 approach)
-    // This prevents flickering by only adding labels once, not repeatedly
-    setTimeout(() => {
-      try {
-        if (typeof addCustomXAxisLabels === 'function') {
-          addCustomXAxisLabels();
-        }
-      } catch (e) {
-        console.warn('Custom X-axis labels failed:', e);
-      }
-    }, 150); // 150ms delay matches v2.2
+    // After labels are added, the final height is known. Update parent iframe.
+    if (window.parent && window.parent !== window) {
+      const bodyHeight = document.body.scrollHeight;
+      const buffer = 30; // Buffer for any small overflows
+      const newHeight = Math.ceil(bodyHeight) + buffer;
+      const currentHeight = window.innerHeight;
+      console.log('📏 Final height calculation: body.scrollHeight=', bodyHeight, 'final=', newHeight);
 
-    // Fallback: If custom labels failed, redraw once with default Google labels
-    if (!customOk && !window.__labelFallback) {
-      window.__labelFallback = true;
-      try {
-        const fallbackOptions = { ...options };
-        fallbackOptions.hAxis.textStyle = { color: '#666' };
-        chart.draw(dataTable, fallbackOptions);
-      } finally {
-        setTimeout(() => { window.__labelFallback = false; }, 0);
+      // Only send message if height has changed significantly
+      if (Math.abs(newHeight - currentHeight) > 20) {
+          console.log('📐 Final height update:', currentHeight, 'to', newHeight);
+          window.parent.postMessage({ type: 'iframeHeight', chart: 'line', height: newHeight }, '*');
       }
     }
 
-    // 3. Notify that the chart has finished rendering (for loading management)
+    // Make chart visible now that it's fully rendered with labels.
+    chartContainer.classList.add('visible');
+
+    // Notify that the chart has finished rendering (for loading management)
     if (chartRenderCallback) {
       console.log('Line chart finished rendering');
       chartRenderCallback();
@@ -921,58 +880,16 @@ function updateChart(){
     }
   });
 
-  // On mobile, show only first and last year for clarity
-  const isMobile = window.innerWidth < 600;
-  if (isMobile) {
-    options.hAxis.slantedText = true;
-    options.hAxis.slantedTextAngle = 90;
-  }
-    // Ensure a small right chart padding so the chart fills most of the container
-  if (options.chartArea) {
-    // Reduce the minimum right padding; previously set to 80px which left a large gap.
-    options.chartArea.right = Math.max(options.chartArea.right || 10, 20);
-    if (isMobile) {
-      options.chartArea.width = '70%';
-    }
-  }
 
-  // Delay slightly to let layout stabilize (prevents negative sizes)
-  setTimeout(() => {
-    // Compute safe width/height to avoid negative SVG dimensions
-    const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
-    const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+  // Draw the chart immediately.
+  // The 'ready' event will handle all post-processing.
+  const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
+  const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
 
-    console.log('Chart container size:', chartContainer.offsetWidth, 'x', chartContainer.offsetHeight, '(using', safeWidth, 'x', safeHeight + ')');
-    console.log('Iframe size:', window.innerWidth, 'x', window.innerHeight);
-    options.width = safeWidth;
-    options.height = safeHeight;
+  options.width = safeWidth;
+  options.height = safeHeight;
 
-    chart.draw(dataTable, options);
-    // Only add visible class when parent is already visible to prevent flash
-    if (document.getElementById('mainContent').classList.contains('loaded')) {
-      chartContainer.classList.add('visible');
-    }
-    
-    // After chart is drawn, send content height to parent
-    if (window.parent && window.parent !== window) {
-      setTimeout(() => {
-        // Use body.scrollHeight which measures actual content
-        const bodyHeight = document.body.scrollHeight;
-        const buffer = 30; // Minimal buffer for axis labels
-        const newHeight = Math.ceil(bodyHeight) + buffer;
-        const currentHeight = window.innerHeight;
-        console.log('📏 Height calculation: body.scrollHeight=', bodyHeight, 'final=', newHeight);
-        if (Math.abs(newHeight - currentHeight) > 20) {
-          console.log('📐 Height update:', currentHeight, 'to', newHeight);
-          window.parent.postMessage({
-            type: 'iframeHeight',
-            chart: 'line',
-            height: newHeight
-          }, '*');
-        }
-      }, 250);
-    }
-  }, 100);
+  chart.draw(dataTable, options);
 
   // update visible title on page
   const titleEl = document.getElementById('chartTitle');
@@ -1036,40 +953,6 @@ function drawChart() {
   }
 }
 
-// Add custom Year label after chart is drawn
-function addCustomYearLabel(chart, chartContainer) {
-  try {
-    let label = document.getElementById('custom-year-label');
-    if (!label) {
-        label = document.createElement('div');
-        label.id = 'custom-year-label';
-        label.textContent = 'Year';
-        label.style.position = 'absolute';
-        label.style.fontFamily = 'Arial, sans-serif';
-        label.style.fontSize = '13px';
-        label.style.color = '#333';
-        label.style.fontWeight = 'bold';
-        label.style.pointerEvents = 'none';
-        chartContainer.appendChild(label);
-    }
-    
-    const chartLayout = chart.getChartLayoutInterface();
-    const chartArea = chartLayout.getChartAreaBoundingBox();
-    
-    label.style.left = chartArea.left + chartArea.width / 2 - 20 + 'px';
-    // Move label below the axis tick labels
-    label.style.top = (chartArea.top + chartArea.height + 30) + 'px';
-    
-  } catch (error) {
-    console.error('Error in addCustomYearLabel:', error);
-  }
-
-  // Add padding to the chart-wrapper to make sure the custom labels are not being cut off
-  const chartWrapper = document.querySelector('.chart-wrapper');
-  if (chartWrapper) {
-    chartWrapper.style.paddingBottom = '30px';
-  }
-}
 
 // Track last resize dimensions to avoid redundant redraws
 let lastResizeWidth = window.innerWidth;
@@ -1147,123 +1030,33 @@ async function revealMainContent() {
   return new Promise(resolve => {
     const mainContent = document.getElementById('mainContent');
     
-    // Make content visible immediately (we're in iframe, parent handles loading)
+    // Make content visible and add 'loaded' class
     mainContent.style.display = 'block';
     mainContent.removeAttribute('aria-hidden');
-    mainContent.classList.add('loaded'); // Add loaded class immediately
+    mainContent.classList.add('loaded');
     
-    // Estimate expected height before rendering chart
-    // This allows parent to resize iframe BEFORE we render, preventing size mismatch
-    const estimatedHeight = 1400; // Conservative estimate for chart with controls
-    
-    if (window.parent && window.parent !== window) {
-      console.log('Sending estimated iframe height:', estimatedHeight + 'px (before rendering)');
-      window.parent.postMessage({
-        type: 'iframeHeight',
-        chart: 'line',
-        height: estimatedHeight
-      }, '*');
-      
-      // Set up a pending render function that will be called when resize is confirmed
-      window.pendingRender = () => {
-        console.log('🎨 Starting chart render after resize confirmed');
-        
-        // Log all available dimension information
-        console.log('📐 === DIMENSION DEBUG ===');
-        console.log('📐 window.innerWidth:', window.innerWidth);
-        console.log('📐 window.innerHeight:', window.innerHeight);
-        console.log('📐 document.documentElement.clientWidth:', document.documentElement.clientWidth);
-        console.log('📐 document.documentElement.clientHeight:', document.documentElement.clientHeight);
-        console.log('📐 document.body.clientWidth:', document.body.clientWidth);
-        console.log('📐 document.body.clientHeight:', document.body.clientHeight);
-        
-        const chartContainer = document.getElementById('chart_div');
-        if (chartContainer) {
-          console.log('📐 chartContainer.offsetWidth:', chartContainer.offsetWidth);
-          console.log('📐 chartContainer.offsetHeight:', chartContainer.offsetHeight);
-          console.log('📐 chartContainer.clientWidth:', chartContainer.clientWidth);
-          console.log('📐 chartContainer.clientHeight:', chartContainer.clientHeight);
-          const computedStyle = window.getComputedStyle(chartContainer);
-          console.log('📐 chartContainer computed width:', computedStyle.width);
-          console.log('📐 chartContainer computed height:', computedStyle.height);
-          console.log('📐 chartContainer computed display:', computedStyle.display);
-          console.log('📐 chartContainer computed visibility:', computedStyle.visibility);
+    // Defer the first chart draw until the DOM is fully painted
+    requestAnimationFrame(() => {
+      // Additional small delay to ensure layout is stable
+      setTimeout(() => {
+        if (selectionsReady()) {
+          console.log('✅ Selections ready – rendering initial chart');
+          updateChart();
+        } else {
+          console.warn('⚠️ Selections not ready for initial render');
         }
-        console.log('📐 === END DIMENSION DEBUG ===');
+
+        // Send chartReady message to parent
+        if (window.parent && window.parent !== window) {
+          console.log('📤 Sending chartReady message to parent...');
+          window.parent.postMessage({ type: 'chartReady', chart: 'line' }, '*');
+        }
         
-        // Now render the chart at the correct size
-        (function gateFirstRender(){
-          let tries = 0;
-          const maxTries = 30; // ~3s
-          function tick(){
-            if (selectionsReady()) {
-              // Pre-render diagnostics
-              try {
-                const params = parseUrlParameters();
-                const dbg = {
-                  stage: 'preRender',
-                  params,
-                  pollutantSelect: document.getElementById('pollutantSelect')?.value || null,
-                  startYear: document.getElementById('startYear')?.value || null,
-                  endYear: document.getElementById('endYear')?.value || null,
-                  groupSelectCount: document.querySelectorAll('#groupContainer select').length,
-                  selectedGroups: (function(){ try { return getSelectedGroups(); } catch(e){ return []; } })(),
-                  globalYearsCount: (window.globalYears || []).length
-                };
-                if (window.groupedData && dbg.pollutantSelect) {
-                  dbg.groupedDataPresence = (dbg.selectedGroups || []).map(g => ({ group: g, hasRow: !!(groupedData[dbg.pollutantSelect] && groupedData[dbg.pollutantSelect][g]) }));
-                }
-                console.log('🧪 Pre-render diagnostics:', dbg);
-                if (window.parent && window.parent !== window) {
-                  window.parent.postMessage({ type: 'lineDebug', payload: dbg }, '*');
-                }
-              } catch (e) {
-                console.warn('Pre-render diagnostics failed:', e);
-              }
-              console.log('✅ Selections ready – rendering chart');
-              updateChart();
-              afterDraw();
-            } else if (++tries < maxTries) {
-              setTimeout(tick, 100);
-            } else {
-              console.warn('⚠️ Selections not ready after waiting — drawing anyway');
-              updateChart();
-              afterDraw();
-            }
-          }
-          function afterDraw(){
-            // Wait for chart to actually render in the DOM
-            setTimeout(() => {
-              console.log('Line chart rendering complete');
-              // Make chart visible
-              const chartDiv = document.getElementById('chart_div');
-              if (chartDiv) {
-                chartDiv.classList.add('visible');
-              }
-              // Wait longer to ensure Google Chart is fully painted and stable
-              setTimeout(() => {
-                console.log('Line chart fully loaded and visible');
-                // Chart is rendered - send chartReady immediately
-                // No need to send another height update, iframe size is already correct
-                console.log('📤 Sending chartReady message to parent...');
-                window.parent.postMessage({
-                  type: 'chartReady',
-                  chart: 'line'
-                }, '*');
-                // DON'T enable resize handler yet - wait for parent to confirm overlay is hidden
-                console.log('⏳ Waiting for overlay to be hidden before enabling resize handler...');
-                resolve();
-              }, 200);
-            }, 350);
-          }
-          tick();
-        })();
-      }; // End of window.pendingRender
-    } else {
-      // Not in iframe, render immediately
-      updateChart();
-      resolve();
-    }
+        // Wait for parent to hide overlay before enabling resize handler
+        console.log('⏳ Waiting for overlay to be hidden before enabling resize handler...');
+        resolve();
+      }, 50); // 50ms delay
+    });
   });
 }
 
@@ -1525,19 +1318,6 @@ function notifyChartReady() {
   }
 }
 
-// Call this after chart is fully loaded
-if (window.google && window.google.visualization && chart) {
-  google.visualization.events.addListener(chart, 'ready', function() {
-    // Add custom year label
-    const chartContainer = document.getElementById('chart_div');
-    if (chartContainer) {
-      addCustomYearLabel(chart, chartContainer);
-    }
-    
-    // Notify parent that chart is ready
-    notifyChartReady();
-  });
-}
 
 // Listen for parent window messages
 window.addEventListener('message', (event) => {
