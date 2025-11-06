@@ -20,6 +20,16 @@ google.charts.setOnLoadCallback(() => {
   console.log('Google Charts loaded successfully for line chart');
 });
 
+// Build/version banner for diagnostics
+(function(){
+  try {
+    const build = 'v2.4-embed-gate-2025-11-04T20:26Z';
+    window.__LINECHART_BUILD__ = build;
+    document.documentElement.setAttribute('data-linechart-build', build);
+    console.log(`🧩 Linechart build loaded: ${build}`);
+  } catch (e) { /* no-op */ }
+})();
+
 // Export configuration constants
 const EXPORT_MIN_SCALE = 16;
 const EXPORT_MAX_DIM = 16000;
@@ -54,6 +64,47 @@ window.addEventListener('message', (event) => {
     });
   }
 });
+
+// ---- Helpers for selection readiness & notices ----
+function selectionsReady() {
+  try {
+    const pollutant = document.getElementById('pollutantSelect')?.value;
+    const startYear = +document.getElementById('startYear')?.value;
+    const endYear = +document.getElementById('endYear')?.value;
+    const groups = getSelectedGroups();
+    return Boolean(pollutant && startYear && endYear && startYear < endYear && groups.length);
+  } catch (e) {
+    return false;
+  }
+}
+
+function ensureNoticeContainer() {
+  let el = document.getElementById('chartNotice');
+  if (!el) {
+    const wrapper = document.querySelector('.chart-wrapper') || document.body;
+    el = document.createElement('div');
+    el.id = 'chartNotice';
+    el.style.display = 'none';
+    el.style.margin = '6px 0 4px 0';
+    el.style.color = '#b91c1c';
+    el.style.fontSize = '14px';
+    el.style.fontWeight = '600';
+    wrapper.insertBefore(el, document.getElementById('chart_div'));
+  }
+  return el;
+}
+
+function showNotice(msg) {
+  const el = ensureNoticeContainer();
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+function hideNotice() {
+  const el = ensureNoticeContainer();
+  el.textContent = '';
+  el.style.display = 'none';
+}
 
 /**
  * Compute a safe export scale that respects EXPORT_MAX_DIM and EXPORT_MAX_PIXELS.
@@ -602,7 +653,27 @@ function updateChart(){
   const startYear = +document.getElementById('startYear').value;
   const endYear = +document.getElementById('endYear').value;
   const selectedGroups = getSelectedGroups();
-  if (!pollutant || !startYear || !endYear || !selectedGroups.length) return;
+
+  // If essential selections aren’t ready yet, retry briefly (handles race with URL parsing/DOM updates)
+  if (!pollutant || !startYear || !endYear || !selectedGroups.length) {
+    window.__updateRetryCount = (window.__updateRetryCount || 0) + 1;
+    const missing = [];
+    if (!pollutant) missing.push('pollutant');
+    if (!startYear) missing.push('startYear');
+    if (!endYear) missing.push('endYear');
+    if (!selectedGroups.length) missing.push('groups');
+    console.log(`⏳ updateChart deferred (${window.__updateRetryCount}) – waiting for: ${missing.join(', ')}`);
+    if (window.__updateRetryCount <= 20) {
+      setTimeout(updateChart, 75);
+      return;
+    } else {
+      console.warn('updateChart gave up waiting for selections; not drawing.');
+      window.__updateRetryCount = 0;
+      return;
+    }
+  }
+  // Reset retry counter once ready
+  window.__updateRetryCount = 0;
 
   // Update the URL with the new state (debounced)
   updateUrlFromChartState();
@@ -734,47 +805,63 @@ function updateChart(){
   const extraChars = Math.max(0, labelLength - 3);
   const leftMargin = Math.min(140, baseMargin + (extraChars * 6)); // dynamic left padding
 
+  // Set a fixed height for the chart container to prevent layout shifts
   const chartContainer = document.getElementById('chart_div');
+  if (chartContainer) {
+    chartContainer.style.minHeight = '500px';
+  }
 
   const options = {
     title: '',
     width: '100%',
     height: '70%',
     legend: 'none',
+    // Configure animations - enable them but with a very short duration
+    animation: {
+      duration: 100,
+      easing: 'out',
+      startup: true
+    },
+    // Configure chart area and axes
+    chartArea: { 
+      width: '85%', 
+      height: '80%',
+      top: 40,
+      bottom: 60,
+      left: 100,
+      right: 40
+    },
     hAxis: {
-      title: '', // Hide default title
-      textStyle: { color: 'transparent' }, // Hide Google Charts labels
-      titleTextStyle: { fontSize: 13, bold: true, color: 'transparent' }, // Hide default title
-// Add custom Year label after chart is drawn
-function addCustomYearLabel(chart, chartContainer) {
-  const existing = document.getElementById('custom-year-label');
-  if (existing) existing.remove();
-  const chartLayout = chart.getChartLayoutInterface();
-  const chartArea = chartLayout.getChartAreaBoundingBox();
-  const label = document.createElement('div');
-  label.id = 'custom-year-label';
-  label.textContent = 'Year';
-  label.style.position = 'absolute';
-  label.style.left = chartArea.left + chartArea.width / 2 - 20 + 'px';
-  // Move label below the axis tick labels (estimate 30px below chart area)
-  label.style.top = (chartArea.top + chartArea.height + 30) + 'px';
-  label.style.fontSize = '14px';
-  label.style.fontWeight = 'bold';
-  label.style.color = '#444';
-  label.style.pointerEvents = 'none';
-  chartContainer.appendChild(label);
-}
-      gridlines: { color: '#e0e0e0' },
-      baselineColor: '#666'
+      title: 'Year',
+      textStyle: { 
+        color: '#666' // Visible Google Charts labels (debug: ensure years visible)
+      },
+      titleTextStyle: { 
+        fontSize: 13, 
+        bold: true 
+      },
+      gridlines: { 
+        color: '#e0e0e0'
+      },
+      baselineColor: '#666',
+      // Let Google Charts handle the view window
+      viewWindow: {
+        min: 1970,
+        max: 2023
+      }
     },
     vAxis: {
-      title: `Emissions${unit ? " (" + unit + ")" : ""}`,
-      viewWindow: { min: 0 },
-      textStyle: { fontSize: 12 },
+      title: `Emissions${unit ? ' (' + unit + ')' : ''}`,
+      viewWindow: { 
+        min: 0 
+      },
+      textStyle: { 
+        fontSize: 12 
+      },
       titleTextStyle: {
-        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 12 : 14, // Slightly larger font for better readability
+        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 12 : 14,
         bold: true,
-        wrap: false // Disable wrapping to prevent splitting unnecessarily
+        wrap: false
       },
       textPosition: 'out', // Ensure title is positioned outside to avoid overlap
     },
@@ -786,7 +873,7 @@ function addCustomYearLabel(chart, chartContainer) {
       top: 20,
       left: leftMargin,
       right: 10,
-  bottom: 120, // Increased to guarantee Year label visibility
+      bottom: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 80 : 60, // Add extra bottom padding for landscape mode
       height: '70%'
     }
   };
@@ -800,7 +887,31 @@ function addCustomYearLabel(chart, chartContainer) {
   google.visualization.events.addListener(chart, 'ready', function() {
     addCustomYearLabel(chart, chartContainer);
   });
-  google.visualization.events.addListener(chart, 'ready', addCustomXAxisLabels);
+
+  // Wrap custom X-axis labels with a safe fallback to Google labels
+  google.visualization.events.addListener(chart, 'ready', () => {
+    let customOk = false;
+    try {
+      if (typeof addCustomXAxisLabels === 'function') {
+        addCustomXAxisLabels();
+        customOk = true;
+      }
+    } catch (e) {
+      console.warn('Custom X-axis labels failed:', e);
+      customOk = false;
+    }
+    // If custom labels failed, redraw once with default Google labels visible
+    if (!customOk && !window.__labelFallback) {
+      window.__labelFallback = true;
+      try {
+        options.hAxis.textStyle = options.hAxis.textStyle || {};
+        options.hAxis.textStyle.color = '#666';
+        chart.draw(dataTable, options);
+      } finally {
+        setTimeout(() => { window.__labelFallback = false; }, 0);
+      }
+    }
+  });
   
   // Add listener for chart render completion (for loading management)
   google.visualization.events.addListener(chart, 'ready', () => {
@@ -914,6 +1025,44 @@ function addCustomYearLabel(chart, chartContainer) {
   // ensure controls reflect available choices
   refreshGroupDropdowns();
   refreshButtons();
+}
+
+// Backward compatibility: some older code paths may still call drawChart()
+// Ensure it simply delegates to the modern updateChart() with readiness guards
+function drawChart() {
+  try {
+    return updateChart();
+  } catch (e) {
+    console.error('drawChart fallback failed:', e);
+  }
+}
+
+// Add custom Year label after chart is drawn
+function addCustomYearLabel(chart, chartContainer) {
+  try {
+    const existing = document.getElementById('custom-year-label');
+    if (existing) existing.remove();
+    
+    const chartLayout = chart.getChartLayoutInterface();
+    const chartArea = chartLayout.getChartAreaBoundingBox();
+    
+    const label = document.createElement('div');
+    label.id = 'custom-year-label';
+    label.textContent = 'Year';
+    label.style.position = 'absolute';
+    label.style.left = chartArea.left + chartArea.width / 2 - 20 + 'px';
+    // Move label below the axis tick labels
+    label.style.top = (chartArea.top + chartArea.height + 30) + 'px';
+    label.style.fontFamily = 'Arial, sans-serif';
+    label.style.fontSize = '13px';
+    label.style.color = '#333';
+    label.style.fontWeight = 'bold';
+    label.style.pointerEvents = 'none';
+    
+    chartContainer.appendChild(label);
+  } catch (error) {
+    console.error('Error in addCustomYearLabel:', error);
+  }
 }
 
 // Track last resize dimensions to avoid redundant redraws
@@ -1048,7 +1197,72 @@ async function revealMainContent() {
         console.log('📐 === END DIMENSION DEBUG ===');
         
         // Now render the chart at the correct size
-        updateChart();
+        (function gateFirstRender(){
+          let tries = 0;
+          const maxTries = 30; // ~3s
+          function tick(){
+            if (selectionsReady()) {
+              // Pre-render diagnostics
+              try {
+                const params = parseUrlParameters();
+                const dbg = {
+                  stage: 'preRender',
+                  params,
+                  pollutantSelect: document.getElementById('pollutantSelect')?.value || null,
+                  startYear: document.getElementById('startYear')?.value || null,
+                  endYear: document.getElementById('endYear')?.value || null,
+                  groupSelectCount: document.querySelectorAll('#groupContainer select').length,
+                  selectedGroups: (function(){ try { return getSelectedGroups(); } catch(e){ return []; } })(),
+                  globalYearsCount: (window.globalYears || []).length
+                };
+                if (window.groupedData && dbg.pollutantSelect) {
+                  dbg.groupedDataPresence = (dbg.selectedGroups || []).map(g => ({ group: g, hasRow: !!(groupedData[dbg.pollutantSelect] && groupedData[dbg.pollutantSelect][g]) }));
+                }
+                console.log('🧪 Pre-render diagnostics:', dbg);
+                if (window.parent && window.parent !== window) {
+                  window.parent.postMessage({ type: 'lineDebug', payload: dbg }, '*');
+                }
+              } catch (e) {
+                console.warn('Pre-render diagnostics failed:', e);
+              }
+              console.log('✅ Selections ready – rendering chart');
+              updateChart();
+              afterDraw();
+            } else if (++tries < maxTries) {
+              setTimeout(tick, 100);
+            } else {
+              console.warn('⚠️ Selections not ready after waiting — drawing anyway');
+              updateChart();
+              afterDraw();
+            }
+          }
+          function afterDraw(){
+            // Wait for chart to actually render in the DOM
+            setTimeout(() => {
+              console.log('Line chart rendering complete');
+              // Make chart visible
+              const chartDiv = document.getElementById('chart_div');
+              if (chartDiv) {
+                chartDiv.classList.add('visible');
+              }
+              // Wait longer to ensure Google Chart is fully painted and stable
+              setTimeout(() => {
+                console.log('Line chart fully loaded and visible');
+                // Chart is rendered - send chartReady immediately
+                // No need to send another height update, iframe size is already correct
+                console.log('📤 Sending chartReady message to parent...');
+                window.parent.postMessage({
+                  type: 'chartReady',
+                  chart: 'line'
+                }, '*');
+                // DON'T enable resize handler yet - wait for parent to confirm overlay is hidden
+                console.log('⏳ Waiting for overlay to be hidden before enabling resize handler...');
+                resolve();
+              }, 200);
+            }, 350);
+          }
+          tick();
+        })();
         
         // Wait for chart to actually render in the DOM
         setTimeout(() => {
@@ -1096,8 +1310,8 @@ function parseUrlParameters() {
   const startYearParam = params.get('start_year');
   const endYearParam = params.get('end_year');
 
-  const pollutants = window.allPollutantsData || [];
-  const groups = window.allGroupsData || [];
+  const pollutants = window.allPollutantsData || window.allPollutants || [];
+  const groups = window.allGroupsData || window.allGroups || [];
   const availableYears = window.globalYears || [];
 
   let pollutantName = null;
@@ -1254,8 +1468,50 @@ async function init() {
   }
 }
 
+// Add the chart ready message when the chart is fully loaded
+function notifyChartReady() {
+  try {
+    // Add a small delay to ensure the chart is fully rendered
+    setTimeout(() => {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ 
+          type: 'chartReady', 
+          chart: 'line',
+          timestamp: new Date().toISOString()
+        }, '*');
+      }
+      
+      // Re-enable animations for future updates
+      if (chart) {
+        chart.setOptions({
+          animation: {
+            duration: 1000,
+            easing: 'out',
+            startup: false
+          }
+        });
+      }
+    }, 300); // 300ms delay to ensure rendering is complete
+  } catch (error) {
+    console.error('Error in notifyChartReady:', error);
+  }
+}
+
+// Call this after chart is fully loaded
+if (window.google && window.google.visualization && chart) {
+  google.visualization.events.addListener(chart, 'ready', function() {
+    // Add custom year label
+    const chartContainer = document.getElementById('chart_div');
+    if (chartContainer) {
+      addCustomYearLabel(chart, chartContainer);
+    }
+    
+    // Notify parent that chart is ready
+    notifyChartReady();
+  });
+}
+
 // Listen for parent window messages
-// Listen for parent window messages (if needed for future features)
 window.addEventListener('message', (event) => {
   // Message handling can be added here for future features
   // Charts now handle their own loading completion
