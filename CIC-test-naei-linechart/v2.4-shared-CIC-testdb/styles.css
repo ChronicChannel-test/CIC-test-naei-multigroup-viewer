@@ -279,7 +279,7 @@ button, .add-btn, .remove-btn, .dragHandle {
   border-radius: 6px;
   box-sizing: border-box;
   background-color: #fff;
-  overflow: hidden;
+  overflow: visible;
 }
 
 #chart_div { 

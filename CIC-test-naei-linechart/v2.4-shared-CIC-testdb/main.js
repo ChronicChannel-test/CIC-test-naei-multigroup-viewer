@@ -456,45 +456,6 @@ function calculateYearTicks(years, chartWidth) {
   return result;
 }
 
-/**
- * Remove bare 4-digit year tick elements from an SVG root unless they're
- * explicitly marked with `data-custom-year`. Returns an object listing
- * removed labels for diagnostics.
- */
-function pruneYearsFromSVG(svgRoot, opts = {}) {
-  const debug = opts.debug || false;
-  const removed = [];
-  try {
-    if (!svgRoot || !svgRoot.querySelectorAll) return { removed };
-    const nodes = svgRoot.querySelectorAll('text, tspan');
-    nodes.forEach(node => {
-      try {
-        const txt = (node.textContent || '').trim();
-        if (/^\d{4}$/.test(txt)) {
-          let cur = node;
-          let hasCustom = false;
-          while (cur && cur.getAttribute) {
-            if (cur.getAttribute('data-custom-year')) { hasCustom = true; break; }
-            cur = cur.parentNode;
-          }
-          if (!hasCustom) {
-            let toRemove = node;
-            while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
-            if (toRemove && toRemove.parentNode) {
-              toRemove.parentNode.removeChild(toRemove);
-              removed.push(txt);
-            }
-          }
-        }
-      } catch (e) {
-        if (debug) console.warn('pruneYearsFromSVG inner error', e);
-      }
-    });
-  } catch (e) {
-    if (debug) console.warn('pruneYearsFromSVG failed', e);
-  }
-  return { removed };
-}
 
 /* ---------------- Drag and drop handlers ---------------- */
 function addDragAndDropHandlers(div){
@@ -861,7 +822,6 @@ function updateChart(){
   const options = {
     title: '',
     width: '100%',
-    height: '70%',
     legend: 'none',
     // Configure animations - enable them but with a very short duration
     animation: {
@@ -913,8 +873,7 @@ function updateChart(){
       top: 20,
       left: leftMargin,
       right: 10,
-      bottom: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 80 : 60, // Add extra bottom padding for landscape mode
-      height: '70%'
+      bottom: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 80 : 60 // Add extra bottom padding for landscape mode
     }
   };
   
@@ -959,15 +918,6 @@ function updateChart(){
     }
   });
 
-  // Compute safe width/height to avoid negative SVG dimensions
-  const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
-  const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
-  
-  console.log(`📊 Chart container size: ${chartContainer.offsetWidth}x${chartContainer.offsetHeight} (using ${safeWidth}x${safeHeight})`);
-  console.log(`📐 Iframe size: ${window.innerWidth}x${window.innerHeight}`);
-  options.width = safeWidth;
-  options.height = safeHeight;
-
   // On mobile, show only first and last year for clarity
   const isMobile = window.innerWidth < 600;
   if (isMobile) {
@@ -985,6 +935,15 @@ function updateChart(){
 
   // Delay slightly to let layout stabilize (prevents negative sizes)
   setTimeout(() => {
+    // Compute safe width/height to avoid negative SVG dimensions
+    const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
+    const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+
+    console.log(`📊 Chart container size: ${chartContainer.offsetWidth}x${chartContainer.offsetHeight} (using ${safeWidth}x${safeHeight})`);
+    console.log(`📐 Iframe size: ${window.innerWidth}x${window.innerHeight}`);
+    options.width = safeWidth;
+    options.height = safeHeight;
+
     chart.draw(dataTable, options);
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
@@ -1101,11 +1060,16 @@ function addCustomYearLabel(chart, chartContainer) {
   } catch (error) {
     console.error('Error in addCustomYearLabel:', error);
   }
+
+  // Add padding to the chart-wrapper to make sure the custom labels are not being cut off
+  const chartWrapper = document.querySelector('.chart-wrapper');
+  if (chartWrapper) {
+    chartWrapper.style.paddingBottom = '30px';
+  }
 }
 
 // Track last resize dimensions to avoid redundant redraws
 let lastResizeWidth = window.innerWidth;
-let lastResizeHeight = window.innerHeight;
 
 window.addEventListener('resize', () => {
   // Don't trigger chart redraws during initial load
@@ -1117,24 +1081,14 @@ window.addEventListener('resize', () => {
   clearTimeout(window._resizeTimer);
   window._resizeTimer = setTimeout(() => {
     const currentWidth = window.innerWidth;
-    const currentHeight = window.innerHeight;
     
     const widthChanged = Math.abs(currentWidth - lastResizeWidth) > 10;
-    const heightChanged = Math.abs(currentHeight - lastResizeHeight) > 10;
     
     // Only redraw on width changes
     if (widthChanged) {
       console.log('Width changed from', lastResizeWidth, 'to', currentWidth, '- redrawing');
       lastResizeWidth = currentWidth;
-      lastResizeHeight = currentHeight;
       updateChart();
-      return;
-    }
-    
-    // Height changes: accept without redraw (parent is resizing iframe to fit content)
-    if (heightChanged) {
-      console.log('Height changed from', lastResizeHeight, 'to', currentHeight, '- accepting');
-      lastResizeHeight = currentHeight;
       return;
     }
   }, 300); // Increased debounce to 300ms for smoother resizing
