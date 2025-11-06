@@ -886,10 +886,7 @@ function updateChart(){
 
   // Single 'ready' event listener to handle all post-draw actions
   google.visualization.events.addListener(chart, 'ready', () => {
-    // 1. Add custom year axis title
-    addCustomYearLabel(chart, chartContainer);
-
-    // 2. Add custom year tick labels with a single delayed execution (v2.2 approach)
+    // 1. Add custom year tick labels with a single delayed execution (v2.2 approach)
     // This prevents flickering by only adding labels once, not repeatedly
     setTimeout(() => {
       try {
@@ -1036,40 +1033,6 @@ function drawChart() {
   }
 }
 
-// Add custom Year label after chart is drawn
-function addCustomYearLabel(chart, chartContainer) {
-  try {
-    let label = document.getElementById('custom-year-label');
-    if (!label) {
-        label = document.createElement('div');
-        label.id = 'custom-year-label';
-        label.textContent = 'Year';
-        label.style.position = 'absolute';
-        label.style.fontFamily = 'Arial, sans-serif';
-        label.style.fontSize = '13px';
-        label.style.color = '#333';
-        label.style.fontWeight = 'bold';
-        label.style.pointerEvents = 'none';
-        chartContainer.appendChild(label);
-    }
-    
-    const chartLayout = chart.getChartLayoutInterface();
-    const chartArea = chartLayout.getChartAreaBoundingBox();
-    
-    label.style.left = chartArea.left + chartArea.width / 2 - 20 + 'px';
-    // Move label below the axis tick labels
-    label.style.top = (chartArea.top + chartArea.height + 30) + 'px';
-    
-  } catch (error) {
-    console.error('Error in addCustomYearLabel:', error);
-  }
-
-  // Add padding to the chart-wrapper to make sure the custom labels are not being cut off
-  const chartWrapper = document.querySelector('.chart-wrapper');
-  if (chartWrapper) {
-    chartWrapper.style.paddingBottom = '30px';
-  }
-}
 
 // Track last resize dimensions to avoid redundant redraws
 let lastResizeWidth = window.innerWidth;
@@ -1528,12 +1491,6 @@ function notifyChartReady() {
 // Call this after chart is fully loaded
 if (window.google && window.google.visualization && chart) {
   google.visualization.events.addListener(chart, 'ready', function() {
-    // Add custom year label
-    const chartContainer = document.getElementById('chart_div');
-    if (chartContainer) {
-      addCustomYearLabel(chart, chartContainer);
-    }
-    
     // Notify parent that chart is ready
     notifyChartReady();
   });
