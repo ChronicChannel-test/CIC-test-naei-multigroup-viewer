@@ -494,23 +494,12 @@ function getDragAfterElement(container, y){
 function addCustomXAxisLabels() {
   try {
     const chartContainer = document.getElementById('chart_div');
-    const svg = chartContainer ? chartContainer.querySelector('svg') : null;
-    if (!svg) {
-      console.warn('[CustomYearTicks] SVG not found in chart_div');
-      return;
-    }
-    if (!chart) {
-      console.warn('[CustomYearTicks] Chart instance not found');
-      return;
-    }
+    const svg = chartContainer.querySelector('svg');
+    if (!svg || !chart) return;
 
     const chartLayout = chart.getChartLayoutInterface();
-    if (!chartLayout || !chartLayout.getChartAreaBoundingBox) {
-      console.warn('[CustomYearTicks] Chart layout not ready for custom labels. chartLayout:', chartLayout);
-      return;
-    }
     const chartArea = chartLayout.getChartAreaBoundingBox();
-    const labelY = chartArea.top + chartArea.height + 15; // Position BELOW chart area, before "Year" label
+    const labelY = chartArea.top + chartArea.height + 20;
     const ns = 'http://www.w3.org/2000/svg';
 
     const startYear = +document.getElementById('startYear').value;
@@ -518,125 +507,53 @@ function addCustomXAxisLabels() {
     const yearsAll = window.globalYears || [];
     const startIdx = yearsAll.indexOf(String(startYear));
     const endIdx = yearsAll.indexOf(String(endYear));
-    if (startIdx === -1 || endIdx === -1) {
-      console.warn('[CustomYearTicks] Invalid start/end year index');
-      return;
-    }
+    if (startIdx === -1 || endIdx === -1) return;
     const years = yearsAll.slice(startIdx, endIdx + 1);
 
-    // Get the initial list of years to show from the tick calculator
+    // Use calculateYearTicks to determine which years to show
     const chartWidth = chartArea.width;
-    let labelsToShow = calculateYearTicks(years, chartWidth);
+    const labelsToShow = calculateYearTicks(years, chartWidth);
 
-    // Refine the list of labels to prevent overlap near the end.
+    const positions = [];
+    const labels = [];
     const minSpacing = 40; // Minimum pixels between labels
-    if (labelsToShow.length >= 2) {
-      const lastYear = labelsToShow[labelsToShow.length - 1];
-      const penultimateYear = labelsToShow[labelsToShow.length - 2];
 
-      const lastYearIndex = years.indexOf(lastYear);
-      const penultimateYearIndex = years.indexOf(penultimateYear);
-
-      // Check if both years are valid and get their pixel locations
-      if (lastYearIndex !== -1 && penultimateYearIndex !== -1) {
-        const lastX = chartLayout.getXLocation(lastYearIndex);
-        const penultimateX = chartLayout.getXLocation(penultimateYearIndex);
-        console.log('[CustomYearTicks] lastX:', lastX, 'penultimateX:', penultimateX);
-
-        // If the penultimate label is too close to the last one, remove it
-        if ((lastX - penultimateX) < minSpacing) {
-          labelsToShow.splice(labelsToShow.length - 2, 1);
-        }
-      }
-    }
-
-    // Remove previous custom year labels before drawing new ones (only if they exist)
-    const existingLabels = svg.querySelectorAll('[data-custom-year], [data-custom-year-label], [data-custom-label-group]');
-    if (existingLabels.length > 0) {
-      existingLabels.forEach(el => el.remove());
-    }
-    
-    // Hide ALL potential Google Charts "Year" labels more aggressively
-    const allTexts = svg.querySelectorAll('text');
-    allTexts.forEach(text => {
-      const content = text.textContent.trim().toLowerCase();
-      // Hide if it's "year" and not our custom label
-      if (content === 'year' && !text.hasAttribute('data-custom-year-label')) {
-        text.style.display = 'none';
-        text.style.visibility = 'hidden';
-        text.setAttribute('opacity', '0');
-      }
-    });
-
-    // Create a group for all custom labels
-    const unclippedGroup = document.createElementNS(ns, 'g');
-    unclippedGroup.setAttribute('data-custom-label-group', 'true');
-    unclippedGroup.setAttribute('clip-path', 'none'); // Ensure no clipping
-
-    // Create and add the year labels
-    labelsToShow.forEach(year => {
+    // First pass: collect all positions
+    for (const year of labelsToShow) {
       const yearIndex = years.indexOf(year);
-      if (yearIndex === -1) return;
+      if (yearIndex === -1) continue;
       
       const x = chartLayout.getXLocation(yearIndex);
+      positions.push(x);
+
       const text = document.createElementNS(ns, 'text');
       text.setAttribute('x', x);
       text.setAttribute('y', labelY);
       text.setAttribute('text-anchor', 'middle');
       text.setAttribute('font-family', 'Arial, sans-serif');
-      text.setAttribute('font-size', '12');
-      text.setAttribute('fill', '#666');
+      text.setAttribute('font-size', '14');
+      text.setAttribute('font-weight', '500');
+      text.setAttribute('fill', '#333');
       text.setAttribute('data-custom-year', 'true');
       text.textContent = year;
-      unclippedGroup.appendChild(text);
-    });
 
-    // Add 'Year' label centered below the year ticks
-    const yearLabel = document.createElementNS(ns, 'text');
-    const yearLabelY = labelY + 20;
-    yearLabel.setAttribute('x', chartArea.left + chartArea.width / 2);
-    yearLabel.setAttribute('y', yearLabelY);
-    yearLabel.setAttribute('text-anchor', 'middle');
-    yearLabel.setAttribute('font-family', 'Arial, sans-serif');
-    yearLabel.setAttribute('font-size', '13');
-    yearLabel.setAttribute('font-weight', 'bold');
-    yearLabel.setAttribute('fill', '#666');
-    yearLabel.setAttribute('data-custom-year-label', 'true');
-    yearLabel.textContent = 'Year';
-    unclippedGroup.appendChild(yearLabel);
-    
-    // Trim white background rectangles BEFORE appending labels
-    const bgRects = svg.querySelectorAll('rect[fill="#ffffff"], rect[fill="white"], rect[fill="rgb(255, 255, 255)"]');
-    bgRects.forEach(rect => {
-      const y = parseFloat(rect.getAttribute('y') || '0');
-      const height = parseFloat(rect.getAttribute('height') || '0');
-      const rectBottom = y + height;
-      const chartBottom = chartArea.top + chartArea.height;
-      
-      // If rect extends below the chart area, trim it to the chart bottom
-      if (rectBottom > chartBottom + 2) { // +2px tolerance
-        const newHeight = Math.max(0, chartBottom - y);
-        rect.setAttribute('height', newHeight.toString());
+      labels.push({ element: text, x: x, year: year });
+    }
+
+    // If the penultimate label is too close to the final label, drop it
+    if (labels.length >= 2) {
+      const lastIdx = labels.length - 1;
+      const lastX = parseFloat(labels[lastIdx].x || labels[lastIdx].element.getAttribute('x'));
+      const prevX = parseFloat(labels[lastIdx - 1].x || labels[lastIdx - 1].element.getAttribute('x'));
+      if ((lastX - prevX) < minSpacing) {
+        labels.splice(lastIdx - 1, 1);
       }
+    }
+
+    // Add all labels to the SVG
+    labels.forEach(label => {
+      svg.appendChild(label.element);
     });
-    
-    // Append the group to SVG
-    svg.appendChild(unclippedGroup);
-    
-    // Expand SVG height to accommodate labels (with extra padding)
-    const finalRequiredHeight = yearLabelY + 15; // Extra 5px padding
-    const currentHeight = parseFloat(svg.getAttribute('height') || '0');
-    if (finalRequiredHeight > currentHeight) {
-      svg.setAttribute('height', finalRequiredHeight.toString());
-    }
-    svg.style.overflow = 'visible'; // Ensure SVG doesn't clip
-    
-    // Also expand the container div
-    const chartDiv = svg.parentElement;
-    if (chartDiv) {
-      chartDiv.style.height = finalRequiredHeight + 'px';
-      chartDiv.style.overflow = 'visible';
-    }
   } catch (e) {
     console.warn('[CustomYearTicks] Could not add custom year labels:', e);
   }
@@ -644,53 +561,11 @@ function addCustomXAxisLabels() {
 
 
 function updateChart(){
-  // Create stack trace to see where this is being called from
-  const stack = new Error().stack;
-  const caller = stack?.split('\n')[2]?.trim() || 'unknown caller';
-  console.log('🎨 updateChart() called from:', caller);
-  console.log('📚 Full stack trace:', stack);
-  
-  // BLOCK: Don't draw while resize is in progress
-  if (resizeInProgress) {
-    console.log('⏸️ Resize in progress - blocking updateChart(), will retry after resize completes');
-    return;
-  }
-  
-  // Wait for Google Charts to be ready
-  if (!googleChartsReady) {
-    console.log('Google Charts not ready yet for line chart, waiting...');
-    google.charts.setOnLoadCallback(() => {
-      googleChartsReady = true;
-      updateChart();
-    });
-    return;
-  }
-
   const pollutant = document.getElementById('pollutantSelect').value;
   const startYear = +document.getElementById('startYear').value;
   const endYear = +document.getElementById('endYear').value;
   const selectedGroups = getSelectedGroups();
-
-  // If essential selections aren’t ready yet, retry briefly (handles race with URL parsing/DOM updates)
-  if (!pollutant || !startYear || !endYear || !selectedGroups.length) {
-    window.__updateRetryCount = (window.__updateRetryCount || 0) + 1;
-    const missing = [];
-    if (!pollutant) missing.push('pollutant');
-    if (!startYear) missing.push('startYear');
-    if (!endYear) missing.push('endYear');
-    if (!selectedGroups.length) missing.push('groups');
-    console.log('⏳ updateChart deferred (' + window.__updateRetryCount + ') – waiting for: ' + missing.join(', '));
-    if (window.__updateRetryCount <= 20) {
-      setTimeout(updateChart, 75);
-      return;
-    } else {
-      console.warn('updateChart gave up waiting for selections; not drawing.');
-      window.__updateRetryCount = 0;
-      return;
-    }
-  }
-  // Reset retry counter once ready
-  window.__updateRetryCount = 0;
+  if (!pollutant || !startYear || !endYear || !selectedGroups.length) return;
 
   // Update the URL with the new state (debounced)
   updateUrlFromChartState();
@@ -832,29 +707,11 @@ function updateChart(){
     title: '',
     width: '100%',
     legend: 'none',
-    // Configure animations - enable them but with a very short duration
-    animation: {
-      duration: 100,
-      easing: 'out',
-      startup: true
-    },
-    // Configure chart area and axes with balanced spacing
-    chartArea: {
-      top: 50,
-      left: leftMargin,
-      right: 10,
-      bottom: 80 // Enough space for custom year labels + axis title
-    },
     hAxis: {
-      title: '', // Title is now handled by a custom DOM element
-      textPosition: 'none', // Hide the default labels entirely
-      titleTextStyle: { 
-        fontSize: 13, 
-        bold: true 
-      },
-      gridlines: { 
-        color: '#e0e0e0'
-      },
+      title: 'Year',
+      textStyle: { color: 'transparent' }, // Hide Google Charts labels
+      titleTextStyle: { fontSize: 13, bold: true },
+      gridlines: { color: '#e0e0e0' },
       baselineColor: '#666'
     },
     vAxis: {
@@ -882,39 +739,16 @@ function updateChart(){
   // draw chart and show pollutant as visible page title
   chart = new google.visualization.LineChart(chartContainer);
 
-  // Single 'ready' event listener to handle all post-draw actions
-  google.visualization.events.addListener(chart, 'ready', () => {
-    // 1. Add custom year tick labels with a single delayed execution (v2.2 approach)
-    // This prevents flickering by only adding labels once, not repeatedly
-    setTimeout(() => {
-      try {
-        if (typeof addCustomXAxisLabels === 'function') {
-          addCustomXAxisLabels();
-        }
-      } catch (e) {
-        console.warn('Custom X-axis labels failed:', e);
-      }
-    }, 150); // 150ms delay matches v2.2
+  // Add a 'ready' event listener that will fire after every draw (v2.3 style)
+  // Remove any existing listeners first to prevent duplicates
+  google.visualization.events.removeAllListeners(chart);
+  google.visualization.events.addListener(chart, 'ready', addCustomXAxisLabels);
 
-    // Fallback: If custom labels failed, redraw once with default Google labels
-    if (!customOk && !window.__labelFallback) {
-      window.__labelFallback = true;
-      try {
-        const fallbackOptions = { ...options };
-        fallbackOptions.hAxis.textStyle = { color: '#666' };
-        chart.draw(dataTable, fallbackOptions);
-      } finally {
-        setTimeout(() => { window.__labelFallback = false; }, 0);
-      }
-    }
-
-    // 3. Notify that the chart has finished rendering (for loading management)
-    if (chartRenderCallback) {
-      console.log('Line chart finished rendering');
-      chartRenderCallback();
-      chartRenderCallback = null; // Clear callback after use
-    }
-  });
+  // Compute safe width/height to avoid negative SVG dimensions
+  const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
+  const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+  options.width = safeWidth;
+  options.height = safeHeight;
 
   // On mobile, show only first and last year for clarity
   const isMobile = window.innerWidth < 600;
@@ -922,7 +756,7 @@ function updateChart(){
     options.hAxis.slantedText = true;
     options.hAxis.slantedTextAngle = 90;
   }
-    // Ensure a small right chart padding so the chart fills most of the container
+  // Ensure a small right chart padding so the chart fills most of the container
   if (options.chartArea) {
     // Reduce the minimum right padding; previously set to 80px which left a large gap.
     options.chartArea.right = Math.max(options.chartArea.right || 10, 20);
@@ -931,59 +765,14 @@ function updateChart(){
     }
   }
 
-  // Use DOUBLE requestAnimationFrame to ensure layout is fully reflowed before drawing
-  // This prevents the chart from reading stale container dimensions during resize
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      // FINAL CHECK: Don't draw if resize is still in progress
-      if (resizeInProgress) {
-        console.log('⏸️ RAF reached but resize still in progress - aborting draw');
-        return;
-      }
-      
-      // Compute safe width/height to avoid negative SVG dimensions
-      const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
-      // Set height based on width to maintain aspect ratio and prevent jumping
-      const aspectRatio = 0.6;
-      const safeHeight = safeWidth * aspectRatio;
-
-      console.log('📊 DRAWING CHART:');
-      console.log('  - Container size:', chartContainer.offsetWidth, 'x', chartContainer.offsetHeight);
-      console.log('  - Using dimensions:', safeWidth, 'x', safeHeight);
-      console.log('  - Iframe window:', window.innerWidth, 'x', window.innerHeight);
-      console.log('  - Resize in progress:', resizeInProgress);
-      options.width = safeWidth;
-      options.height = safeHeight;
-
+  // Delay slightly to let layout stabilize (prevents negative sizes and bouncing)
+  setTimeout(() => {
     chart.draw(dataTable, options);
-    console.log('✅ Chart.draw() completed');
-    
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
       chartContainer.classList.add('visible');
     }
-    
-    // After chart is drawn, send content height to parent
-    if (window.parent && window.parent !== window) {
-      setTimeout(() => {
-        // Use body.scrollHeight which measures actual content
-        const bodyHeight = document.body.scrollHeight;
-        const buffer = 30; // Minimal buffer for axis labels
-        const newHeight = Math.ceil(bodyHeight) + buffer;
-        const currentHeight = window.innerHeight;
-        console.log('📏 Height calculation: body.scrollHeight=', bodyHeight, 'final=', newHeight);
-        if (Math.abs(newHeight - currentHeight) > 20) {
-          console.log('📐 Height update:', currentHeight, 'to', newHeight);
-          window.parent.postMessage({
-            type: 'iframeHeight',
-            chart: 'line',
-            height: newHeight
-          }, '*');
-        }
-      }, 250);
-    }
-    }); // end inner RAF
-  }); // end outer RAF
+  }, 100);
 
   // update visible title on page
   const titleEl = document.getElementById('chartTitle');
@@ -1048,46 +837,10 @@ function drawChart() {
 }
 
 
-// Track last resize dimensions to avoid redundant redraws
-let lastResizeWidth = window.innerWidth;
-let resizeInProgress = false;
-
+// Simple resize handler - just debounce and redraw (v2.3 style)
 window.addEventListener('resize', () => {
-  // Don't trigger chart redraws during initial load
-  if (!initialLoadComplete) {
-    console.log('🔄 Resize event ignored during initial load');
-    return;
-  }
-  
-  // Don't process new resize events while one is already in progress
-  if (resizeInProgress) {
-    console.log('🔄 Resize already in progress - ignoring additional resize event');
-    return;
-  }
-  
-  console.log('🔄 RESIZE EVENT - Current width:', window.innerWidth, 'Last width:', lastResizeWidth);
-  
   clearTimeout(window._resizeTimer);
-  resizeInProgress = true;
-  
-  window._resizeTimer = setTimeout(() => {
-    const currentWidth = window.innerWidth;
-    console.log('🔄 Debounce timer fired - Current width:', currentWidth, 'Last width:', lastResizeWidth);
-    
-    const widthChanged = Math.abs(currentWidth - lastResizeWidth) > 10;
-    
-    // Only redraw on width changes
-    if (widthChanged) {
-      console.log('🎨 Width changed from', lastResizeWidth, 'to', currentWidth, '- TRIGGERING REDRAW');
-      lastResizeWidth = currentWidth;
-      resizeInProgress = false;
-      updateChart();
-      return;
-    } else {
-      console.log('⏭️ Width change too small (<10px) - skipping redraw');
-      resizeInProgress = false;
-    }
-  }, 300); // Debounce waits for resize to stop
+  window._resizeTimer = setTimeout(updateChart, 200);
 });
 
 async function renderInitialView() {
