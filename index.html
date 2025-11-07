@@ -41,6 +41,8 @@
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>  <style>
+    /* Chart interface - no transition needed, overlay fade handles visibility */
+    
     /* Chart containers with fade-in effect */
     .chart-container {
       opacity: 0;
@@ -408,10 +410,9 @@
         </div>
       </div>
     </div>
-  </div>
-
-  <!-- Footer (outside chart area) -->
-  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; outline: 5px solid orange;">
+  
+  <!-- Footer (inside chart-interface so it fades in with the chart) -->
+  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; outline: 5px solid orange; opacity: 1;">
     <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via 
     <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
     <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
@@ -419,9 +420,11 @@
     <strong>YouTube:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">www.youtube.com/@ChronicIllnessChannel</a>
     <br>
     <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-      Version: v3.0 Shared CIC-testdb (Line: v2.4, Scatter: v2.0) • Build: 2025.11.06
+      Viewer Version: v3.0 Shared CIC-testdb (Line: v2.4, Scatter: v2.0) • Build: 2025.11.07
     </span>
   </footer>
+  
+  </div> <!-- End chart-interface -->
 
   <style>
     .footer-copyright,
@@ -584,6 +587,17 @@
       // Update URL
       const currentParams = new URLSearchParams(window.location.search);
       currentParams.set('chart', chartId);
+      
+      // If switching to line chart (chart 1) and no chart parameters exist yet, add defaults
+      if (chartId === '1' && !currentParams.has('pollutant_id')) {
+        // Default line chart parameters: PM2.5, All groups, 1970-2023
+        // PM2.5 ID = 5, All group ID = 1
+        currentParams.set('pollutant_id', '5');
+        currentParams.set('group_ids', '1');
+        currentParams.set('start_year', '1970');
+        currentParams.set('end_year', '2023');
+      }
+      
       const newUrl = window.location.pathname + '?' + currentParams.toString();
       window.history.pushState({}, '', newUrl);
       
@@ -674,8 +688,16 @@
         
         // Hide overlay when both charts are ready
         if (lineChartReady && scatterChartReady) {
-          console.log('✅ Both charts ready - hiding overlay');
-          window.hideLoadingOverlay();
+          console.log('✅ Both charts ready - requesting height before hiding overlay');
+          
+          // Request height from line chart before hiding overlay to prevent layout shift
+          const lineIframe = document.getElementById('linechart-iframe');
+          if (lineIframe && lineIframe.contentWindow) {
+            console.log('📐 Requesting height from line chart iframe...');
+            lineIframe.contentWindow.postMessage({ type: 'requestHeight' }, '*');
+          }
+          
+          // Height will be received, then hideLoadingOverlay will be called
         } else {
           console.log(`⏳ Waiting for: ${!lineChartReady ? 'line chart ' : ''}${!scatterChartReady ? 'scatter chart' : ''}`);
         }
@@ -690,12 +712,34 @@
         if (iframe && event.data.height) {
           console.log(`📏 Received content height from ${event.data.chart}: ${event.data.height}px`);
           iframe.style.height = event.data.height + 'px';
+          
+          // If this is the line chart and both charts are ready, hide overlay now that layout is stable
+          if (event.data.chart === 'line' && lineChartReady && scatterChartReady) {
+            console.log('✅ Height received, layout stable - hiding overlay now');
+            // Small delay to ensure browser has applied the height change
+            setTimeout(() => {
+              window.hideLoadingOverlay();
+            }, 50);
+          }
         }
       }
       
       // Debug messages from iframes
       if (event.data && event.data.type === 'debug') {
         console.log('🐛 Debug message from iframe:', event.data.message);
+      }
+      
+      // URL update messages from iframe
+      if (event.data && event.data.type === 'updateURL') {
+        const urlParams = new URLSearchParams(window.location.search);
+        const currentChart = urlParams.get('chart') || '1';
+        
+        // Combine chart parameter with params from iframe
+        const newParams = ['chart=' + currentChart, ...event.data.params];
+        const newUrl = `${window.location.pathname}?${newParams.join('&')}`;
+        
+        window.history.replaceState({ path: newUrl }, '', newUrl);
+        console.log('🔗 URL updated:', newUrl);
       }
       
       // Line debug messages
@@ -710,87 +754,31 @@
       window.postMessage({ type: 'test', message: 'Self test message' }, '*');
     }, 100);
     
-    // DEBUG: Comprehensive loading element check
-    function debugAllLoadingElements() {
-      console.log('🔍 === COMPREHENSIVE LOADING ELEMENT DEBUG ===');
-      
-      // Check for all possible loading-related elements
-      const loadingSelectors = [
-        '#main-loading-overlay',
-        '#loading', 
-        '.spinner',
-        '.main-spinner',
-        '[class*="loading"]',
-        '[id*="loading"]',
-        '[class*="spinner"]'
-      ];
-      
-      loadingSelectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        console.log(`🔍 ${selector}: Found ${elements.length} elements`);
-        elements.forEach((el, index) => {
-          console.log(`  - Element ${index + 1}: id="${el.id}", class="${el.className}", display="${window.getComputedStyle(el).display}", opacity="${window.getComputedStyle(el).opacity}"`);
-        });
-      });
-      
-      console.log('🔍 === END LOADING ELEMENT DEBUG ===');
-    }
-    
-    // Run debug after DOM loads
-    setTimeout(debugAllLoadingElements, 200);
-    
     // Hide loading overlay function - make it global for iframe onload
     window.hideLoadingOverlay = function() {
       if (overlayHidden) {
-        console.log('⚠️ hideLoadingOverlay called but already hidden');
         return;
       }
       overlayHidden = true;
       
-      console.log('💫 Hiding loading overlay...');
       const overlay = document.getElementById('main-loading-overlay');
       const chartInterface = document.getElementById('chart-interface');
       
-      console.log('🔍 Overlay element:', !!overlay);
-      console.log('🔍 Chart interface element:', !!chartInterface);
-      
-      if (overlay) {
-        console.log('🔍 Overlay current display:', overlay.style.display);
-        console.log('🔍 Overlay current opacity:', overlay.style.opacity);
-        console.log('🔍 Overlay computed display:', window.getComputedStyle(overlay).display);
-        console.log('🔍 Overlay computed opacity:', window.getComputedStyle(overlay).opacity);
-      }
-      
       if (chartInterface) {
-        console.log('🔍 Chart interface opacity before:', chartInterface.style.opacity);
-        // Fade in the chart interface
+        // Make chart interface visible instantly (no transition)
+        // The overlay fade will handle the visual reveal
         chartInterface.style.opacity = '1';
-        console.log('🔍 Chart interface opacity after:', chartInterface.style.opacity);
       }
       
       if (overlay) {
-        console.log('📉 Setting overlay opacity to 0...');
         overlay.style.opacity = '0';
         
         setTimeout(() => {
-          console.log('🗑️ Removing overlay from DOM...');
           if (overlay.parentNode) {
             overlay.parentNode.removeChild(overlay);
-            console.log('✅ Overlay removed successfully');
-          } else {
-            console.log('⚠️ Overlay has no parent node');
           }
           
-          // Double-check what's visible now
-          const remainingOverlay = document.getElementById('main-loading-overlay');
-          console.log('🔍 Overlay still exists after removal:', !!remainingOverlay);
-          
-          // Run comprehensive debug to see what loading elements remain
-          console.log('🔍 Running post-removal debug...');
-          debugAllLoadingElements();
-          
           // Notify iframes that overlay is fully hidden and they can respond to resizes
-          console.log('📢 Notifying iframes that overlay is hidden...');
           const lineIframe = document.getElementById('linechart-iframe');
           const scatterIframe = document.getElementById('scatterchart-iframe');
           if (lineIframe && lineIframe.contentWindow) {

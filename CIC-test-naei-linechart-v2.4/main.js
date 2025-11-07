@@ -92,6 +92,12 @@ window.addEventListener('message', (event) => {
       sendContentHeightToParent();
     }, 100);
   }
+  
+  // Handle height request from parent (sent before hiding overlay to prevent layout shift)
+  if (event.data && event.data.type === 'requestHeight') {
+    console.log('📐 Parent requested height - sending immediately');
+    sendContentHeightToParent();
+  }
 });
 
 // ---- Helpers for selection readiness & notices ----
@@ -545,6 +551,84 @@ function addCustomXAxisLabels() {
   } catch (e) {
     console.warn('[CustomYearTicks] Could not add custom year labels:', e);
   }
+}
+
+/* ---------------- URL Update Function ---------------- */
+function updateUrlFromChartState() {
+  // Ensure the data needed for ID lookups is available.
+  const pollutants = window.allPollutantsData || [];
+  const groups = window.allGroupsData || [];
+  
+  console.log('🔗 updateUrlFromChartState called');
+  console.log('🔗 Pollutants available:', pollutants.length);
+  console.log('🔗 Groups available:', groups.length);
+  
+  if (!pollutants.length || !groups.length) {
+    console.log("🔗 URL update skipped: lookup data not yet available.");
+    return;
+  }
+
+  clearTimeout(urlUpdateTimer);
+  urlUpdateTimer = setTimeout(() => {
+    try {
+      const pollutantName = document.getElementById('pollutantSelect')?.value;
+      const startYear = document.getElementById('startYear')?.value;
+      const endYear = document.getElementById('endYear')?.value;
+      const groupNames = getSelectedGroups();
+
+      console.log('🔗 URL update values:', { pollutantName, startYear, endYear, groupNames });
+
+      if (!pollutantName || !startYear || !endYear || groupNames.length === 0) {
+        console.log('🔗 URL update skipped: missing values');
+        return; // Not enough info to create a valid URL
+      }
+
+      // Find pollutant ID
+      const pollutant = pollutants.find(p => p.pollutant === pollutantName);
+      const pollutantId = pollutant ? pollutant.id : null;
+
+      // Find group IDs
+      const groupIds = groupNames.map(name => {
+        const group = groups.find(g => g.group_title === name);
+        return group ? group.id : null;
+      }).filter(id => id !== null);
+
+      if (!pollutantId || groupIds.length !== groupNames.length) {
+        console.warn("🔗 Could not map all names to IDs for URL update.");
+        console.warn('🔗 pollutantId:', pollutantId, 'groupIds:', groupIds, 'groupNames:', groupNames);
+        return;
+      }
+
+      if (parseInt(startYear) >= parseInt(endYear)) {
+        console.warn(`🔗 URL update skipped: Invalid year range (start=${startYear}, end=${endYear}).`);
+        return;
+      }
+
+      // Build query parameters
+      const queryParts = [
+        `pollutant_id=${encodeURIComponent(pollutantId)}`,
+        `group_ids=${groupIds.join(',')}`,
+        `start_year=${encodeURIComponent(startYear)}`,
+        `end_year=${encodeURIComponent(endYear)}`
+      ];
+      
+      console.log('🔗 Sending URL update to parent:', queryParts);
+      
+      // Send URL update to parent window
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({
+          type: 'updateURL',
+          params: queryParts
+        }, '*');
+        console.log('🔗 URL update message sent');
+      } else {
+        console.log('🔗 No parent window to send URL update to');
+      }
+
+    } catch (error) {
+      console.error("Failed to update URL from chart state:", error);
+    }
+  }, 300); // Debounce for 300ms
 }
 
 
@@ -1011,6 +1095,9 @@ async function revealMainContent() {
               setTimeout(() => {
                 console.log('Line chart fully loaded and visible');
                 
+                // Update URL with initial chart state
+                updateUrlFromChartState();
+                
                 // Chart is rendered - send chartReady
                 // Height will be sent after overlay is hidden and layout is stable
                 console.log('📤 Sending chartReady message to parent...');
@@ -1111,67 +1198,6 @@ function parseUrlParameters() {
     startYear,
     endYear
   };
-}
-
-/**
- * Update URL with current chart state (debounced)
- */
-function updateUrlFromChartState() {
-  // Ensure the data needed for ID lookups is available.
-  const pollutants = window.allPollutantsData || window.allPollutants || [];
-  const groups = window.allGroupsData || window.allGroups || [];
-  if (!pollutants.length || !groups.length) {
-    console.log("URL update skipped: lookup data not yet available.");
-    return;
-  }
-
-  clearTimeout(urlUpdateTimer);
-  urlUpdateTimer = setTimeout(() => {
-    try {
-      const pollutantName = document.getElementById('pollutantSelect').value;
-      const startYear = document.getElementById('startYear').value;
-      const endYear = document.getElementById('endYear').value;
-      const groupNames = getSelectedGroups();
-
-      if (!pollutantName || !startYear || !endYear || groupNames.length === 0) {
-        return; // Not enough info to create a valid URL
-      }
-
-      // Find pollutant ID
-      const pollutant = pollutants.find(p => p.pollutant === pollutantName);
-      const pollutantId = pollutant ? pollutant.id : null;
-
-      // Find group IDs
-      const groupIds = groupNames.map(name => {
-        const group = groups.find(g => g.group_title === name);
-        return group ? group.id : null;
-      }).filter(id => id !== null);
-
-      if (!pollutantId || groupIds.length !== groupNames.length) {
-        console.warn("Could not map all names to IDs for URL update.");
-        return;
-      }
-
-      if (parseInt(startYear) >= parseInt(endYear)) {
-        console.warn('URL update skipped: Invalid year range (start=' + startYear + ', end=' + endYear + ').');
-        return;
-      }
-
-      const queryParts = [
-        'pollutant_id=' + encodeURIComponent(pollutantId),
-        'group_ids=' + groupIds.join(','),
-        'start_year=' + encodeURIComponent(startYear),
-        'end_year=' + encodeURIComponent(endYear)
-      ];
-      
-      const newUrl = window.location.pathname + '?' + queryParts.join('&');
-      
-      window.history.replaceState({ path: newUrl }, '', newUrl);
-
-    } catch (error) {
-      console.error("Failed to update URL from chart state:", error);
-    }
-  }, 400); // 400ms debounce delay
 }
 
 /**
