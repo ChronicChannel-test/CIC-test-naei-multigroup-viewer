@@ -641,53 +641,12 @@
     let lineChartReady = false;
     let scatterChartReady = false;
     
-    // Measure footer height once
-    const footer = document.querySelector('footer');
-    const footerHeight = footer ? footer.offsetHeight : 0;
-    console.log('📏 Footer height measured:', footerHeight + 'px');
-    
-    // Function to constrain iframe height based on scroll position
-    function applyIframeHeightConstraint(iframe) {
-      if (!iframe) return;
-      
-      const naturalHeight = parseInt(iframe.dataset.naturalHeight || 0);
-      if (!naturalHeight) return;
-      
-      // SIMPLE: iframe height = child content + footer height
-      const totalHeight = naturalHeight + footerHeight;
-      console.log(`Setting iframe height: ${naturalHeight}px (content) + ${footerHeight}px (footer) = ${totalHeight}px`);
-      iframe.style.height = totalHeight + 'px';
+    // Set initial reasonable height estimate
+    const lineIframe = document.getElementById('linechart-iframe');
+    if (lineIframe) {
+      lineIframe.style.height = '1200px'; // Initial estimate
+      console.log('📏 Line chart iframe initial height: 1200px');
     }
-    
-    // Apply constraints on scroll
-    let scrollTimeout;
-    window.addEventListener('scroll', function() {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        const lineIframe = document.getElementById('linechart-iframe');
-        const scatterIframe = document.getElementById('scatterchart-iframe');
-        
-        if (lineIframe && lineIframe.dataset.naturalHeight) {
-          applyIframeHeightConstraint(lineIframe);
-        }
-        if (scatterIframe && scatterIframe.dataset.naturalHeight) {
-          applyIframeHeightConstraint(scatterIframe);
-        }
-      }, 10);
-    });
-    
-    // Apply constraints on window resize
-    window.addEventListener('resize', function() {
-      const lineIframe = document.getElementById('linechart-iframe');
-      const scatterIframe = document.getElementById('scatterchart-iframe');
-      
-      if (lineIframe && lineIframe.dataset.naturalHeight) {
-        applyIframeHeightConstraint(lineIframe);
-      }
-      if (scatterIframe && scatterIframe.dataset.naturalHeight) {
-        applyIframeHeightConstraint(scatterIframe);
-      }
-    });
     
     // Set up message listener IMMEDIATELY (before DOM is ready)
     console.log('🎯 Setting up message listener...');
@@ -722,43 +681,26 @@
         }
       }
       
-      // Handle iframe height updates for seamless scrolling
-      if (event.data && event.data.type === 'iframeHeight') {
+      // Handle content height from iframe (sent once after initial render)
+      if (event.data && event.data.type === 'contentHeight') {
         const iframe = event.data.chart === 'line' 
           ? document.getElementById('linechart-iframe')
           : document.getElementById('scatterchart-iframe');
         
         if (iframe && event.data.height) {
-          // Store the natural content height
-          iframe.dataset.naturalHeight = event.data.height;
-          
-          // Apply height constraint based on scroll position
-          applyIframeHeightConstraint(iframe);
-          
-          // Only send resizeComplete during initial load (before overlay is hidden)
-          // After that, just resize without confirmation
-          if (!overlayHidden) {
-            setTimeout(() => {
-              console.log(`✅ Resize complete, notifying ${event.data.chart} iframe`);
-              if (iframe.contentWindow) {
-                iframe.contentWindow.postMessage({ 
-                  type: 'resizeComplete',
-                  height: event.data.height 
-                }, '*');
-              }
-            }, 50); // Small delay to ensure resize has been applied
-          }
+          console.log(`📏 Received content height from ${event.data.chart}: ${event.data.height}px`);
+          iframe.style.height = event.data.height + 'px';
         }
       }
       
-      // Also handle debug messages
+      // Debug messages from iframes
       if (event.data && event.data.type === 'debug') {
         console.log('🐛 Debug message from iframe:', event.data.message);
       }
       
-      // Handle test messages
-      if (event.data && event.data.type === 'test') {
-        console.log('✅ Test message received:', event.data.message);
+      // Line debug messages
+      if (event.data && event.data.type === 'lineDebug') {
+        console.log('🐛 Line chart debug:', event.data.payload);
       }
     });
     

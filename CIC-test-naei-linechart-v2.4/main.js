@@ -85,24 +85,12 @@ window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'overlayHidden') {
     console.log('✅ Received overlayHidden message from parent - enabling resize handler');
     initialLoadComplete = true;
-  } else if (event.data && event.data.type === 'resizeComplete') {
-    console.log('✅ Parent confirmed resize to ' + event.data.height + 'px - waiting for reflow...');
     
-    // Wait for browser to reflow the iframe before measuring dimensions
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        // Force reflow by accessing dimensions
-        const currentHeight = document.documentElement.offsetHeight;
-        const currentWidth = document.documentElement.offsetWidth;
-        console.log('📐 After reflow - iframe dimensions: ' + currentWidth + 'x' + currentHeight);
-        
-        // Now render the chart
-        if (window.pendingRender) {
-          window.pendingRender();
-          window.pendingRender = null;
-        }
-      });
-    });
+    // Now that overlay is hidden and layout is stable, send final accurate height
+    setTimeout(() => {
+      console.log('📐 Layout stable, sending final content height');
+      sendContentHeightToParent();
+    }, 100);
   }
 });
 
@@ -766,15 +754,21 @@ function updateChart(){
 
   // Delay slightly to let layout stabilize (prevents negative sizes and bouncing)
   setTimeout(() => {
-    // Listen for chart ready event to send height after render completes
-    google.visualization.events.addOneTimeListener(chart, 'ready', () => {
-      sendHeightToParent();
-    });
-    
     chart.draw(dataTable, options);
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
       chartContainer.classList.add('visible');
+    }
+    
+    // After chart finishes drawing, update height if we're in a resize
+    if (window._pendingHeightUpdate) {
+      window._pendingHeightUpdate = false;
+      // Use requestAnimationFrame to ensure DOM has fully updated
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          sendContentHeightToParent();
+        }, 100);
+      });
     }
   }, 100);
 
@@ -830,38 +824,27 @@ function updateChart(){
   refreshButtons();
 }
 
-// Track last sent height to prevent feedback loops
-let lastSentHeight = 0;
-let lastWindowWidth = window.innerWidth;
-
-// Helper function to measure and send content height to parent
-function sendHeightToParent() {
-  const chartWrapper = document.querySelector('.chart-wrapper');
-  if (!chartWrapper) return;
+// Helper to send content height to parent (called once after initial render)
+function sendContentHeightToParent() {
+  const body = document.body;
   
-  const wrapperRect = chartWrapper.getBoundingClientRect();
-  const wrapperBottom = wrapperRect.bottom + window.scrollY;
-  const actualHeight = Math.ceil(wrapperBottom + 20);
+  // Only use body measurements - html measurements reflect the iframe size set by parent
+  const height = Math.max(
+    body.scrollHeight,
+    body.offsetHeight
+  );
   
-  // Only send if height changed by more than 5px (prevents feedback loop from sub-pixel changes)
-  const heightDiff = Math.abs(actualHeight - lastSentHeight);
-  if (heightDiff < 5) {
-    console.log('📐 Height change too small, skipping update:', heightDiff + 'px');
-    return;
-  }
-  
-  lastSentHeight = actualHeight;
-  
-  console.log('📐 Sending height to parent:', actualHeight);
-  console.log('📐 chart-wrapper bottom:', wrapperBottom);
-  console.log('📐 chart-wrapper height:', wrapperRect.height);
+  console.log('📐 Sending content height to parent:', height + 'px');
   
   window.parent.postMessage({
-    type: 'iframeHeight',
+    type: 'contentHeight',
     chart: 'line',
-    height: actualHeight
+    height: height
   }, '*');
 }
+
+// No need for dynamic height - chart is fixed at 600px
+// Parent will set iframe to fixed height
 
 // Backward compatibility: some older code paths may still call drawChart()
 // Ensure it simply delegates to the modern updateChart() with readiness guards
@@ -873,18 +856,27 @@ function drawChart() {
   }
 }
 
+// Track last window width to detect real user resizes vs parent iframe height adjustments
+let lastWindowWidth = window.innerWidth;
 
-// Simple resize handler - only trigger on WIDTH changes (ignore height changes from parent)
+// Resize handler - only update height when WIDTH changes (real user resize)
 window.addEventListener('resize', () => {
-  const currentWidth = window.innerWidth;
-  if (currentWidth === lastWindowWidth) {
-    console.log('📐 Height-only resize, ignoring (parent adjusting iframe)');
-    return;
-  }
-  lastWindowWidth = currentWidth;
-  console.log('📐 Width changed, updating chart:', currentWidth);
   clearTimeout(window._resizeTimer);
-  window._resizeTimer = setTimeout(updateChart, 200);
+  window._resizeTimer = setTimeout(() => {
+    const currentWidth = window.innerWidth;
+    
+    // Only proceed if width actually changed (real user resize, not parent adjusting iframe height)
+    if (currentWidth !== lastWindowWidth) {
+      console.log(`📐 Width changed from ${lastWindowWidth}px to ${currentWidth}px - updating chart and height`);
+      lastWindowWidth = currentWidth;
+      
+      window._pendingHeightUpdate = true;
+      updateChart();
+      // Height will be sent after chart finishes drawing (see updateChart's setTimeout callback)
+    } else {
+      console.log('📐 Height-only resize (parent adjusted iframe) - ignoring to prevent loop');
+    }
+  }, 200);
 });
 
 async function renderInitialView() {
@@ -942,47 +934,32 @@ async function revealMainContent() {
     mainContent.removeAttribute('aria-hidden');
     mainContent.classList.add('loaded'); // Add loaded class immediately
     
-    // Send a conservative initial height estimate to parent
-    // After chart renders, we'll send the actual measured height
-    const estimatedHeight = 1200; // Single estimate for all screen widths
+    // Since iframe has fixed height, we can render immediately
+    // Log all available dimension information
+    console.log('📐 === DIMENSION DEBUG ===');
+    console.log('📐 window.innerWidth:', window.innerWidth);
+    console.log('📐 window.innerHeight:', window.innerHeight);
+    console.log('📐 document.documentElement.clientWidth:', document.documentElement.clientWidth);
+    console.log('📐 document.documentElement.clientHeight:', document.documentElement.clientHeight);
+    console.log('📐 document.body.clientWidth:', document.body.clientWidth);
+    console.log('📐 document.body.clientHeight:', document.body.clientHeight);
     
-    if (window.parent && window.parent !== window) {
-      console.log('Sending initial height estimate:', estimatedHeight + 'px');
-      window.parent.postMessage({
-        type: 'iframeHeight',
-        chart: 'line',
-        height: estimatedHeight
-      }, '*');
-      
-      // Set up a pending render function that will be called when resize is confirmed
-      window.pendingRender = () => {
-        console.log('🎨 Starting chart render after resize confirmed');
-        
-        // Log all available dimension information
-        console.log('📐 === DIMENSION DEBUG ===');
-        console.log('📐 window.innerWidth:', window.innerWidth);
-        console.log('📐 window.innerHeight:', window.innerHeight);
-        console.log('📐 document.documentElement.clientWidth:', document.documentElement.clientWidth);
-        console.log('📐 document.documentElement.clientHeight:', document.documentElement.clientHeight);
-        console.log('📐 document.body.clientWidth:', document.body.clientWidth);
-        console.log('📐 document.body.clientHeight:', document.body.clientHeight);
-        
-        const chartContainer = document.getElementById('chart_div');
-        if (chartContainer) {
-          console.log('📐 chartContainer.offsetWidth:', chartContainer.offsetWidth);
-          console.log('📐 chartContainer.offsetHeight:', chartContainer.offsetHeight);
-          console.log('📐 chartContainer.clientWidth:', chartContainer.clientWidth);
-          console.log('📐 chartContainer.clientHeight:', chartContainer.clientHeight);
-          const computedStyle = window.getComputedStyle(chartContainer);
-          console.log('📐 chartContainer computed width:', computedStyle.width);
-          console.log('📐 chartContainer computed height:', computedStyle.height);
-          console.log('📐 chartContainer computed display:', computedStyle.display);
-          console.log('📐 chartContainer computed visibility:', computedStyle.visibility);
-        }
-        console.log('📐 === END DIMENSION DEBUG ===');
-        
-        // Now render the chart at the correct size
-        (function gateFirstRender(){
+    const chartContainer = document.getElementById('chart_div');
+    if (chartContainer) {
+      console.log('📐 chartContainer.offsetWidth:', chartContainer.offsetWidth);
+      console.log('📐 chartContainer.offsetHeight:', chartContainer.offsetHeight);
+      console.log('📐 chartContainer.clientWidth:', chartContainer.clientWidth);
+      console.log('📐 chartContainer.clientHeight:', chartContainer.clientHeight);
+      const computedStyle = window.getComputedStyle(chartContainer);
+      console.log('📐 chartContainer computed width:', computedStyle.width);
+      console.log('📐 chartContainer computed height:', computedStyle.height);
+      console.log('📐 chartContainer computed display:', computedStyle.display);
+      console.log('📐 chartContainer computed visibility:', computedStyle.visibility);
+    }
+    console.log('📐 === END DIMENSION DEBUG ===');
+    
+    // Now render the chart at the correct size
+    (function gateFirstRender(){
           let tries = 0;
           const maxTries = 30; // ~3s
           function tick(){
@@ -1034,10 +1011,8 @@ async function revealMainContent() {
               setTimeout(() => {
                 console.log('Line chart fully loaded and visible');
                 
-                // Send actual content height after chart is fully rendered
-                sendHeightToParent();
-                
                 // Chart is rendered - send chartReady
+                // Height will be sent after overlay is hidden and layout is stable
                 console.log('📤 Sending chartReady message to parent...');
                 window.parent.postMessage({
                   type: 'chartReady',
@@ -1051,12 +1026,6 @@ async function revealMainContent() {
           }
           tick();
         })();
-      }; // End of window.pendingRender
-    } else {
-      // Not in iframe, render immediately
-      updateChart();
-      resolve();
-    }
   });
 }
 
