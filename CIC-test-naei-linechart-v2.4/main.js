@@ -707,6 +707,12 @@ function updateChart(){
     title: '',
     width: '100%',
     legend: 'none',
+    chartArea: {
+      top: 10,
+      left: leftMargin,
+      right: 20,
+      bottom: 60
+    },
     hAxis: {
       title: 'Year',
       textStyle: { color: 'transparent' }, // Hide Google Charts labels
@@ -755,18 +761,16 @@ function updateChart(){
   if (isMobile) {
     options.hAxis.slantedText = true;
     options.hAxis.slantedTextAngle = 90;
-  }
-  // Ensure a small right chart padding so the chart fills most of the container
-  if (options.chartArea) {
-    // Reduce the minimum right padding; previously set to 80px which left a large gap.
-    options.chartArea.right = Math.max(options.chartArea.right || 10, 20);
-    if (isMobile) {
-      options.chartArea.width = '70%';
-    }
+    options.chartArea.width = '70%';
   }
 
   // Delay slightly to let layout stabilize (prevents negative sizes and bouncing)
   setTimeout(() => {
+    // Listen for chart ready event to send height after render completes
+    google.visualization.events.addOneTimeListener(chart, 'ready', () => {
+      sendHeightToParent();
+    });
+    
     chart.draw(dataTable, options);
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
@@ -826,6 +830,39 @@ function updateChart(){
   refreshButtons();
 }
 
+// Track last sent height to prevent feedback loops
+let lastSentHeight = 0;
+let lastWindowWidth = window.innerWidth;
+
+// Helper function to measure and send content height to parent
+function sendHeightToParent() {
+  const chartWrapper = document.querySelector('.chart-wrapper');
+  if (!chartWrapper) return;
+  
+  const wrapperRect = chartWrapper.getBoundingClientRect();
+  const wrapperBottom = wrapperRect.bottom + window.scrollY;
+  const actualHeight = Math.ceil(wrapperBottom + 20);
+  
+  // Only send if height changed by more than 5px (prevents feedback loop from sub-pixel changes)
+  const heightDiff = Math.abs(actualHeight - lastSentHeight);
+  if (heightDiff < 5) {
+    console.log('📐 Height change too small, skipping update:', heightDiff + 'px');
+    return;
+  }
+  
+  lastSentHeight = actualHeight;
+  
+  console.log('📐 Sending height to parent:', actualHeight);
+  console.log('📐 chart-wrapper bottom:', wrapperBottom);
+  console.log('📐 chart-wrapper height:', wrapperRect.height);
+  
+  window.parent.postMessage({
+    type: 'iframeHeight',
+    chart: 'line',
+    height: actualHeight
+  }, '*');
+}
+
 // Backward compatibility: some older code paths may still call drawChart()
 // Ensure it simply delegates to the modern updateChart() with readiness guards
 function drawChart() {
@@ -837,8 +874,15 @@ function drawChart() {
 }
 
 
-// Simple resize handler - just debounce and redraw (v2.3 style)
+// Simple resize handler - only trigger on WIDTH changes (ignore height changes from parent)
 window.addEventListener('resize', () => {
+  const currentWidth = window.innerWidth;
+  if (currentWidth === lastWindowWidth) {
+    console.log('📐 Height-only resize, ignoring (parent adjusting iframe)');
+    return;
+  }
+  lastWindowWidth = currentWidth;
+  console.log('📐 Width changed, updating chart:', currentWidth);
   clearTimeout(window._resizeTimer);
   window._resizeTimer = setTimeout(updateChart, 200);
 });
@@ -898,12 +942,12 @@ async function revealMainContent() {
     mainContent.removeAttribute('aria-hidden');
     mainContent.classList.add('loaded'); // Add loaded class immediately
     
-    // Estimate expected height before rendering chart
-    // This allows parent to resize iframe BEFORE we render, preventing size mismatch
-    const estimatedHeight = 1400; // Conservative estimate for chart with controls
+    // Send a conservative initial height estimate to parent
+    // After chart renders, we'll send the actual measured height
+    const estimatedHeight = 1200; // Single estimate for all screen widths
     
     if (window.parent && window.parent !== window) {
-      console.log('Sending estimated iframe height:', estimatedHeight + 'px (before rendering)');
+      console.log('Sending initial height estimate:', estimatedHeight + 'px');
       window.parent.postMessage({
         type: 'iframeHeight',
         chart: 'line',
@@ -989,8 +1033,11 @@ async function revealMainContent() {
               // Wait longer to ensure Google Chart is fully painted and stable
               setTimeout(() => {
                 console.log('Line chart fully loaded and visible');
-                // Chart is rendered - send chartReady immediately
-                // No need to send another height update, iframe size is already correct
+                
+                // Send actual content height after chart is fully rendered
+                sendHeightToParent();
+                
+                // Chart is rendered - send chartReady
                 console.log('📤 Sending chartReady message to parent...');
                 window.parent.postMessage({
                   type: 'chartReady',

@@ -380,29 +380,29 @@
     </div>
 
     <!-- Chart Content -->
-  <div class="relative" style="margin: 0; padding: 0;">
+  <div class="relative" style="margin: 0; padding: 0; outline: 3px solid lime;">
       <!-- Chart Area -->
-  <div class="w-full" style="margin: 0; padding: 0;">
+  <div class="w-full" style="margin: 0; padding: 0; outline: 3px solid cyan;">
         <!-- Line Chart Container -->
-        <div id="chart-1" class="chart-container">
+        <div id="chart-1" class="chart-container" style="outline: 3px solid magenta;">
           <iframe 
             id="linechart-iframe"
             src="linechart.html" 
             frameborder="0" 
             scrolling="no"
-            style="width: 100%; border: none; display: block; overflow: hidden;"
+            style="width: 100%; border: none; display: block; overflow: hidden; outline: 3px solid yellow;"
             title="NAEI Line Chart">
           </iframe>
         </div>
         
         <!-- Scatter Chart Container -->
-        <div id="chart-2" class="chart-container hidden">
+        <div id="chart-2" class="chart-container hidden" style="outline: 3px solid magenta;">
           <iframe 
             id="scatterchart-iframe"
             src="scatterchart.html" 
             frameborder="0" 
             scrolling="no"
-            style="width: 100%; min-height: 800px; border: none; background: white; display: block; overflow: hidden;"
+            style="width: 100%; min-height: 800px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
             title="NAEI Activity Data Scatter Chart">
           </iframe>
         </div>
@@ -411,7 +411,7 @@
   </div>
 
   <!-- Footer (outside chart area) -->
-  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0;">
+  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; outline: 5px solid orange;">
     <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via 
     <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
     <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
@@ -641,6 +641,11 @@
     let lineChartReady = false;
     let scatterChartReady = false;
     
+    // Measure footer height once
+    const footer = document.querySelector('footer');
+    const footerHeight = footer ? footer.offsetHeight : 0;
+    console.log('📏 Footer height measured:', footerHeight + 'px');
+    
     // Function to constrain iframe height based on scroll position
     function applyIframeHeightConstraint(iframe) {
       if (!iframe) return;
@@ -648,39 +653,10 @@
       const naturalHeight = parseInt(iframe.dataset.naturalHeight || 0);
       if (!naturalHeight) return;
       
-      // For now, always use natural height - no constraining
-      // This allows full scrolling to see entire chart including footer
-      console.log(`Setting iframe height to natural: ${naturalHeight}px`);
-      iframe.style.height = naturalHeight + 'px';
-      
-      // Debug: Check actual measurements
-      setTimeout(() => {
-        const rect = iframe.getBoundingClientRect();
-        const footer = document.querySelector('footer');
-        const footerRect = footer ? footer.getBoundingClientRect() : null;
-        console.log(`Iframe bottom: ${rect.bottom}px`);
-        if (footerRect) {
-          console.log(`Footer top: ${footerRect.top}px`);
-          console.log(`Gap: ${footerRect.top - rect.bottom}px`);
-          
-          // NEW: Detailed element inspection
-          console.log('🔍 === ELEMENT HIERARCHY DEBUG ===');
-          
-          // Get all elements and their positions
-          const chartContainer = document.getElementById('chart-1');
-          const relative = chartContainer?.parentElement;
-          const wFull = relative?.parentElement;
-          const chartInterface = document.getElementById('chart-interface');
-          
-          console.log('📦 iframe parent chain:');
-          console.log('  - #chart-1:', chartContainer?.getBoundingClientRect().bottom, 'padding:', window.getComputedStyle(chartContainer).padding);
-          console.log('  - .relative:', relative?.getBoundingClientRect().bottom, 'padding:', window.getComputedStyle(relative).padding, 'margin:', window.getComputedStyle(relative).margin);
-          console.log('  - .w-full:', wFull?.getBoundingClientRect().bottom, 'padding:', window.getComputedStyle(wFull).padding, 'margin:', window.getComputedStyle(wFull).margin);
-          console.log('  - #chart-interface:', chartInterface?.getBoundingClientRect().bottom, 'padding:', window.getComputedStyle(chartInterface).padding, 'margin:', window.getComputedStyle(chartInterface).margin);
-          console.log('  - footer:', footerRect.top);
-          console.log('🔍 === END HIERARCHY DEBUG ===');
-        }
-      }, 100);
+      // SIMPLE: iframe height = child content + footer height
+      const totalHeight = naturalHeight + footerHeight;
+      console.log(`Setting iframe height: ${naturalHeight}px (content) + ${footerHeight}px (footer) = ${totalHeight}px`);
+      iframe.style.height = totalHeight + 'px';
     }
     
     // Apply constraints on scroll
