@@ -366,19 +366,23 @@ async function renderInitialView() {
 
       // Set year from URL params or default to latest
       const yearSelect = document.getElementById('yearSelect');
-      if (params.year && yearSelect.querySelector(`option[value="${params.year}"]`)) {
+      const availableYears = window.supabaseModule.getAvailableYears() || [];
+      const mostRecentYear = availableYears.length > 0 ? Math.max(...availableYears) : null;
+
+      if (Number.isInteger(params.year) && yearSelect.querySelector(`option[value="${params.year}"]`)) {
         yearSelect.value = String(params.year);
+        selectedYear = params.year;
       } else {
-        // Default to latest year (first option)
-        const latestOption = yearSelect.options[yearSelect.options.length - 1]; // Get last option (most recent year)
-        if (latestOption) {
-          yearSelect.value = latestOption.value;
+        // Default to most recent available year
+        if (mostRecentYear) {
+          yearSelect.value = String(mostRecentYear);
+          selectedYear = mostRecentYear;
+        } else {
+          selectedYear = null;
         }
       }
       
-      // Always set selectedYear from the dropdown value
-      selectedYear = yearSelect.value ? parseInt(yearSelect.value) : null;
-      console.log('Initial selectedYear:', selectedYear);
+      console.log('Initial selectedYear:', selectedYear, 'available years:', availableYears);
       
       // Refresh group dropdowns and buttons after adding default groups
       refreshGroupDropdowns();
@@ -391,15 +395,48 @@ async function renderInitialView() {
 
 /**
  * Parse URL parameters (simplified version for scatter chart)
+ * Read from parent window if embedded in iframe
  */
 function parseUrlParameters() {
-  const params = new URLSearchParams(window.location.search);
+  // Try to get params from parent window if in iframe, otherwise use own window
+  let searchParams;
+  try {
+    if (window.parent && window.parent !== window && window.parent.location.search) {
+      searchParams = window.parent.location.search;
+      console.log('Reading URL params from parent:', searchParams);
+    } else {
+      searchParams = window.location.search;
+      console.log('Reading URL params from own window:', searchParams);
+    }
+  } catch (e) {
+    // Cross-origin restriction, use own window
+    searchParams = window.location.search;
+    console.log('Cross-origin restriction, using own window params:', searchParams);
+  }
+  
+  const params = new URLSearchParams(searchParams);
+  
+  // Check if this is the active chart - only parse params if chart=1 (bubble chart)
+  const chartParam = params.get('chart');
+  if (chartParam && chartParam !== '1') {
+    console.log('URL is for chart', chartParam, 'not chart 1 (bubble). Using defaults.');
+    // Return empty params so defaults will be used
+    return {
+      pollutantName: null,
+      groupNames: [],
+      comparisonFlags: [],
+      year: null
+    };
+  }
+  
   const pollutantId = params.get('pollutant_id');
   const groupIdsParam = params.get('group_ids')?.split(',') || [];
-  const year = params.get('year');
+  const yearParamRaw = params.get('year');
+  const yearParam = yearParamRaw ? parseInt(yearParamRaw, 10) : null;
 
   const pollutants = window.supabaseModule.allPollutants || [];
   const groups = window.supabaseModule.allGroups || [];
+  const availableYears = window.supabaseModule.getAvailableYears() || [];
 
   let pollutantName = null;
   if (pollutantId) {
@@ -426,6 +463,23 @@ function parseUrlParameters() {
         }
       }
     });
+  }
+
+  // Validate year against available years
+  let year = null;
+  if (availableYears.length > 0) {
+    const mostRecentYear = Math.max(...availableYears);
+    if (Number.isInteger(yearParam) && availableYears.includes(yearParam)) {
+      // Year is valid
+      year = yearParam;
+    } else if (Number.isInteger(yearParam)) {
+      // Year provided but invalid - use most recent available
+      console.warn('Invalid year in URL: ' + yearParam + '. Using most recent year.');
+      year = mostRecentYear;
+    } else {
+      // No year provided - use most recent
+      year = mostRecentYear;
+    }
   }
 
   return {
@@ -867,8 +921,20 @@ function setupEventListeners() {
     }
 
     lastKnownViewportWidth = currentWidth;
-    console.log('📐 Width changed - redrawing chart (no height update to prevent gap)');
-    drawChart(true); // Pass skipHeightUpdate flag
+    console.log('📐 Width changed - redrawing chart');
+    drawChart(true); // Pass skipHeightUpdate flag to prevent immediate update
+    
+    // After chart redraws and layout settles, check if height actually changed
+    setTimeout(() => {
+      const currentHeight = Math.max(
+        document.body?.scrollHeight || 0,
+        document.body?.offsetHeight || 0
+      );
+      if (lastSentHeight && Math.abs(currentHeight - lastSentHeight) >= MIN_HEIGHT_DELTA) {
+        console.log('📐 Height changed after resize from', lastSentHeight, 'to', currentHeight, '- sending update');
+        sendContentHeightToParent(true);
+      }
+    }, 200);
   }, 250));
 }
 
@@ -1168,9 +1234,43 @@ function updateURL() {
     return isChecked ? `${group.id}c` : `${group.id}`;
   }).filter(id => id !== null);
 
-  const query = `pollutant_id=${selectedPollutantId}&group_ids=${groupIdsWithFlags.join(',')}&year=${selectedYear}`;
+  // Build params array - use raw strings to avoid encoding commas
+  const params = [
+    `pollutant_id=${selectedPollutantId}`,
+    `group_ids=${groupIdsWithFlags.join(',')}`,  // Comma NOT encoded
+    `year=${selectedYear}`
+  ];
+  
+  // Update iframe's own URL (for standalone use)
+  const query = params.join('&');
   const newURL = window.location.pathname + '?' + query;
   window.history.replaceState({}, '', newURL);
+  
+  // Send message to parent to update its URL (for embedded use)
+  // But ONLY if this is the active chart (chart=1 in parent URL)
+  if (window.parent && window.parent !== window) {
+    try {
+      const parentParams = new URLSearchParams(window.parent.location.search);
+      const chartParam = parentParams.get('chart');
+      
+      // Only send if chart=1 (bubble) or no chart param (default to bubble)
+      if (!chartParam || chartParam === '1') {
+        window.parent.postMessage({
+          type: 'updateURL',
+          params: params  // Send as array of raw strings
+        }, '*');
+        console.log('📤 Sent URL update to parent:', params);
+      } else {
+        console.log('🚫 Not active chart (chart=' + chartParam + '), not sending URL update');
+      }
+    } catch (e) {
+      // Cross-origin restriction - send anyway (standalone mode)
+      window.parent.postMessage({
+        type: 'updateURL',
+        params: params
+      }, '*');
+    }
+  }
 }
 
 /**

@@ -72,10 +72,11 @@
 
   <div id="mainContent" aria-hidden="true">
     <div id="mainContentTop">
-      <div class="title-row">
+            <div class="title-row">
         <h2 class="main-title"><span class="title-part title-part-1">NAEI Multi-Group</span> <span class="title-part title-part-2">Pollutant Line Chart</span></h2>
       </div>
       <!-- Everything above the chart (dropdowns, buttons, group info, etc.) -->
+  <!-- QUICK START GUIDE - Commented out for use in main index.html tab later
   <details class="my-4 bg-gray-50 rounded-2xl shadow-sm p-4" style="margin-right: 130px;">
     <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
       📘 Quick Start Guide
@@ -131,6 +132,17 @@
         console.error('Failed to load Quick Start Guide:', error);
         document.getElementById('quickStartContent').innerHTML = '<p class="text-red-600">Failed to load guide content.</p>';
       });
+  </script>
+
+
+  <script>
+    // Detect Opera browser and add a class for Opera-specific styling
+    (function() {
+      const isOpera = (!!window.opr && !!window.opr.addons) || !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0;
+      if (isOpera) {
+        document.documentElement.classList.add('opera-browser');
+      }
+    })();
   </script>
 
       <div class="button-row">

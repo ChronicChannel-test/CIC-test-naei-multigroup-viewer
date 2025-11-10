@@ -52,22 +52,120 @@
   border-radius: 0; 
   padding: 0; 
   box-sizing: border-box;
+  position: relative; /* For absolute positioned elements inside */
+  overflow: visible; /* Allow content to show beyond bounds */
 }
 
 #chart_div.visible { 
   opacity: 1; 
 }
 
-/* Year selector styling */
-#yearSelect {
-  min-width: 120px;
+/* Controls wrapper - match line chart */
+.controls-wrapper {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-right: 150px; /* Increased to prevent icon overlap (110px sidebar + 40px margin) */
+}
+
+.controls-wrapper label { 
+  white-space: nowrap; 
+  margin-right: 4px; 
+}
+
+.controls-wrapper select { 
+  margin-left: 0; 
+  margin-right: 8px; 
+}
+
+/* Button styling - match line chart */
+.add-btn, .remove-btn {
+  background: #EFEFEF !important;
+  cursor: pointer !important;
+  margin: 6px !important;
+  padding: 6px 10px !important;
+  border-radius: 6px !important;
+  border: 1px solid #ccc !important;
+  font-family: system-ui, sans-serif !important;
+  color: inherit !important;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.add-btn:hover, .remove-btn:hover {
+  background: #E0E0E0 !important;
+}
+
+.add-btn, .remove-btn { 
+  display: inline-flex; 
+  align-items: center; 
+  gap: 6px; 
+}
+
+.controls-wrapper button { 
+  margin-left: 4px; 
+  margin-right: 4px; 
+}
+
+.year-pair { 
+  display: inline-flex; 
+  align-items: center; 
+  white-space: nowrap; 
+  margin-right: 8px; 
+}
+
+.controls-wrapper, #groupContainer, .groupRow { 
+  row-gap: 6px; 
+}
+
+.groupRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0;
+}
+
+.groupRow select {
+  flex-shrink: 0;
+}
+
+#groupContainer {
+  padding-right: 0; /* Remove - padding is on individual rows instead */
+}
+
+.button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.button-row label {
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+.button-row select {
+  margin-left: 0;
+  margin-right: 8px;
 }
 
 /* Main content opacity control (matching linechart v2.3) */
 #mainContent { 
   display: none; 
   opacity: 0; 
-  transition: opacity .4s ease; 
+  transition: opacity .4s ease;
+  margin-bottom: 0; /* Remove any bottom margin */
+  padding-bottom: 0; /* Remove any bottom padding */
+}
+
+#mainContentTop { 
+  padding-right: 150px; 
 }
 
 #mainContent.loaded { 
@@ -76,7 +174,14 @@
 
 /* Chart wrapper opacity control (matching linechart v2.3) */
 .chart-wrapper {
-  margin-top: 20px;
+  width: calc(100% - 140px);
+  padding: 4px 4px 0 4px; /* Match line chart - 0 bottom padding */
+  margin: 0 auto 0 0;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  box-sizing: border-box;
+  background-color: #fff;
+  overflow: visible;
   opacity: 0;
   transition: opacity 0.3s ease-in-out 0.1s;
 }
@@ -215,7 +320,7 @@
   }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 830px) {
   .main-title {
     padding-right: 0;
   }
@@ -231,6 +336,19 @@
   .button-row {
     width: 100% !important;
     margin-right: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .groupRow { 
+    flex-direction: column; 
+    align-items: flex-start; 
+    gap: 6px; 
+    padding-right: 0 !important;
+  }
+
+  .groupRow .remove-btn { 
+    align-self: flex-start; 
+    margin-top: 4px; 
   }
 
   #groupContainer {
@@ -353,6 +471,10 @@
   .main-title {
     padding-right: 0;
     width: 100%;
+  }
+
+  #mainContentTop {
+    padding-right: 0 !important;
   }
 
   .chart-wrapper {

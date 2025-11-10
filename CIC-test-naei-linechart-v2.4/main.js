@@ -656,12 +656,30 @@ function updateUrlFromChartState() {
       console.log('🔗 Sending URL update to parent:', queryParts);
       
       // Send URL update to parent window
+      // But ONLY if this is the active chart (chart=2 in parent URL)
       if (window.parent && window.parent !== window) {
-        window.parent.postMessage({
-          type: 'updateURL',
-          params: queryParts
-        }, '*');
-        console.log('🔗 URL update message sent');
+        try {
+          const parentParams = new URLSearchParams(window.parent.location.search);
+          const chartParam = parentParams.get('chart');
+          
+          // Only send if chart=2 (line chart)
+          if (chartParam === '2') {
+            window.parent.postMessage({
+              type: 'updateURL',
+              params: queryParts
+            }, '*');
+            console.log('🔗 URL update message sent');
+          } else {
+            console.log('🚫 Not active chart (chart=' + chartParam + '), not sending URL update');
+          }
+        } catch (e) {
+          // Cross-origin restriction - send anyway (standalone mode)
+          window.parent.postMessage({
+            type: 'updateURL',
+            params: queryParts
+          }, '*');
+          console.log('🔗 URL update message sent (standalone mode)');
+        }
       } else {
         console.log('🔗 No parent window to send URL update to');
       }
@@ -1197,7 +1215,37 @@ async function revealMainContent() {
 
 /* ---------------- URL Parameters and Initialization ---------------- */
 function parseUrlParameters() {
-  const params = new URLSearchParams(window.location.search);
+  // Try to get params from parent window if in iframe, otherwise use own window
+  let searchParams;
+  try {
+    if (window.parent && window.parent !== window && window.parent.location.search) {
+      searchParams = window.parent.location.search;
+      console.log('Reading URL params from parent:', searchParams);
+    } else {
+      searchParams = window.location.search;
+      console.log('Reading URL params from own window:', searchParams);
+    }
+  } catch (e) {
+    // Cross-origin restriction, use own window
+    searchParams = window.location.search;
+    console.log('Cross-origin restriction, using own window params:', searchParams);
+  }
+  
+  const params = new URLSearchParams(searchParams);
+  
+  // Check if this is the active chart - only parse params if chart=2 (line chart)
+  const chartParam = params.get('chart');
+  if (chartParam && chartParam !== '2') {
+    console.log('URL is for chart', chartParam, 'not chart 2 (line). Using defaults.');
+    // Return empty params so defaults will be used
+    return {
+      pollutantName: null,
+      groupNames: [],
+      startYear: null,
+      endYear: null
+    };
+  }
+  
   const pollutantId = params.get('pollutant_id');
   const groupIds = params.get('group_ids')?.split(',').map(Number).filter(Boolean);
   const startYearParam = params.get('start_year');

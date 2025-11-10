@@ -517,11 +517,11 @@ function addBubbleExplanationOverlay() {
     existingOverlay.remove();
   }
   
-  // Create overlay div with scale information
+  // Create overlay div with scale information - positioned ON the chart
   const overlay = document.createElement('div');
   overlay.className = 'bubble-explanation-overlay';
   overlay.style.position = 'absolute';
-  overlay.style.top = '15px';
+  overlay.style.top = '15px';  // Top of chart, opposite to x-axis label
   overlay.style.left = '50%';
   overlay.style.transform = 'translateX(-50%)';
   overlay.style.textAlign = 'center';
@@ -529,16 +529,18 @@ function addBubbleExplanationOverlay() {
   overlay.style.color = '#666';
   overlay.style.lineHeight = '1.4';
   overlay.style.pointerEvents = 'none'; // Allow clicks to pass through
+  overlay.style.zIndex = '10'; // Ensure it's visible
+  overlay.style.maxWidth = '95%'; // Wide container to minimize wrapping
   
-  // Update text based on scaling type
+  // Update text based on scaling type with natural wrapping like footer
   if (useLogScale) {
-    overlay.innerHTML = 'Bubble size proportional to log₁₀(Emission Factor) - logarithmic scale used due to wide EF range<br>Hover over bubble to see values';
+    overlay.innerHTML = '<span style="white-space: nowrap;">Bubble size proportional to log₁₀(Emission Factor)</span> <span style="white-space: nowrap;">- logarithmic scale used due to wide EF range</span><br>Hover over bubble to see values';
   } else {
-    overlay.innerHTML = 'Bubble size proportional to Emission Factor (area-scaled, radius = √EF)<br>Hover over bubble to see values';
+    overlay.innerHTML = '<span style="white-space: nowrap;">Bubble size proportional to Emission Factor</span> <span style="white-space: nowrap;">(area-scaled, radius = √EF)</span><br>Hover over bubble to see values';
   }
   
-  // Insert as first child so it's behind everything else in the chart
-  chartDiv.insertBefore(overlay, chartDiv.firstChild);
+  // Append to chart_div so it overlays the chart
+  chartDiv.appendChild(overlay);
 }
 
 /**

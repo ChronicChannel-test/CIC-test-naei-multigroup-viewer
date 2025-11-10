@@ -409,6 +409,12 @@
     // Chart routing system with tabbed interface
     let currentChart = null;
     
+    // Store last known state for each chart (populated by messages from iframes)
+    const chartStates = {
+      '1': null, // Bubble chart state
+      '2': null  // Line chart state
+    };
+    
     // Load shared resources
     window.addEventListener('DOMContentLoaded', function() {
       // Load shared analytics, colors, and configuration
@@ -464,8 +470,8 @@
       }
       
       if (chartId === '1' || !chartId) {
-        // Bubble chart defaults: PM2.5 (id=5), Ecodesign+Gas groups (ids 25,37), most recent year (2023)
-        return `${baseUrl}?chart=1&pollutant_id=5&group_ids=25,37&year=2023`;
+        // Bubble chart defaults: PM2.5 (id=5), Ecodesign+Gas groups (ids 20,37), most recent year (2023)
+        return `${baseUrl}?chart=1&pollutant_id=5&group_ids=20,37&year=2023`;
       } else if (chartId === '2') {
         // Line chart defaults: PM2.5 (id=5), All group (id=1), 1970-2023
         return `${baseUrl}?chart=2&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
@@ -581,30 +587,98 @@
 
     // Simplified chart loading - no complex coordination needed
 
+    function hasParamsForChart(chartId, params) {
+      if (!params) return false;
+      if (chartId === '1') {
+        return ['pollutant_id', 'group_ids', 'year'].every(key => params.has(key) && params.get(key));
+      }
+      if (chartId === '2') {
+        return ['pollutant_id', 'group_ids', 'start_year', 'end_year'].every(key => params.has(key) && params.get(key));
+      }
+      return false;
+    }
+
+    function extractChartState(chartId, params) {
+      if (!hasParamsForChart(chartId, params)) {
+        return [];
+      }
+      if (chartId === '1') {
+        return [
+          `pollutant_id=${params.get('pollutant_id')}`,
+          `group_ids=${params.get('group_ids')}`,
+          `year=${params.get('year')}`
+        ];
+      }
+      if (chartId === '2') {
+        return [
+          `pollutant_id=${params.get('pollutant_id')}`,
+          `group_ids=${params.get('group_ids')}`,
+          `start_year=${params.get('start_year')}`,
+          `end_year=${params.get('end_year')}`
+        ];
+      }
+      return [];
+    }
+
     function switchChart(chartId) {
       if (currentChart === chartId) return;
-      
-      // Update URL
-      const currentParams = new URLSearchParams(window.location.search);
-      currentParams.set('chart', chartId);
-      
-      // Apply defaults when switching charts without existing parameters
-      if (chartId === '1' && !currentParams.has('pollutant_id')) {
-        // Bubble chart defaults: PM2.5 (id 5), Ecodesign & Gas (ids 25,37), most recent year
-        currentParams.set('pollutant_id', '5');
-        currentParams.set('group_ids', '25,37');
-        currentParams.set('year', '2023');
-      } else if (chartId === '2' && !currentParams.has('pollutant_id')) {
-        // Line chart defaults: PM2.5 (id 5), All group (id 1), full range
-        currentParams.set('pollutant_id', '5');
-        currentParams.set('group_ids', '1');
-        currentParams.set('start_year', '1970');
-        currentParams.set('end_year', '2023');
+
+      const urlParams = new URLSearchParams(window.location.search);
+
+      if ((!chartStates[chartId] || chartStates[chartId]?.length === 0) && hasParamsForChart(chartId, urlParams)) {
+        chartStates[chartId] = extractChartState(chartId, urlParams);
       }
-      
-      const newUrl = window.location.pathname + '?' + currentParams.toString();
-      window.history.pushState({}, '', newUrl);
-      
+
+      const storedState = chartStates[chartId];
+
+      if (storedState && storedState.length > 0) {
+        console.log('Using stored state for chart', chartId, storedState);
+        const paramsArray = ['chart=' + chartId, ...storedState];
+        const newQuery = paramsArray.join('&');
+        const newUrl = window.location.pathname + '?' + newQuery;
+        const historyMethod = currentChart ? 'pushState' : 'replaceState';
+
+        if (window.location.search.substring(1) !== newQuery || urlParams.get('chart') !== chartId) {
+          window.history[historyMethod]({}, '', newUrl);
+        }
+      } else {
+        console.log('No stored state for chart', chartId, '- using defaults');
+
+        const newParams = new URLSearchParams();
+        newParams.set('chart', chartId);
+
+        if (chartId === '1') {
+          newParams.set('pollutant_id', '5');
+          newParams.set('group_ids', '20,37');
+          newParams.set('year', '2023');
+        } else if (chartId === '2') {
+          newParams.set('pollutant_id', '5');
+          newParams.set('group_ids', '1');
+          newParams.set('start_year', '1970');
+          newParams.set('end_year', '2023');
+        }
+
+        const paramsArray = [];
+        for (const [key, value] of newParams) {
+          if (key === 'group_ids' || key === 'start_year' || key === 'end_year' || key === 'year') {
+            paramsArray.push(`${key}=${value}`);
+          } else {
+            paramsArray.push(`${key}=${encodeURIComponent(value)}`);
+          }
+        }
+
+        const newQuery = paramsArray.join('&');
+        const newUrl = window.location.pathname + '?' + newQuery;
+        const historyMethod = currentChart ? 'pushState' : 'replaceState';
+        window.history[historyMethod]({}, '', newUrl);
+
+        if (chartId === '1') {
+          chartStates['1'] = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
+        } else if (chartId === '2') {
+          chartStates['2'] = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
+        }
+      }
+
       currentChart = chartId;
       updateTabStates();
       showChart(chartId);
@@ -740,6 +814,9 @@
         const urlParams = new URLSearchParams(window.location.search);
         const currentChart = urlParams.get('chart') || '1';
         
+        // Store the state for this chart
+        chartStates[currentChart] = event.data.params;
+        
         // Combine chart parameter with params from iframe
         const newParams = ['chart=' + currentChart, ...event.data.params];
         const newUrl = `${window.location.pathname}?${newParams.join('&')}`;
@@ -816,8 +893,14 @@
     window.addEventListener('DOMContentLoaded', function() {
       console.log('Main page DOM loaded');
       const urlParams = new URLSearchParams(window.location.search);
-      const chartParam = urlParams.get('chart') || '1';
-      console.log('Switching to chart:', chartParam);
+      let chartParam = urlParams.get('chart');
+      
+      // If no chart param, default to chart 1
+      if (!chartParam) {
+        chartParam = '1';
+      }
+      
+      console.log('Initial chart selection:', chartParam);
       switchChart(chartParam);
       
     // Comprehensive iframe debugging

@@ -78,31 +78,14 @@
       </div>
 
       <!-- Controls section -->
-      <table style="width: 100%; border-spacing: 0;">
-        <tr>
-          <td style="width: 300px; vertical-align: top;">
-            <div style="display: flex; align-items: center; gap: 10px;">
-              <label for="pollutantSelect" style="white-space: nowrap;">Pollutant:</label>
-              <select id="pollutantSelect" name="pollutantSelect">
-                <option value="">Select pollutant</option>
-              </select>
-            </div>
-          </td>
-          <td style="vertical-align: top; position: relative;">
-            <!-- Comparison Statement header disabled -->
-            <!-- <div id="comparisonHeader" class="comparison-header" style="position: absolute; margin-bottom: 10px;">
-              <h4 style="margin: 0; font-weight: bold; font-size: 16px; color: #333; text-align: center;">
-                Comparison<br>Statement
-              </h4>
-            </div> -->
-          </td>
-        </tr>
-        <tr>
-          <td colspan="2" style="vertical-align: top;">
-            <div id="groupContainer"></div>
-          </td>
-        </tr>
-      </table>
+      <div class="button-row" style="padding-right: 130px;">
+        <label for="pollutantSelect">Pollutant:</label>
+        <select id="pollutantSelect" name="pollutantSelect">
+          <option value="">Select pollutant</option>
+        </select>
+      </div>
+      
+      <div id="groupContainer"></div>
       
       <details id="groupInfoDetails" class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm" style="margin-right: 130px;">
         <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
