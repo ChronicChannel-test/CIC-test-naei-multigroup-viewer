@@ -135,7 +135,12 @@ function showContentDirectly() {
     // Loading overlay removed - skip hiding step
     
     // Make chart visible
-    const chartDiv = document.querySelector('.chart-wrapper');
+    const chartWrapper = document.querySelector('.chart-wrapper');
+    if (chartWrapper) {
+      chartWrapper.classList.add('visible');
+    }
+
+    const chartDiv = document.getElementById('chart_div');
     if (chartDiv) {
       chartDiv.classList.add('visible');
     }

@@ -389,6 +389,11 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     
     // Add bubble size explanation text overlay at top of chart
     addBubbleExplanationOverlay();
+
+    // Ensure chart region fades in once Google Charts has drawn content
+    if (!chartDiv.classList.contains('visible')) {
+      chartDiv.classList.add('visible');
+    }
   } catch (err) {
     console.error('Error calling chart.draw():', err);
   }
