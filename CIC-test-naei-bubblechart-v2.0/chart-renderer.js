@@ -252,15 +252,15 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     chartTitleElement.appendChild(pollutantElement);
   }
 
-  // Calculate dynamic height based on window size
-  const chartHeight = Math.max(500, window.innerHeight * 0.8);
-
+  // Set a fixed height for the chart container to prevent layout shifts (same as line chart)
   const chartDiv = document.getElementById('chart_div');
   if (!chartDiv) {
     console.error('Missing #chart_div element');
     showMessage('Chart container not found', 'error');
     return;
   }
+  
+  chartDiv.style.minHeight = '800px';
 
   // Prepare colors for each group (use visible data points only)
   const colors = [];
@@ -294,6 +294,7 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     titleTextStyle: {
       fontSize: 0 // Minimize title space
     },
+    width: '100%',
     chartArea: {
       top: 85,  // Slightly increased to avoid gridline at edge
       bottom: 120,
@@ -302,7 +303,6 @@ function drawBubbleChart(year, pollutantId, groupIds) {
       backgroundColor: 'transparent'
     },
     backgroundColor: 'transparent',
-    height: chartHeight,
     tooltip: { trigger: 'focus' }, // Enable tooltips on hover
     hAxis: {
       title: xAxisTitle,

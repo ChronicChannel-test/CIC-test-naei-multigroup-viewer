@@ -824,7 +824,7 @@ function updateChart(){
   // Set a fixed height for the chart container to prevent layout shifts
   const chartContainer = document.getElementById('chart_div');
   if (chartContainer) {
-    chartContainer.style.minHeight = '500px';
+    chartContainer.style.minHeight = '800px';
   } else {
     console.error('chart_div element not found when attempting to draw line chart');
     return;
@@ -902,6 +902,13 @@ function updateChart(){
     if (window._pendingHeightUpdate) {
       window._pendingHeightUpdate = false;
       // Use requestAnimationFrame to ensure DOM has fully updated
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          sendContentHeightToParent();
+        }, 100);
+      });
+    } else {
+      // Always send height after drawing (for filter changes that may affect button container layout)
       requestAnimationFrame(() => {
         setTimeout(() => {
           sendContentHeightToParent();

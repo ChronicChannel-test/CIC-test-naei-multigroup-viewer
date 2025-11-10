@@ -867,16 +867,17 @@ function setupEventListeners() {
     }
 
     lastKnownViewportWidth = currentWidth;
-    console.log('Window width changed, redrawing chart...');
-    drawChart();
+    console.log('📐 Width changed - redrawing chart (no height update to prevent gap)');
+    drawChart(true); // Pass skipHeightUpdate flag
   }, 250));
 }
 
 /**
  * Draw the scatter chart
+ * @param {boolean} skipHeightUpdate - If true, don't send height update to parent (for resize events)
  */
-function drawChart() {
-  console.log('drawChart() called');
+function drawChart(skipHeightUpdate = false) {
+  console.log('drawChart() called', skipHeightUpdate ? '(skip height update)' : '');
   window.ChartRenderer.clearMessage();
 
   if (!selectedYear) {
@@ -978,7 +979,10 @@ function drawChart() {
     group_count: selectedGroupIds.length
   });
 
-  setTimeout(sendContentHeightToParent, 150);
+  // Only send height update if not triggered by resize (prevents growing gap)
+  if (!skipHeightUpdate) {
+    setTimeout(sendContentHeightToParent, 150);
+  }
 }
 
 function ensureComparisonDivExists() {

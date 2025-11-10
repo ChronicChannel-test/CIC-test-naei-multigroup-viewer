@@ -363,18 +363,18 @@
         src="CIC-test-naei-bubblechart-v2.0/index.html"
         frameborder="0"
         scrolling="no"
-        style="width: 100%; min-height: 900px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
+        style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
         title="NAEI Activity Data Bubble Chart"></iframe>
     </div>
 
     <!-- Line Chart Container -->
-    <div id="chart-2" class="chart-container hidden" style="outline: 3px solid magenta;">
+    <div id="chart-2" class="chart-container" style="outline: 3px solid magenta; visibility: hidden; height: 0; overflow: hidden;">
       <iframe
         id="linechart-iframe"
         src="CIC-test-naei-linechart-v2.4/index.html"
         frameborder="0"
         scrolling="no"
-        style="width: 100%; min-height: 900px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
+        style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
         title="NAEI Activity Data Line Chart"></iframe>
     </div>
 
@@ -623,22 +623,24 @@
     }
 
     function showChart(chartId) {
-      // Hide all charts
+      // Use visibility to allow both charts to render, but only show one
       document.querySelectorAll('.chart-container').forEach(container => {
-        container.classList.add('hidden');
-        container.style.opacity = '';
+        container.style.visibility = 'hidden';
+        container.style.height = '0';
+        container.style.overflow = 'hidden';
       });
       
-      // Show selected chart
       const chartContainer = document.getElementById(`chart-${chartId}`);
-      chartContainer.classList.remove('hidden');
-      chartContainer.style.opacity = '';
+      chartContainer.style.visibility = 'visible';
+      chartContainer.style.height = 'auto';
+      chartContainer.style.overflow = 'visible';
     }
 
     // Simplified initialization for iframe-based charts
     
     // Simple loading overlay control - MESSAGE BASED APPROACH
     let overlayHidden = false;
+    const heightsReceived = { bubble: false, line: false };
     
     // Set initial reasonable height estimate
     const lineIframe = iframeElements.line;
@@ -717,8 +719,10 @@
 
           iframe.style.height = safeHeight + 'px';
           
-          if (chartKey === 'line' && areAllChartsReady()) {
-            console.log('✅ Height received, layout stable - hiding overlay now');
+          heightsReceived[chartKey] = true;
+          
+          if (heightsReceived.bubble && heightsReceived.line && areAllChartsReady()) {
+            console.log('✅ Both chart heights received, layout stable - hiding overlay now');
             setTimeout(() => {
               window.hideLoadingOverlay();
             }, 50);
