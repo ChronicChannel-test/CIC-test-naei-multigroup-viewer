@@ -66,11 +66,17 @@ async function init() {
 
     // Create window data stores EXACTLY like linechart v2.3
     window.allPollutants = window.supabaseModule.allPollutants;
-    window.allGroups = window.supabaseModule.allGroups;
+    window.allGroupsRaw = window.supabaseModule.allGroups;
+    const activeGroupsForSelectors = window.supabaseModule.activeGroups || window.supabaseModule.allGroups || [];
+    window.allGroups = activeGroupsForSelectors;
     console.log('Created window.allGroups with', window.allGroups.length, 'groups');
+    if (window.groupsWithoutActivityData && window.groupsWithoutActivityData.length) {
+      console.log('Groups hidden due to missing activity data:', window.groupsWithoutActivityData);
+      showNotification(`Hiding ${window.groupsWithoutActivityData.length} group(s) that lack Activity Data`, 'info');
+    }
 
     // Create allGroupsList EXACTLY like linechart setupSelectors function
-    const groups = window.supabaseModule.allGroups || [];
+    const groups = window.supabaseModule.activeGroups || window.supabaseModule.allGroups || [];
     const groupNames = [...new Set(groups.map(g => g.group_title))]
       .filter(Boolean)
       .sort((a, b) => {
@@ -310,7 +316,7 @@ async function renderInitialView() {
         // Clear comparison flags for default groups (will be set to checked by default)
         initialComparisonFlags = [];
         // Add default groups if none are in the URL
-        const allGroups = window.allGroupsList || [];
+      const allGroups = window.allGroupsList || [];
         console.log('Adding default groups from', allGroups.length, 'available groups:', allGroups);
         
         // Find specific "Ecodesign Stove - Ready To Burn" group
@@ -436,6 +442,7 @@ function parseUrlParameters() {
 
   const pollutants = window.supabaseModule.allPollutants || [];
   const groups = window.supabaseModule.allGroups || [];
+  const activeGroupIdSet = new Set(window.supabaseModule.activeGroupIds || []);
   const availableYears = window.supabaseModule.getAvailableYears() || [];
 
   let pollutantName = null;
@@ -458,6 +465,10 @@ function parseUrlParameters() {
       if (id) {
         const group = groups.find(g => g.id === id);
         if (group) {
+          if (activeGroupIdSet.size && !activeGroupIdSet.has(group.id)) {
+            console.warn('Ignoring group without activity data for bubble chart:', group.group_title || `Group ${group.id}`);
+            return;
+          }
           groupNames.push(group.group_title);
           comparisonFlags.push(hasComparisonFlag);
         }
@@ -664,8 +675,11 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
 
 // Refresh group dropdown options (like linechart)
 function refreshGroupDropdowns() {
-  const allGroups = window.supabaseModule.allGroups || [];
-  const allGroupNames = allGroups.map(g => g.group_title).sort();
+  const allGroups = window.supabaseModule.activeGroups || window.supabaseModule.allGroups || [];
+  const allGroupNames = allGroups
+    .map(g => g.group_title)
+    .filter(Boolean)
+    .sort();
   const selected = getSelectedGroups();
   
   document.querySelectorAll('#groupContainer select').forEach(select => {

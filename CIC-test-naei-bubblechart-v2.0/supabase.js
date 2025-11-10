@@ -28,6 +28,9 @@ let groupedData = {};
 let allGroupsList = [];
 let allPollutants = [];
 let allGroups = [];
+let activeGroups = [];
+let activeGroupIds = [];
+let inactiveActivityGroupIds = [];
 let pollutantsData = []; // Store raw pollutant data for ID lookups
 let groupsData = []; // Store raw group data for ID lookups
 let activityDataId = null;
@@ -129,12 +132,12 @@ async function loadData() {
       console.warn("Activity Data not found in pollutants list");
     }
 
-    // Store data globally for access by other modules
-    allPollutants = pollutants;
-    allGroups = groups;
-    globalRows = rows;
-    pollutantsData = pollutants;
-    groupsData = groups;
+  // Store data globally for access by other modules
+  allPollutants = pollutants;
+  allGroups = groups;
+  globalRows = rows;
+  pollutantsData = pollutants;
+  groupsData = groups;
 
     // Get available years from data columns
     if (rows.length > 0) {
@@ -146,11 +149,88 @@ async function loadData() {
       window.globalYearKeys = headers;
     }
 
-    // Build groups list for dropdowns
-    allGroupsList = groups.map(g => ({
+    // Determine which groups have any non-zero activity data across available years
+    activeGroups = [];
+    activeGroupIds = [];
+    inactiveActivityGroupIds = [];
+
+    if (activityDataId && globalHeaders.length > 0) {
+      const activityRowsByGroup = new Map();
+      globalRows.forEach(row => {
+        if (row.pollutant_id === activityDataId) {
+          activityRowsByGroup.set(row.group_id, row);
+        }
+      });
+
+      groups.forEach(group => {
+        const activityRow = activityRowsByGroup.get(group.id);
+
+        if (!activityRow) {
+          inactiveActivityGroupIds.push(group.id);
+          return;
+        }
+
+        const hasActivity = globalHeaders.some(header => {
+          const value = activityRow[header];
+          if (value === null || value === undefined) return false;
+          const numeric = Number(value);
+          if (!Number.isFinite(numeric)) return false;
+          return numeric !== 0;
+        });
+
+        if (hasActivity) {
+          activeGroups.push(group);
+          activeGroupIds.push(group.id);
+        } else {
+          inactiveActivityGroupIds.push(group.id);
+        }
+      });
+
+      if (activeGroups.length === 0 && groups.length > 0) {
+        console.warn('No groups reported activity data; reverting to full group list.');
+        activeGroups = [...groups];
+        activeGroupIds = activeGroups.map(g => g.id);
+        inactiveActivityGroupIds = [];
+      }
+    } else {
+      // Fallback: if we cannot determine activity data, treat all groups as active
+      activeGroups = [...groups];
+      activeGroupIds = activeGroups.map(g => g.id);
+      inactiveActivityGroupIds = [];
+    }
+
+    // Always exclude the aggregate "All" group from bubble chart selectors
+    const allGroupEntry = groups.find(g => typeof g.group_title === 'string' && g.group_title.trim().toLowerCase() === 'all');
+    if (allGroupEntry) {
+      const allGroupId = allGroupEntry.id;
+      activeGroups = activeGroups.filter(g => g.id !== allGroupId);
+      activeGroupIds = activeGroupIds.filter(id => id !== allGroupId);
+      if (!inactiveActivityGroupIds.includes(allGroupId)) {
+        inactiveActivityGroupIds.push(allGroupId);
+      }
+    }
+
+    // Build groups list for dropdowns using only active groups (fallback to all if none identified)
+    const baseGroupsForDropdown = activeGroups.length > 0 ? activeGroups : groups;
+    const groupsForDropdown = baseGroupsForDropdown.filter(g => {
+      if (typeof g.group_title !== 'string') return true;
+      return g.group_title.trim().toLowerCase() !== 'all';
+    });
+    allGroupsList = groupsForDropdown.map(g => ({
       id: g.id,
       name: g.group_title || `Group ${g.id}`
     })).sort((a, b) => a.name.localeCompare(b.name));
+
+    if (inactiveActivityGroupIds.length > 0) {
+      const inactiveNames = inactiveActivityGroupIds
+        .map(id => groups.find(g => g.id === id)?.group_title || `Group ${id}`)
+        .filter(Boolean)
+        .sort();
+      window.groupsWithoutActivityData = inactiveNames;
+      console.log('Groups without activity data (excluded from bubble chart dropdown):', inactiveNames);
+    } else {
+      window.groupsWithoutActivityData = [];
+    }
 
     console.log(`Loaded ${pollutants.length} pollutants, ${groups.length} groups, ${rows.length} data rows`);
     
@@ -336,7 +416,10 @@ try {
     get allPollutants() { return allPollutants; },
     get allGroups() { return allGroups; },
     get allGroupsList() { return allGroupsList; },
-    get activityDataId() { return activityDataId; }
+    get activityDataId() { return activityDataId; },
+    get activeGroups() { return activeGroups; },
+    get activeGroupIds() { return activeGroupIds; },
+    get inactiveActivityGroupIds() { return inactiveActivityGroupIds; }
   };
   console.log('supabaseModule for scatter chart initialized successfully');
 } catch (error) {

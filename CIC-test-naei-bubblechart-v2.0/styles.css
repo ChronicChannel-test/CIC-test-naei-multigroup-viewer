@@ -598,6 +598,10 @@ body {
   background-color: #2ecc71;
 }
 
+.notification.info {
+  background-color: #3498db;
+}
+
 /* Google Charts tooltip styling - add white background */
 .google-visualization-tooltip {
   background-color: white !important;
