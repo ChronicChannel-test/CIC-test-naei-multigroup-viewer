@@ -54,7 +54,7 @@ async function loadData() {
   try {
     // Track page load
     await trackAnalytics('page_load', { 
-      page: 'scatter_chart',
+  page: 'bubble_chart',
       timestamp: new Date().toISOString()
     });
 
@@ -167,7 +167,7 @@ async function loadData() {
     await trackAnalytics('error', {
       error_type: 'data_load_error',
       error_message: error.message,
-      page: 'scatter_chart'
+  page: 'bubble_chart'
     });
     
     throw error;
@@ -251,8 +251,12 @@ function getPollutantName(pollutantId) {
  * @returns {string} Pollutant unit
  */
 function getPollutantUnit(pollutantId) {
-  const pollutantName = getPollutantName(pollutantId);
-  return pollutantUnits[pollutantName] || '';
+  console.log('Getting unit for pollutant ID:', pollutantId);
+  const pollutant = allPollutants.find(p => p.id === pollutantId);
+  console.log('Found pollutant:', pollutant);
+  const unit = pollutant?.emission_unit || '';
+  console.log('Returning unit:', unit);
+  return unit;
 }
 
 /**

@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <title>NAEI Multi-Group Pollutant Viewer v3.0 Shared</title>
-  <link rel="icon" type="image/png" sizes="64x64" href="Shared Resources/images/favicon.png">
-  <link rel="apple-touch-icon" href="Shared Resources/images/favicon.png">
+  <link rel="icon" type="image/png" sizes="64x64" href="SharedResources/images/favicon.png">
+  <link rel="apple-touch-icon" href="SharedResources/images/favicon.png">
 
   <!-- Social preview / link preview meta tags -->
   <meta name="description" content="NAEI Data Viewer - Interactive charts for UK emissions data">
@@ -13,7 +13,7 @@
   <meta property="og:title" content="NAEI Data Viewer">
   <meta property="og:description" content="Interactive charts for analyzing UK National Atmospheric Emissions Inventory data">
   <meta property="og:url" content="https://github.com/Chronic-Illness-Channel/naei-multigroup-viewer">
-  <meta property="og:image" content="Shared Resources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
+  <meta property="og:image" content="SharedResources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
   <meta property="og:image:width" content="1120">
   <meta property="og:image:height" content="630">
 
@@ -21,7 +21,7 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="NAEI Data Viewer">
   <meta name="twitter:description" content="Interactive charts for UK emissions data">
-  <meta name="twitter:image" content="Shared Resources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
+  <meta name="twitter:image" content="SharedResources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
   <meta name="twitter:site" content="@Chronic_Channel">
   <meta name="twitter:creator" content="@Chronic_Channel">
 
@@ -29,9 +29,9 @@
   
   <!-- Load Supabase and shared resources -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <script src="Shared Resources/supabase-config.js"></script>
+  <script src="SharedResources/supabase-config.js"></script>
   <!-- Shared Data Loader -->
-  <script src="Shared Resources/shared-data-loader.js"></script>
+  <script src="SharedResources/shared-data-loader.js"></script>
   
   <!-- Google Charts for charting -->
   <script src="https://www.gstatic.com/charts/loader.js"></script>
@@ -85,7 +85,7 @@
       font-weight: 500;
     }
     
-    #chart_div, #scatter_chart_div {
+  #chart_div {
       width: 100%;
       min-height: 400px;
     }
@@ -299,26 +299,26 @@
   <!-- CIC Logo and Social Media Sidebar -->
   <div class="sidebar-socials">
     <a href="https://chronic-illness-channel.github.io" target="_blank">
-      <img id="cicLogo" src="Shared Resources/images/CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
+      <img id="cicLogo" src="SharedResources/images/CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
     </a>
     <div class="sidebar-icons">
       <a href="https://youtube.com/@chronichannelillness" target="_blank" class="sidebar-link">
-        <img src="Shared Resources/images/youtube-logo-6.svg" alt="YouTube">
+        <img src="SharedResources/images/youtube-logo-6.svg" alt="YouTube">
       </a>
       <a href="https://bsky.app/profile/chronicillnesschannel.bsky.social" target="_blank" class="sidebar-link">
-        <img src="Shared Resources/images/Bluesky_Logo.svg" alt="Bluesky">
+        <img src="SharedResources/images/Bluesky_Logo.svg" alt="Bluesky">
       </a>
       <a href="https://twitter.com/chronic_channel" target="_blank" class="sidebar-link">
-        <img src="Shared Resources/images/Twitter dead bird with X.svg" alt="Twitter/X">
+        <img src="SharedResources/images/Twitter dead bird with X.svg" alt="Twitter/X">
       </a>
       <a href="https://facebook.com/chronicillnesschannel" target="_blank" class="sidebar-link">
-        <img src="Shared Resources/images/facebook.svg" alt="Facebook">
+        <img src="SharedResources/images/facebook.svg" alt="Facebook">
       </a>
     </div>
     <div class="kofi-wrapper">
       <a href="https://ko-fi.com/chronicillnesschannel" target="_blank" class="kofi-button">
         <span class="kofi-icon-svg">
-          <img src="Shared Resources/images/kofi_symbol.svg" alt="Ko-fi" style="width: 28px; height: 28px; display: block; object-fit: contain;">
+          <img src="SharedResources/images/kofi_symbol.svg" alt="Ko-fi" style="width: 28px; height: 28px; display: block; object-fit: contain;">
         </span>
         <span class="kofi-text">Support Chronic Illness Channel</span>
       </a>
@@ -339,31 +339,6 @@
     </div>
   </div>
 
-  <!-- Chart Selection/Loading States (COMMENTED OUT - may use later) -->
-  <!--
-  <div id="selector" class="max-w-4xl mx-auto px-4 py-8">
-    <div class="text-center">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Select a Chart Type</h2>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-2xl mx-auto">
-        <button onclick="selectChart('1')" class="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-2 border-transparent hover:border-blue-200">
-          <div class="text-4xl mb-3">📈</div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Line Chart</h3>
-          <p class="text-gray-600 text-sm">Compare emissions trends over time across multiple groups and pollutants</p>
-        </button>
-        
-        <button onclick="selectChart('2')" class="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow border-2 border-transparent hover:border-blue-200">
-          <div class="text-4xl mb-3">📊</div>
-          <h3 class="text-lg font-semibold text-gray-900 mb-2">Scatter Chart</h3>
-          <p class="text-gray-600 text-sm">Visualize the relationship between activity data and pollutant emissions</p>
-        </button>
-      </div>
-    </div>
-  </div>
-  -->
-
-  <!-- Chart interface -->
-
-  <!-- Main Chart Interface - visible from start but behind overlay -->
   <div id="chart-interface" style="opacity: 0; margin: 0;">
     <!-- Tab Navigation -->
     <div class="bg-white">
@@ -371,59 +346,50 @@
         <div class="border-b border-gray-200">
           <nav class="-mb-px flex space-x-8">
             <button id="tab-1" onclick="switchChart('1')" class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
-              📈 Line Chart
+              🫧 Bubble Chart
             </button>
             <button id="tab-2" onclick="switchChart('2')" class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
-              📊 Scatter Chart  
+              📈 Line Chart
             </button>
           </nav>
         </div>
       </div>
     </div>
 
-    <!-- Chart Content -->
-  <div class="relative" style="margin: 0; padding: 0; outline: 3px solid lime;">
-      <!-- Chart Area -->
-  <div class="w-full" style="margin: 0; padding: 0; outline: 3px solid cyan;">
-        <!-- Line Chart Container -->
-        <div id="chart-1" class="chart-container" style="outline: 3px solid magenta;">
-          <iframe 
-            id="linechart-iframe"
-            src="linechart.html" 
-            frameborder="0" 
-            scrolling="no"
-            style="width: 100%; border: none; display: block; overflow: hidden; outline: 3px solid yellow;"
-            title="NAEI Line Chart">
-          </iframe>
-        </div>
-        
-        <!-- Scatter Chart Container -->
-        <div id="chart-2" class="chart-container hidden" style="outline: 3px solid magenta;">
-          <iframe 
-            id="scatterchart-iframe"
-            src="scatterchart.html" 
-            frameborder="0" 
-            scrolling="no"
-            style="width: 100%; min-height: 800px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
-            title="NAEI Activity Data Scatter Chart">
-          </iframe>
-        </div>
-      </div>
+    <!-- Bubble Chart Container -->
+    <div id="chart-1" class="chart-container" style="outline: 3px solid magenta;">
+      <iframe
+        id="bubblechart-iframe"
+        src="CIC-test-naei-bubblechart-v2.0/index.html"
+        frameborder="0"
+        scrolling="no"
+        style="width: 100%; min-height: 900px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
+        title="NAEI Activity Data Bubble Chart"></iframe>
     </div>
-  
-  <!-- Footer (inside chart-interface so it fades in with the chart) -->
-  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; outline: 5px solid orange; opacity: 1;">
-    <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via 
-    <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
-    <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
-    <br>
-    <strong>YouTube:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">www.youtube.com/@ChronicIllnessChannel</a>
-    <br>
-    <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-      Viewer Version: v3.0 Shared CIC-testdb (Line: v2.4, Scatter: v2.0) • Build: 2025.11.09
-    </span>
-  </footer>
-  
+
+    <!-- Line Chart Container -->
+    <div id="chart-2" class="chart-container hidden" style="outline: 3px solid magenta;">
+      <iframe
+        id="linechart-iframe"
+        src="CIC-test-naei-linechart-v2.4/index.html"
+        frameborder="0"
+        scrolling="no"
+        style="width: 100%; min-height: 1100px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
+        title="NAEI Activity Data Line Chart"></iframe>
+    </div>
+
+    <!-- Footer (inside chart-interface so it fades in with the chart) -->
+    <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; outline: 5px solid orange; opacity: 1;">
+      <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via
+      <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
+      <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
+      <br>
+      <strong>YouTube:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">www.youtube.com/@ChronicIllnessChannel</a>
+      <br>
+      <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
+        Viewer Version: v3.0 Shared CIC-testdb (Line: v2.4, Bubble: v2.0) • Build: 2025.11.10
+      </span>
+    </footer>
   </div> <!-- End chart-interface -->
 
   <style>
@@ -446,8 +412,8 @@
     // Load shared resources
     window.addEventListener('DOMContentLoaded', function() {
       // Load shared analytics, colors, and configuration
-      loadScript('Shared Resources/analytics.js');
-      loadScript('Shared Resources/colors.js');
+      loadScript('SharedResources/analytics.js');
+      loadScript('SharedResources/colors.js');
     });
     
     function loadScript(src) {
@@ -459,7 +425,19 @@
         document.head.appendChild(script);
       });
     }
-    let chartsLoaded = {};
+    const chartReadyState = {
+      bubble: false,
+      line: false
+    };
+
+    const iframeElements = {
+      bubble: document.getElementById('bubblechart-iframe'),
+      line: document.getElementById('linechart-iframe')
+    };
+
+    function areAllChartsReady() {
+      return Object.values(chartReadyState).every(Boolean);
+    }
 
     function getChartParam() {
       const params = new URLSearchParams(window.location.search);
@@ -486,19 +464,22 @@
       }
       
       if (chartId === '1' || !chartId) {
-        // Line chart defaults: PM2.5 (id=5), All group (id=1), 1970-2023
-        return `${baseUrl}?chart=1&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+        // Bubble chart defaults: PM2.5 (id=5), Ecodesign+Gas groups (ids 25,37), most recent year (2023)
+        return `${baseUrl}?chart=1&pollutant_id=5&group_ids=25,37&year=2023`;
       } else if (chartId === '2') {
-        // Scatter chart defaults: PM2.5 (id=5), Ecodesign+Gas groups (ids 25,37), most recent year (2023)
-        return `${baseUrl}?chart=2&pollutant_id=5&group_ids=25,37&year=2023`;
+        // Line chart defaults: PM2.5 (id=5), All group (id=1), 1970-2023
+        return `${baseUrl}?chart=2&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
       }
       
       return baseUrl;
     }
 
     function selectChart(chartId) {
-      // Show loading
-      document.getElementById('loading').classList.remove('hidden');
+      // Show loading indicator if present
+      const loadingEl = document.getElementById('loading');
+      if (loadingEl) {
+        loadingEl.classList.remove('hidden');
+      }
       
       // Set default URL and load chart interface
       const defaultUrl = getDefaultUrl(chartId);
@@ -529,8 +510,16 @@
         console.error('Error loading chart interface:', error);
         
         // Fallback: show interface anyway
-        document.getElementById('loading').classList.add('hidden');
-        document.getElementById('white-overlay').style.display = 'none';
+        const loadingEl = document.getElementById('loading');
+        if (loadingEl) {
+          loadingEl.classList.add('hidden');
+        }
+
+        const whiteOverlayEl = document.getElementById('white-overlay');
+        if (whiteOverlayEl) {
+          whiteOverlayEl.style.display = 'none';
+        }
+
         document.getElementById('chart-interface').classList.remove('hidden');
         updateTabStates();
         showChart(chartId);
@@ -544,11 +533,13 @@
       currentChart = chartId;
       
       // Ensure chart containers are ready
-      const chart1 = document.getElementById('chart-1');
-      const chart2 = document.getElementById('chart-2');
+      const chartContainers = ['1', '2']
+        .map(id => document.getElementById(`chart-${id}`))
+        .filter(Boolean);
       
-      chart1.style.display = 'block';
-      chart2.style.display = 'block';
+      chartContainers.forEach(container => {
+        container.style.display = 'block';
+      });
       
       // Short delay to ensure positioning (v2.3 style)
       await new Promise(resolve => setTimeout(resolve, 250));
@@ -556,9 +547,14 @@
       // Start fade out of loading overlay and white overlay together
       const loading = document.getElementById('loading');
       const whiteOverlay = document.getElementById('white-overlay');
-      
-      loading.style.opacity = '0';
-      whiteOverlay.style.opacity = '0';
+
+      if (loading) {
+        loading.style.opacity = '0';
+      }
+
+      if (whiteOverlay) {
+        whiteOverlay.style.opacity = '0';
+      }
       
       // Reveal interface and charts simultaneously 
       requestAnimationFrame(() => {
@@ -567,14 +563,18 @@
         showChart(chartId);
         
         // Mark charts as ready
-        chart1.classList.add('ready');
-        chart2.classList.add('ready');
+        chartContainers.forEach(container => container.classList.add('ready'));
       });
       
       // Clean up after transition completes (v2.3 timing)
       setTimeout(() => {
-        loading.classList.add('hidden');
-        whiteOverlay.style.display = 'none';
+        if (loading) {
+          loading.classList.add('hidden');
+        }
+
+        if (whiteOverlay) {
+          whiteOverlay.style.display = 'none';
+        }
         console.log('Fade to complete interface finished');
       }, 400);
     }
@@ -588,10 +588,14 @@
       const currentParams = new URLSearchParams(window.location.search);
       currentParams.set('chart', chartId);
       
-      // If switching to line chart (chart 1) and no chart parameters exist yet, add defaults
+      // Apply defaults when switching charts without existing parameters
       if (chartId === '1' && !currentParams.has('pollutant_id')) {
-        // Default line chart parameters: PM2.5, All groups, 1970-2023
-        // PM2.5 ID = 5, All group ID = 1
+        // Bubble chart defaults: PM2.5 (id 5), Ecodesign & Gas (ids 25,37), most recent year
+        currentParams.set('pollutant_id', '5');
+        currentParams.set('group_ids', '25,37');
+        currentParams.set('year', '2023');
+      } else if (chartId === '2' && !currentParams.has('pollutant_id')) {
+        // Line chart defaults: PM2.5 (id 5), All group (id 1), full range
         currentParams.set('pollutant_id', '5');
         currentParams.set('group_ids', '1');
         currentParams.set('start_year', '1970');
@@ -651,15 +655,17 @@
     // Simple loading overlay control - MESSAGE BASED APPROACH
     let overlayHidden = false;
     
-    // Track which charts are ready
-    let lineChartReady = false;
-    let scatterChartReady = false;
-    
     // Set initial reasonable height estimate
-    const lineIframe = document.getElementById('linechart-iframe');
+    const lineIframe = iframeElements.line;
     if (lineIframe) {
       lineIframe.style.height = '1200px'; // Initial estimate
       console.log('📏 Line chart iframe initial height: 1200px');
+    }
+
+    const bubbleIframe = iframeElements.bubble;
+    if (bubbleIframe) {
+      bubbleIframe.style.height = '1100px';
+      console.log('📏 Bubble chart iframe initial height: 1100px');
     }
     
     // Set up message listener IMMEDIATELY (before DOM is ready)
@@ -674,49 +680,60 @@
       }
       
       if (event.data && event.data.type === 'chartReady' && !overlayHidden) {
+        const chartKey = event.data.chart;
+        const keyLabel = typeof chartKey === 'string'
+          ? chartKey.charAt(0).toUpperCase() + chartKey.slice(1)
+          : 'Unknown';
+
         console.log('📨 Chart ready message received');
-        console.log('🎯 Chart type:', event.data.chart);
+        console.log('🎯 Chart type:', chartKey);
         
-        // Track which charts are ready
-        if (event.data.chart === 'line') {
-          lineChartReady = true;
-          console.log('✅ Line chart is ready');
-        } else if (event.data.chart === 'scatter') {
-          scatterChartReady = true;
-          console.log('✅ Scatter chart is ready');
+        if (chartReadyState.hasOwnProperty(chartKey)) {
+          chartReadyState[chartKey] = true;
+          console.log(`✅ ${keyLabel} chart is ready`);
+        } else {
+          console.warn('⚠️ Unknown chart reported ready:', chartKey);
         }
         
-        // Hide overlay when both charts are ready
-        if (lineChartReady && scatterChartReady) {
-          console.log('✅ Both charts ready - requesting height before hiding overlay');
-          
-          // Request height from line chart before hiding overlay to prevent layout shift
-          const lineIframe = document.getElementById('linechart-iframe');
-          if (lineIframe && lineIframe.contentWindow) {
-            console.log('📐 Requesting height from line chart iframe...');
-            lineIframe.contentWindow.postMessage({ type: 'requestHeight' }, '*');
-          }
-          
-          // Height will be received, then hideLoadingOverlay will be called
+        if (areAllChartsReady()) {
+          console.log('✅ All charts ready - requesting heights before hiding overlay');
+          Object.entries(iframeElements).forEach(([key, iframe]) => {
+            if (iframe && iframe.contentWindow) {
+              console.log(`📐 Requesting height from ${key} chart iframe...`);
+              iframe.contentWindow.postMessage({ type: 'requestHeight' }, '*');
+            }
+          });
         } else {
-          console.log(`⏳ Waiting for: ${!lineChartReady ? 'line chart ' : ''}${!scatterChartReady ? 'scatter chart' : ''}`);
+          const pending = Object.entries(chartReadyState)
+            .filter(([, ready]) => !ready)
+            .map(([key]) => key)
+            .join(', ');
+          console.log(`⏳ Waiting for: ${pending}`);
         }
       }
       
       // Handle content height from iframe (sent once after initial render)
       if (event.data && event.data.type === 'contentHeight') {
-        const iframe = event.data.chart === 'line' 
-          ? document.getElementById('linechart-iframe')
-          : document.getElementById('scatterchart-iframe');
+        const chartKey = event.data.chart;
+        const iframe = iframeElements[chartKey];
         
-        if (iframe && event.data.height) {
-          console.log(`📏 Received content height from ${event.data.chart}: ${event.data.height}px`);
-          iframe.style.height = event.data.height + 'px';
+        if (iframe) {
+          const reportedHeight = Number(event.data.height);
+          const fallbackHeight = chartKey === 'line' ? 1200 : 1100;
+          const safeHeight = Number.isFinite(reportedHeight) && reportedHeight > 0
+            ? reportedHeight
+            : fallbackHeight;
+
+          if (!Number.isFinite(reportedHeight) || reportedHeight <= 0) {
+            console.warn(`⚠️ Received invalid height (${event.data.height}) from ${chartKey}; using fallback ${safeHeight}px`);
+          } else {
+            console.log(`📏 Received content height from ${chartKey}: ${reportedHeight}px`);
+          }
+
+          iframe.style.height = safeHeight + 'px';
           
-          // If this is the line chart and both charts are ready, hide overlay now that layout is stable
-          if (event.data.chart === 'line' && lineChartReady && scatterChartReady) {
+          if (chartKey === 'line' && areAllChartsReady()) {
             console.log('✅ Height received, layout stable - hiding overlay now');
-            // Small delay to ensure browser has applied the height change
             setTimeout(() => {
               window.hideLoadingOverlay();
             }, 50);
@@ -779,14 +796,11 @@
           }
           
           // Notify iframes that overlay is fully hidden and they can respond to resizes
-          const lineIframe = document.getElementById('linechart-iframe');
-          const scatterIframe = document.getElementById('scatterchart-iframe');
-          if (lineIframe && lineIframe.contentWindow) {
-            lineIframe.contentWindow.postMessage({ type: 'overlayHidden' }, '*');
-          }
-          if (scatterIframe && scatterIframe.contentWindow) {
-            scatterIframe.contentWindow.postMessage({ type: 'overlayHidden' }, '*');
-          }
+          Object.values(iframeElements).forEach(iframe => {
+            if (iframe && iframe.contentWindow) {
+              iframe.contentWindow.postMessage({ type: 'overlayHidden' }, '*');
+            }
+          });
           
         }, 500);
       }
@@ -817,9 +831,9 @@
       console.log('Switching to chart:', chartParam);
       switchChart(chartParam);
       
-      // Comprehensive iframe debugging
-      const lineIframe = document.getElementById('linechart-iframe');
-      const scatterIframe = document.getElementById('scatterchart-iframe');
+    // Comprehensive iframe debugging
+    const lineIframe = iframeElements.line;
+    const bubbleIframe = iframeElements.bubble;
       
       if (lineIframe) {
         console.log('Line chart iframe found, src:', lineIframe.src);
@@ -876,10 +890,10 @@
         });
       }
       
-      if (scatterIframe) {
-        console.log('Scatter chart iframe found, src:', scatterIframe.src);
-        scatterIframe.addEventListener('load', () => {
-          console.log('Scatter chart iframe loaded');
+      if (bubbleIframe) {
+        console.log('Bubble chart iframe found, src:', bubbleIframe.src);
+        bubbleIframe.addEventListener('load', () => {
+          console.log('Bubble chart iframe loaded');
         });
       }
     });

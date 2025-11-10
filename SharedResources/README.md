@@ -52,15 +52,15 @@ Base styling shared across all NAEI viewers:
 ### In HTML
 ```html
 <!-- Styles -->
-<link rel="stylesheet" href="../Shared Resources/common-styles.css">
+<link rel="stylesheet" href="../SharedResources/common-styles.css">
 
 <!-- Scripts -->
-<script src="../Shared Resources/supabase-config.js"></script>
-<script src="../Shared Resources/analytics.js"></script>
-<script src="../Shared Resources/colors.js"></script>
+<script src="../SharedResources/supabase-config.js"></script>
+<script src="../SharedResources/analytics.js"></script>
+<script src="../SharedResources/colors.js"></script>
 
 <!-- Images -->
-<img src="../Shared Resources/images/CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
+<img src="../SharedResources/images/CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
 ```
 
 ### In JavaScript
@@ -78,13 +78,17 @@ window.Colors.resetColorSystem(); // Reset for new chart
 
 ## Applications Using Shared Resources
 
-1. **NAEI Multi-Group Line Chart Viewer** (`../CIC-test-naei-linechart/v2.3-modular-CIC-testdb/`)
+1. **NAEI Multi-Group Line Chart Viewer** (`../CIC-test-naei-linechart-v2.4/`)
    - Time-series line charts comparing emissions across years
-   - Multiple groups, year range selection
+   - Multiple groups, flexible year range selection
 
-2. **NAEI Activity Data Scatter Chart** (`../CIC-test-naei-activity-data-scatterchart/`)
+2. **NAEI Activity Data Scatter Chart** (`../CIC-test-naei-scatterchart-v2.0/`)
    - Scatter plots showing activity data vs pollutant emissions
    - Single year, multiple groups (up to 10)
+
+3. **NAEI Activity Data Bubble Chart** (`../CIC-test-naei-bubblechart-v2.0/`)
+   - Bubble visualization showing pollutant vs activity with emission factor sizing
+   - Single year focus with responsive comparison overlays
 
 ## Maintenance
 
@@ -127,10 +131,10 @@ Category assignments:
 
 Standard analytics events tracked across applications:
 - `page_load` - Application initialized
-- `chart_drawn` / `scatter_chart_drawn` - Chart rendered
+- `chart_drawn` / `scatter_chart_drawn` / `bubble_chart_drawn` - Chart rendered
 - `share_url_copied` - Shareable URL copied
 - `share_png_copied` - Chart image copied to clipboard
-- `chart_downloaded` / `scatter_chart_downloaded` - PNG downloaded
+- `chart_downloaded` / `scatter_chart_downloaded` / `bubble_chart_downloaded` - PNG downloaded
 
 Analytics can be disabled with URL parameter: `?analytics=off`
 

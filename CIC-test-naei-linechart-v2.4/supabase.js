@@ -118,6 +118,11 @@ async function loadData() {
     rows = result.rows;
   }
   
+  // Cache raw datasets for fallback usage when Supabase is unavailable
+  pollutantsData = Array.isArray(pollutants) ? pollutants : [];
+  groupsData = Array.isArray(groups) ? groups : [];
+  globalRows = Array.isArray(rows) ? rows : [];
+
   // Store globally for URL parameter lookups
   window.allPollutantsData = pollutants;
   window.allGroupsData = groups;

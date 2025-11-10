@@ -16,7 +16,7 @@ Interactive scatter chart visualization showing the relationship between Activit
 
 The application uses a modular JavaScript architecture with shared resources:
 
-### Shared Resources (from `../Shared Resources/`)
+### Shared Resources (from `../SharedResources/`)
 - `supabase-config.js` - Database connection configuration
 - `analytics.js` - Privacy-friendly usage tracking
 - `colors.js` - Consistent color palette management

@@ -12,51 +12,12 @@ let urlUpdateTimer = null; // Debounce timer for URL updates
 let googleChartsReady = false;
 let chartRenderCallback = null; // Callback for when chart finishes rendering
 let initialLoadComplete = false; // Track if initial chart load is done (prevent resize redraw)
-let initFailureNotified = false; // Ensure we only notify parent once on failure
-
-// Provide a minimal fallback palette if the shared Colors module fails to load.
-if (!window.Colors) {
-  console.warn('Colors module not found in line chart – using fallback palette.');
-  const fallbackPalette = [
-    '#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
-    '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf'
-  ];
-  const colorAssignments = new Map();
-  let nextColorIndex = 0;
-
-  window.Colors = {
-    resetColorSystem() {
-      colorAssignments.clear();
-      nextColorIndex = 0;
-    },
-    getColorForGroup(groupName) {
-      const key = groupName || `group-${nextColorIndex}`;
-      if (colorAssignments.has(key)) {
-        return colorAssignments.get(key);
-      }
-      const chosen = fallbackPalette[nextColorIndex % fallbackPalette.length];
-      colorAssignments.set(key, chosen);
-      nextColorIndex += 1;
-      return chosen;
-    }
-  };
-}
 
 // Load Google Charts and set up callback
 google.charts.load('current', {packages:['corechart']});
 google.charts.setOnLoadCallback(() => {
   googleChartsReady = true;
   console.log('Google Charts loaded successfully for line chart');
-
-  if (typeof chartRenderCallback === 'function') {
-    try {
-      const pending = chartRenderCallback;
-      chartRenderCallback = null;
-      pending();
-    } catch (callbackError) {
-      console.error('Failed to run deferred chart render after Google Charts load:', callbackError);
-    }
-  }
 });
 
 // Build/version banner for diagnostics
@@ -65,50 +26,9 @@ google.charts.setOnLoadCallback(() => {
     const build = 'v2.4-embed-gate-2025-11-04T20:26Z';
     window.__LINECHART_BUILD__ = build;
     document.documentElement.setAttribute('data-linechart-build', build);
-    console.log('🧩 Linechart build loaded: ' + build);
+    console.log(`🧩 Linechart build loaded: ${build}`);
   } catch (e) { /* no-op */ }
 })();
-
-/**
- * Creates and displays a dismissible error notification.
- * @param {string} message - The error message to display.
- */
-function showError(message) {
-  try {
-    // Create the notification element
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-notification';
-    errorDiv.textContent = message;
-
-    // Create the close button
-    const closeButton = document.createElement('button');
-    closeButton.textContent = '×';
-    closeButton.className = 'close-button';
-    closeButton.onclick = () => {
-      errorDiv.style.opacity = '0';
-      setTimeout(() => {
-        if (errorDiv.parentNode) {
-          errorDiv.parentNode.removeChild(errorDiv);
-        }
-      }, 300); // Allow fade out transition to complete
-    };
-
-    errorDiv.appendChild(closeButton);
-
-    // Add to the body
-    document.body.appendChild(errorDiv);
-
-    // Fade in the notification
-    setTimeout(() => {
-      errorDiv.style.opacity = '1';
-    }, 10);
-
-  } catch (e) {
-    console.error("Failed to show error notification:", e);
-    // Fallback to alert if the notification system fails
-    alert(message);
-  }
-}
 
 // Export configuration constants
 const EXPORT_MIN_SCALE = 16;
@@ -124,18 +44,24 @@ window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'overlayHidden') {
     console.log('✅ Received overlayHidden message from parent - enabling resize handler');
     initialLoadComplete = true;
+  } else if (event.data && event.data.type === 'resizeComplete') {
+    console.log(`✅ Parent confirmed resize to ${event.data.height}px - waiting for reflow...`);
     
-    // Now that overlay is hidden and layout is stable, send final accurate height
-    setTimeout(() => {
-      console.log('📐 Layout stable, sending final content height');
-      sendContentHeightToParent();
-    }, 100);
-  }
-  
-  // Handle height request from parent (sent before hiding overlay to prevent layout shift)
-  if (event.data && event.data.type === 'requestHeight') {
-    console.log('📐 Parent requested height - sending immediately');
-    sendContentHeightToParent();
+    // Wait for browser to reflow the iframe before measuring dimensions
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        // Force reflow by accessing dimensions
+        const currentHeight = document.documentElement.offsetHeight;
+        const currentWidth = document.documentElement.offsetWidth;
+        console.log(`📐 After reflow - iframe dimensions: ${currentWidth}x${currentHeight}`);
+        
+        // Now render the chart
+        if (window.pendingRender) {
+          window.pendingRender();
+          window.pendingRender = null;
+        }
+      });
+    });
   }
 });
 
@@ -193,7 +119,7 @@ function computeSafeExportScale(origW, origH, desiredScale) {
   const maxAreaScale = Math.sqrt(EXPORT_MAX_PIXELS / (origW * origH));
   const allowed = Math.max(1, Math.min(desiredScale, maxDimScale, maxAreaScale));
   if (allowed < desiredScale) {
-    console.warn('Export scale ' + desiredScale + ' reduced to ' + allowed + ' to avoid huge canvas (' + Math.round(origW*allowed) + 'x' + Math.round(origH*allowed) + ')');
+    console.warn(`Export scale ${desiredScale} reduced to ${allowed} to avoid huge canvas (${Math.round(origW*allowed)}x${Math.round(origH*allowed)})`);
     try {
       window.__export_debug = window.__export_debug || {};
       window.__export_debug.lastClamped = { origW, origH, desiredScale, allowed };
@@ -430,7 +356,7 @@ function refreshButtons() {
         // make ARIA label include the current group name if available
         const sel = row.querySelector('select');
         const groupName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
-        removeBtn.setAttribute('aria-label', groupName ? 'Remove group ' + groupName : 'Remove group');
+        removeBtn.setAttribute('aria-label', groupName ? `Remove group ${groupName}` : 'Remove group');
         removeBtn.onclick = () => {
           row.remove();
           refreshButtons();
@@ -489,6 +415,45 @@ function calculateYearTicks(years, chartWidth) {
   return result;
 }
 
+/**
+ * Remove bare 4-digit year tick elements from an SVG root unless they're
+ * explicitly marked with `data-custom-year`. Returns an object listing
+ * removed labels for diagnostics.
+ */
+function pruneYearsFromSVG(svgRoot, opts = {}) {
+  const debug = opts.debug || false;
+  const removed = [];
+  try {
+    if (!svgRoot || !svgRoot.querySelectorAll) return { removed };
+    const nodes = svgRoot.querySelectorAll('text, tspan');
+    nodes.forEach(node => {
+      try {
+        const txt = (node.textContent || '').trim();
+        if (/^\d{4}$/.test(txt)) {
+          let cur = node;
+          let hasCustom = false;
+          while (cur && cur.getAttribute) {
+            if (cur.getAttribute('data-custom-year')) { hasCustom = true; break; }
+            cur = cur.parentNode;
+          }
+          if (!hasCustom) {
+            let toRemove = node;
+            while (toRemove && toRemove.nodeName && toRemove.nodeName.toLowerCase() !== 'text') toRemove = toRemove.parentNode;
+            if (toRemove && toRemove.parentNode) {
+              toRemove.parentNode.removeChild(toRemove);
+              removed.push(txt);
+            }
+          }
+        }
+      } catch (e) {
+        if (debug) console.warn('pruneYearsFromSVG inner error', e);
+      }
+    });
+  } catch (e) {
+    if (debug) console.warn('pruneYearsFromSVG failed', e);
+  }
+  return { removed };
+}
 
 /* ---------------- Drag and drop handlers ---------------- */
 function addDragAndDropHandlers(div){
@@ -588,37 +553,35 @@ function addCustomXAxisLabels() {
       svg.appendChild(label.element);
     });
   } catch (e) {
-    console.warn('[CustomYearTicks] Could not add custom year labels:', e);
+    console.warn('Could not add custom year labels:', e);
   }
 }
 
-/* ---------------- URL Update Function ---------------- */
+
+/* ---------------- Chart rendering & legend ---------------- */
+
+/**
+ * Updates the browser's URL with the current chart settings.
+ * This function is debounced to prevent flooding the browser history.
+ */
 function updateUrlFromChartState() {
   // Ensure the data needed for ID lookups is available.
   const pollutants = window.allPollutantsData || [];
   const groups = window.allGroupsData || [];
-  
-  console.log('🔗 updateUrlFromChartState called');
-  console.log('🔗 Pollutants available:', pollutants.length);
-  console.log('🔗 Groups available:', groups.length);
-  
   if (!pollutants.length || !groups.length) {
-    console.log("🔗 URL update skipped: lookup data not yet available.");
+    console.log("URL update skipped: lookup data not yet available.");
     return;
   }
 
   clearTimeout(urlUpdateTimer);
   urlUpdateTimer = setTimeout(() => {
     try {
-      const pollutantName = document.getElementById('pollutantSelect')?.value;
-      const startYear = document.getElementById('startYear')?.value;
-      const endYear = document.getElementById('endYear')?.value;
+      const pollutantName = document.getElementById('pollutantSelect').value;
+      const startYear = document.getElementById('startYear').value;
+      const endYear = document.getElementById('endYear').value;
       const groupNames = getSelectedGroups();
 
-      console.log('🔗 URL update values:', { pollutantName, startYear, endYear, groupNames });
-
       if (!pollutantName || !startYear || !endYear || groupNames.length === 0) {
-        console.log('🔗 URL update skipped: missing values');
         return; // Not enough info to create a valid URL
       }
 
@@ -633,17 +596,15 @@ function updateUrlFromChartState() {
       }).filter(id => id !== null);
 
       if (!pollutantId || groupIds.length !== groupNames.length) {
-        console.warn("🔗 Could not map all names to IDs for URL update.");
-        console.warn('🔗 pollutantId:', pollutantId, 'groupIds:', groupIds, 'groupNames:', groupNames);
+        console.warn("Could not map all names to IDs for URL update.");
         return;
       }
 
       if (parseInt(startYear) >= parseInt(endYear)) {
-        console.warn(`🔗 URL update skipped: Invalid year range (start=${startYear}, end=${endYear}).`);
+        console.warn(`URL update skipped: Invalid year range (start=${startYear}, end=${endYear}).`);
         return;
       }
 
-      // Build query parameters
       const queryParts = [
         `pollutant_id=${encodeURIComponent(pollutantId)}`,
         `group_ids=${groupIds.join(',')}`,
@@ -651,35 +612,40 @@ function updateUrlFromChartState() {
         `end_year=${encodeURIComponent(endYear)}`
       ];
       
-      console.log('🔗 Sending URL update to parent:', queryParts);
-      
-      // Send URL update to parent window
+      // If we're in an iframe, send URL update to parent
       if (window.parent && window.parent !== window) {
+        const newUrl = `?chart=1&${queryParts.join('&')}`;
         window.parent.postMessage({
-          type: 'updateURL',
-          params: queryParts
+          type: 'updateUrl',
+          url: newUrl
         }, '*');
-        console.log('🔗 URL update message sent');
       } else {
-        console.log('🔗 No parent window to send URL update to');
+        // Standalone mode - update our own URL
+        const newUrl = `${window.location.pathname}?${queryParts.join('&')}`;
+        window.history.replaceState({ path: newUrl }, '', newUrl);
       }
 
     } catch (error) {
       console.error("Failed to update URL from chart state:", error);
     }
-  }, 300); // Debounce for 300ms
+  }, 400); // 400ms debounce delay
 }
 
 
 function updateChart(){
-  if (!googleChartsReady || !google.visualization || typeof google.visualization.DataTable !== 'function') {
-    if (!chartRenderCallback) {
-      console.warn('Google Charts library not ready yet – deferring chart render.');
-      chartRenderCallback = () => {
-        chartRenderCallback = null;
-        updateChart();
-      };
-    }
+  // Create stack trace to see where this is being called from
+  const stack = new Error().stack;
+  const caller = stack?.split('\n')[2]?.trim() || 'unknown caller';
+  console.log('🎨 updateChart() called from:', caller);
+  console.log('📚 Full stack trace:', stack);
+  
+  // Wait for Google Charts to be ready
+  if (!googleChartsReady) {
+    console.log('Google Charts not ready yet for line chart, waiting...');
+    google.charts.setOnLoadCallback(() => {
+      googleChartsReady = true;
+      updateChart();
+    });
     return;
   }
 
@@ -687,7 +653,27 @@ function updateChart(){
   const startYear = +document.getElementById('startYear').value;
   const endYear = +document.getElementById('endYear').value;
   const selectedGroups = getSelectedGroups();
-  if (!pollutant || !startYear || !endYear || !selectedGroups.length) return;
+
+  // If essential selections aren’t ready yet, retry briefly (handles race with URL parsing/DOM updates)
+  if (!pollutant || !startYear || !endYear || !selectedGroups.length) {
+    window.__updateRetryCount = (window.__updateRetryCount || 0) + 1;
+    const missing = [];
+    if (!pollutant) missing.push('pollutant');
+    if (!startYear) missing.push('startYear');
+    if (!endYear) missing.push('endYear');
+    if (!selectedGroups.length) missing.push('groups');
+    console.log(`⏳ updateChart deferred (${window.__updateRetryCount}) – waiting for: ${missing.join(', ')}`);
+    if (window.__updateRetryCount <= 20) {
+      setTimeout(updateChart, 75);
+      return;
+    } else {
+      console.warn('updateChart gave up waiting for selections; not drawing.');
+      window.__updateRetryCount = 0;
+      return;
+    }
+  }
+  // Reset retry counter once ready
+  window.__updateRetryCount = 0;
 
   // Update the URL with the new state (debounced)
   updateUrlFromChartState();
@@ -767,7 +753,7 @@ function updateChart(){
           formattedValue = value.toFixed(3).replace(/\.?0+$/, ''); // 3 decimals for normal values
         }
         
-        const tooltip = groupName + '\nYear: ' + row[0] + '\nValue: ' + formattedValue + (unit ? ' ' + unit : '');
+        const tooltip = `${groupName}\nYear: ${row[0]}\nValue: ${formattedValue}${unit ? ' ' + unit : ''}`;
         newRow.push(tooltip);
       }
     }
@@ -828,22 +814,44 @@ function updateChart(){
   const options = {
     title: '',
     width: '100%',
+    height: '70%',
     legend: 'none',
-    chartArea: {
-      top: 10,
-      left: leftMargin,
-      right: 20,
-      bottom: 60
+    // Configure animations - enable them but with a very short duration
+    animation: {
+      duration: 100,
+      easing: 'out',
+      startup: true
+    },
+    // Configure chart area and axes
+    chartArea: { 
+      width: '85%', 
+      height: '80%',
+      top: 40,
+      bottom: 60,
+      left: 100,
+      right: 40
     },
     hAxis: {
       title: 'Year',
-      textStyle: { color: 'transparent' }, // Hide Google Charts labels
-      titleTextStyle: { fontSize: 13, bold: true },
-      gridlines: { color: '#e0e0e0' },
-      baselineColor: '#666'
+      textStyle: { 
+        color: '#666' // Visible Google Charts labels (debug: ensure years visible)
+      },
+      titleTextStyle: { 
+        fontSize: 13, 
+        bold: true 
+      },
+      gridlines: { 
+        color: '#e0e0e0'
+      },
+      baselineColor: '#666',
+      // Let Google Charts handle the view window
+      viewWindow: {
+        min: 1970,
+        max: 2023
+      }
     },
     vAxis: {
-      title: 'Emissions' + (unit ? ' (' + unit + ')' : ''),
+      title: `Emissions${unit ? ' (' + unit + ')' : ''}`,
       viewWindow: { 
         min: 0 
       },
@@ -860,21 +868,66 @@ function updateChart(){
     series: seriesOptions,
     curveType: smoothLines ? 'function' : 'none',
     lineWidth: 3,
-    pointSize: 4
+    pointSize: 4,
+    chartArea: {
+      top: 20,
+      left: leftMargin,
+      right: 10,
+      bottom: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 80 : 60, // Add extra bottom padding for landscape mode
+      height: '70%'
+    }
   };
   
 
   // draw chart and show pollutant as visible page title
   chart = new google.visualization.LineChart(chartContainer);
 
-  // Add a 'ready' event listener that will fire after every draw (v2.3 style)
-  // Remove any existing listeners first to prevent duplicates
-  google.visualization.events.removeAllListeners(chart);
-  google.visualization.events.addListener(chart, 'ready', addCustomXAxisLabels);
+  // Add a 'ready' event listener that will fire after every draw,
+  // ensuring custom labels are always present.
+  google.visualization.events.addListener(chart, 'ready', function() {
+    addCustomYearLabel(chart, chartContainer);
+  });
+
+  // Wrap custom X-axis labels with a safe fallback to Google labels
+  google.visualization.events.addListener(chart, 'ready', () => {
+    let customOk = false;
+    try {
+      if (typeof addCustomXAxisLabels === 'function') {
+        addCustomXAxisLabels();
+        customOk = true;
+      }
+    } catch (e) {
+      console.warn('Custom X-axis labels failed:', e);
+      customOk = false;
+    }
+    // If custom labels failed, redraw once with default Google labels visible
+    if (!customOk && !window.__labelFallback) {
+      window.__labelFallback = true;
+      try {
+        options.hAxis.textStyle = options.hAxis.textStyle || {};
+        options.hAxis.textStyle.color = '#666';
+        chart.draw(dataTable, options);
+      } finally {
+        setTimeout(() => { window.__labelFallback = false; }, 0);
+      }
+    }
+  });
+  
+  // Add listener for chart render completion (for loading management)
+  google.visualization.events.addListener(chart, 'ready', () => {
+    if (chartRenderCallback) {
+      console.log('Line chart finished rendering');
+      chartRenderCallback();
+      chartRenderCallback = null; // Clear callback after use
+    }
+  });
 
   // Compute safe width/height to avoid negative SVG dimensions
   const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
   const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+  
+  console.log(`📊 Chart container size: ${chartContainer.offsetWidth}x${chartContainer.offsetHeight} (using ${safeWidth}x${safeHeight})`);
+  console.log(`📐 Iframe size: ${window.innerWidth}x${window.innerHeight}`);
   options.width = safeWidth;
   options.height = safeHeight;
 
@@ -883,10 +936,17 @@ function updateChart(){
   if (isMobile) {
     options.hAxis.slantedText = true;
     options.hAxis.slantedTextAngle = 90;
-    options.chartArea.width = '70%';
+  }
+    // Ensure a small right chart padding so the chart fills most of the container
+  if (options.chartArea) {
+    // Reduce the minimum right padding; previously set to 80px which left a large gap.
+    options.chartArea.right = Math.max(options.chartArea.right || 10, 20);
+    if (isMobile) {
+      options.chartArea.width = '70%';
+    }
   }
 
-  // Delay slightly to let layout stabilize (prevents negative sizes and bouncing)
+  // Delay slightly to let layout stabilize (prevents negative sizes)
   setTimeout(() => {
     chart.draw(dataTable, options);
     // Only add visible class when parent is already visible to prevent flash
@@ -894,21 +954,30 @@ function updateChart(){
       chartContainer.classList.add('visible');
     }
     
-    // After chart finishes drawing, update height if we're in a resize
-    if (window._pendingHeightUpdate) {
-      window._pendingHeightUpdate = false;
-      // Use requestAnimationFrame to ensure DOM has fully updated
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          sendContentHeightToParent();
-        }, 100);
-      });
+    // After chart is drawn, send content height to parent
+    if (window.parent && window.parent !== window) {
+      setTimeout(() => {
+        // Use body.scrollHeight which measures actual content
+        const bodyHeight = document.body.scrollHeight;
+        const buffer = 30; // Minimal buffer for axis labels
+        const newHeight = Math.ceil(bodyHeight) + buffer;
+        const currentHeight = window.innerHeight;
+        console.log('📏 Height calculation: body.scrollHeight=', bodyHeight, 'final=', newHeight);
+        if (Math.abs(newHeight - currentHeight) > 20) {
+          console.log('📐 Height update:', currentHeight, 'to', newHeight);
+          window.parent.postMessage({
+            type: 'iframeHeight',
+            chart: 'line',
+            height: newHeight
+          }, '*');
+        }
+      }, 250);
     }
   }, 100);
 
   // update visible title on page
   const titleEl = document.getElementById('chartTitle');
-  titleEl.textContent = pollutant + (unit ? " (" + unit + ")" : "");
+  titleEl.textContent = `${pollutant}${unit ? " (" + unit + ")" : ""}`;
 
   // build custom legend (interactive)
   const legendDiv = document.getElementById('customLegend');
@@ -958,36 +1027,6 @@ function updateChart(){
   refreshButtons();
 }
 
-// Helper to send content height to parent (called once after initial render)
-function sendContentHeightToParent() {
-  const body = document.body;
-  
-  // Only use body measurements - html measurements reflect the iframe size set by parent
-  let measuredHeight = Math.max(
-    body?.scrollHeight || 0,
-    body?.offsetHeight || 0
-  );
-
-  if (!measuredHeight || measuredHeight < 200) {
-    const mainContent = document.getElementById('mainContent');
-    const contentHeight = Math.max(mainContent?.scrollHeight || 0, mainContent?.offsetHeight || 0);
-    const fallbackHeight = 1100;
-    measuredHeight = Math.max(contentHeight, fallbackHeight);
-    console.warn('Line chart content height below threshold; using fallback height:', measuredHeight);
-  }
-  
-  console.log('📐 Sending content height to parent:', measuredHeight + 'px');
-  
-  window.parent.postMessage({
-    type: 'contentHeight',
-    chart: 'line',
-    height: measuredHeight
-  }, '*');
-}
-
-// No need for dynamic height - chart is fixed at 600px
-// Parent will set iframe to fixed height
-
 // Backward compatibility: some older code paths may still call drawChart()
 // Ensure it simply delegates to the modern updateChart() with readiness guards
 function drawChart() {
@@ -998,27 +1037,69 @@ function drawChart() {
   }
 }
 
-// Track last window width to detect real user resizes vs parent iframe height adjustments
-let lastWindowWidth = window.innerWidth;
+// Add custom Year label after chart is drawn
+function addCustomYearLabel(chart, chartContainer) {
+  try {
+    const existing = document.getElementById('custom-year-label');
+    if (existing) existing.remove();
+    
+    const chartLayout = chart.getChartLayoutInterface();
+    const chartArea = chartLayout.getChartAreaBoundingBox();
+    
+    const label = document.createElement('div');
+    label.id = 'custom-year-label';
+    label.textContent = 'Year';
+    label.style.position = 'absolute';
+    label.style.left = chartArea.left + chartArea.width / 2 - 20 + 'px';
+    // Move label below the axis tick labels
+    label.style.top = (chartArea.top + chartArea.height + 30) + 'px';
+    label.style.fontFamily = 'Arial, sans-serif';
+    label.style.fontSize = '13px';
+    label.style.color = '#333';
+    label.style.fontWeight = 'bold';
+    label.style.pointerEvents = 'none';
+    
+    chartContainer.appendChild(label);
+  } catch (error) {
+    console.error('Error in addCustomYearLabel:', error);
+  }
+}
 
-// Resize handler - only update height when WIDTH changes (real user resize)
+// Track last resize dimensions to avoid redundant redraws
+let lastResizeWidth = window.innerWidth;
+let lastResizeHeight = window.innerHeight;
+
 window.addEventListener('resize', () => {
+  // Don't trigger chart redraws during initial load
+  if (!initialLoadComplete) {
+    console.log('Resize event ignored during initial load');
+    return;
+  }
+  
   clearTimeout(window._resizeTimer);
   window._resizeTimer = setTimeout(() => {
     const currentWidth = window.innerWidth;
+    const currentHeight = window.innerHeight;
     
-    // Only proceed if width actually changed (real user resize, not parent adjusting iframe height)
-    if (currentWidth !== lastWindowWidth) {
-      console.log(`📐 Width changed from ${lastWindowWidth}px to ${currentWidth}px - updating chart and height`);
-      lastWindowWidth = currentWidth;
-      
-      window._pendingHeightUpdate = true;
+    const widthChanged = Math.abs(currentWidth - lastResizeWidth) > 10;
+    const heightChanged = Math.abs(currentHeight - lastResizeHeight) > 10;
+    
+    // Only redraw on width changes
+    if (widthChanged) {
+      console.log('Width changed from', lastResizeWidth, 'to', currentWidth, '- redrawing');
+      lastResizeWidth = currentWidth;
+      lastResizeHeight = currentHeight;
       updateChart();
-      // Height will be sent after chart finishes drawing (see updateChart's setTimeout callback)
-    } else {
-      console.log('📐 Height-only resize (parent adjusted iframe) - ignoring to prevent loop');
+      return;
     }
-  }, 200);
+    
+    // Height changes: accept without redraw (parent is resizing iframe to fit content)
+    if (heightChanged) {
+      console.log('Height changed from', lastResizeHeight, 'to', currentHeight, '- accepting');
+      lastResizeHeight = currentHeight;
+      return;
+    }
+  }, 300); // Increased debounce to 300ms for smoother resizing
 });
 
 async function renderInitialView() {
@@ -1052,10 +1133,10 @@ async function renderInitialView() {
       const endYearSelect = document.getElementById('endYear');
       
       // Set year values from URL params (already validated in parseUrlParameters)
-      if (params.startYear && startYearSelect.querySelector('option[value="' + params.startYear + '"]')) {
+      if (params.startYear && startYearSelect.querySelector(`option[value="${params.startYear}"]`)) {
         startYearSelect.value = params.startYear;
       }
-      if (params.endYear && endYearSelect.querySelector('option[value="' + params.endYear + '"]')) {
+      if (params.endYear && endYearSelect.querySelector(`option[value="${params.endYear}"]`)) {
         endYearSelect.value = params.endYear;
       }
       
@@ -1076,32 +1157,47 @@ async function revealMainContent() {
     mainContent.removeAttribute('aria-hidden');
     mainContent.classList.add('loaded'); // Add loaded class immediately
     
-    // Since iframe has fixed height, we can render immediately
-    // Log all available dimension information
-    console.log('📐 === DIMENSION DEBUG ===');
-    console.log('📐 window.innerWidth:', window.innerWidth);
-    console.log('📐 window.innerHeight:', window.innerHeight);
-    console.log('📐 document.documentElement.clientWidth:', document.documentElement.clientWidth);
-    console.log('📐 document.documentElement.clientHeight:', document.documentElement.clientHeight);
-    console.log('📐 document.body.clientWidth:', document.body.clientWidth);
-    console.log('📐 document.body.clientHeight:', document.body.clientHeight);
+    // Estimate expected height before rendering chart
+    // This allows parent to resize iframe BEFORE we render, preventing size mismatch
+    const estimatedHeight = 1400; // Conservative estimate for chart with controls
     
-    const chartContainer = document.getElementById('chart_div');
-    if (chartContainer) {
-      console.log('📐 chartContainer.offsetWidth:', chartContainer.offsetWidth);
-      console.log('📐 chartContainer.offsetHeight:', chartContainer.offsetHeight);
-      console.log('📐 chartContainer.clientWidth:', chartContainer.clientWidth);
-      console.log('📐 chartContainer.clientHeight:', chartContainer.clientHeight);
-      const computedStyle = window.getComputedStyle(chartContainer);
-      console.log('📐 chartContainer computed width:', computedStyle.width);
-      console.log('📐 chartContainer computed height:', computedStyle.height);
-      console.log('📐 chartContainer computed display:', computedStyle.display);
-      console.log('📐 chartContainer computed visibility:', computedStyle.visibility);
-    }
-    console.log('📐 === END DIMENSION DEBUG ===');
-    
-    // Now render the chart at the correct size
-    (function gateFirstRender(){
+    if (window.parent && window.parent !== window) {
+      console.log(`📏 Sending estimated iframe height: ${estimatedHeight}px (before rendering)`);
+      window.parent.postMessage({
+        type: 'iframeHeight',
+        chart: 'line',
+        height: estimatedHeight
+      }, '*');
+      
+      // Set up a pending render function that will be called when resize is confirmed
+      window.pendingRender = () => {
+        console.log('🎨 Starting chart render after resize confirmed');
+        
+        // Log all available dimension information
+        console.log('📐 === DIMENSION DEBUG ===');
+        console.log('📐 window.innerWidth:', window.innerWidth);
+        console.log('📐 window.innerHeight:', window.innerHeight);
+        console.log('📐 document.documentElement.clientWidth:', document.documentElement.clientWidth);
+        console.log('📐 document.documentElement.clientHeight:', document.documentElement.clientHeight);
+        console.log('📐 document.body.clientWidth:', document.body.clientWidth);
+        console.log('📐 document.body.clientHeight:', document.body.clientHeight);
+        
+        const chartContainer = document.getElementById('chart_div');
+        if (chartContainer) {
+          console.log('📐 chartContainer.offsetWidth:', chartContainer.offsetWidth);
+          console.log('📐 chartContainer.offsetHeight:', chartContainer.offsetHeight);
+          console.log('📐 chartContainer.clientWidth:', chartContainer.clientWidth);
+          console.log('📐 chartContainer.clientHeight:', chartContainer.clientHeight);
+          const computedStyle = window.getComputedStyle(chartContainer);
+          console.log('📐 chartContainer computed width:', computedStyle.width);
+          console.log('📐 chartContainer computed height:', computedStyle.height);
+          console.log('📐 chartContainer computed display:', computedStyle.display);
+          console.log('📐 chartContainer computed visibility:', computedStyle.visibility);
+        }
+        console.log('📐 === END DIMENSION DEBUG ===');
+        
+        // Now render the chart at the correct size
+        (function gateFirstRender(){
           let tries = 0;
           const maxTries = 30; // ~3s
           function tick(){
@@ -1149,23 +1245,11 @@ async function revealMainContent() {
               if (chartDiv) {
                 chartDiv.classList.add('visible');
               }
-
-              const loadingOverlay = document.getElementById('loadingOverlay');
-              if (loadingOverlay && !loadingOverlay.classList.contains('hidden')) {
-                loadingOverlay.classList.add('hidden');
-                setTimeout(() => {
-                  loadingOverlay.style.display = 'none';
-                }, 350);
-              }
               // Wait longer to ensure Google Chart is fully painted and stable
               setTimeout(() => {
                 console.log('Line chart fully loaded and visible');
-                
-                // Update URL with initial chart state
-                updateUrlFromChartState();
-                
-                // Chart is rendered - send chartReady
-                // Height will be sent after overlay is hidden and layout is stable
+                // Chart is rendered - send chartReady immediately
+                // No need to send another height update, iframe size is already correct
                 console.log('📤 Sending chartReady message to parent...');
                 window.parent.postMessage({
                   type: 'chartReady',
@@ -1179,6 +1263,40 @@ async function revealMainContent() {
           }
           tick();
         })();
+        
+        // Wait for chart to actually render in the DOM
+        setTimeout(() => {
+          console.log('Line chart rendering complete');
+          
+          // Make chart visible
+          const chartDiv = document.getElementById('chart_div');
+          if (chartDiv) {
+            chartDiv.classList.add('visible');
+          }
+          
+          // Wait longer to ensure Google Chart is fully painted and stable
+          setTimeout(() => {
+            console.log('Line chart fully loaded and visible');
+            
+            // Chart is rendered - send chartReady immediately
+            // No need to send another height update, iframe size is already correct
+            console.log('📤 Sending chartReady message to parent...');
+            window.parent.postMessage({
+              type: 'chartReady',
+              chart: 'line'
+            }, '*');
+            
+            // DON'T enable resize handler yet - wait for parent to confirm overlay is hidden
+            console.log('⏳ Waiting for overlay to be hidden before enabling resize handler...');
+            resolve();
+          }, 200); // Longer delay to ensure Google Chart is fully stable
+        }, 350); // Wait for chart render
+      };
+    } else {
+      // Not in iframe, render immediately
+      updateChart();
+      resolve();
+    }
   });
 }
 
@@ -1232,7 +1350,7 @@ function parseUrlParameters() {
         endYear = endYearParam;
       } else {
         // Invalid range - use defaults
-        console.warn('Invalid year range in URL: start=' + startYearParam + ', end=' + endYearParam + '. Using defaults.');
+        console.warn(`Invalid year range in URL: start=${startYearParam}, end=${endYearParam}. Using defaults.`);
         startYear = availableYears[0];
         endYear = availableYears[availableYears.length - 1];
       }
@@ -1242,16 +1360,16 @@ function parseUrlParameters() {
       // Find a valid end year after the start
       const startIdx = availableYears.indexOf(startYearParam);
       endYear = availableYears[availableYears.length - 1];
-      console.warn('Invalid end year in URL: ' + endYearParam + '. Using ' + endYear + '.');
+      console.warn(`Invalid end year in URL: ${endYearParam}. Using ${endYear}.`);
     } else if (isEndYearValid) {
       // Only end year valid
       endYear = endYearParam;
       // Find a valid start year before the end
       startYear = availableYears[0];
-      console.warn('Invalid start year in URL: ' + startYearParam + '. Using ' + startYear + '.');
+      console.warn(`Invalid start year in URL: ${startYearParam}. Using ${startYear}.`);
     } else if (startYearParam || endYearParam) {
       // Years provided but both invalid
-      console.warn('Invalid years in URL: start=' + startYearParam + ', end=' + endYearParam + '. Using defaults.');
+      console.warn(`Invalid years in URL: start=${startYearParam}, end=${endYearParam}. Using defaults.`);
       startYear = availableYears[0];
       endYear = availableYears[availableYears.length - 1];
     }
@@ -1345,59 +1463,9 @@ async function init() {
 
   } catch (error) {
     console.error("Initialization failed:", error);
-    // Use the new non-blocking error notification
-    showError('Error loading line chart: ' + error.message + '. Please check the console and refresh the page.');
-    notifyParentOfInitFailure(error);
+    // Loading overlay removed - error handling via console and main index.html
+    alert(`Error loading line chart: ${error.message}. Please check the console and refresh the page.`);
   }
-}
-
-function notifyParentOfInitFailure(error) {
-  if (initFailureNotified) {
-    return;
-  }
-  initFailureNotified = true;
-
-  try {
-    const mainContent = document.getElementById('mainContent');
-    if (mainContent) {
-      mainContent.style.display = 'block';
-      mainContent.removeAttribute('aria-hidden');
-      mainContent.classList.add('loaded');
-    }
-
-    const loadingOverlay = document.getElementById('loadingOverlay');
-    if (loadingOverlay) {
-      loadingOverlay.classList.add('hidden');
-      setTimeout(() => {
-        loadingOverlay.style.display = 'none';
-      }, 350);
-    }
-  } catch (layoutError) {
-    console.error('Failed to reveal main content during failure handling:', layoutError);
-  }
-
-  try {
-    if (window.parent && window.parent !== window) {
-      const message = (error && error.message) ? error.message : 'Unknown initialization error';
-      console.warn('📣 Notifying parent about initialization failure');
-      window.parent.postMessage({
-        type: 'chartReady',
-        chart: 'line',
-        status: 'error',
-        message
-      }, '*');
-    }
-  } catch (postError) {
-    console.error('Failed to notify parent of initialization failure:', postError);
-  }
-
-  setTimeout(() => {
-    try {
-      sendContentHeightToParent();
-    } catch (heightError) {
-      console.error('Failed to send fallback content height to parent:', heightError);
-    }
-  }, 150);
 }
 
 // Add the chart ready message when the chart is fully loaded
@@ -1432,6 +1500,12 @@ function notifyChartReady() {
 // Call this after chart is fully loaded
 if (window.google && window.google.visualization && chart) {
   google.visualization.events.addListener(chart, 'ready', function() {
+    // Add custom year label
+    const chartContainer = document.getElementById('chart_div');
+    if (chartContainer) {
+      addCustomYearLabel(chart, chartContainer);
+    }
+    
     // Notify parent that chart is ready
     notifyChartReady();
   });
