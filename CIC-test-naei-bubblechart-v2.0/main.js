@@ -30,7 +30,6 @@ let chartReadyNotified = false;
 // Track parent height coordination so we avoid chatty postMessage loops.
 const MIN_HEIGHT_DELTA = 8; // px difference required before re-sending height
 
-const FALLBACK_HEIGHT = 1200; // conservative default like line chart fallback
 let lastSentHeight = 0;
 let lastKnownViewportWidth = 0;
 
@@ -167,7 +166,7 @@ function sendContentHeightToParent(force = false) {
           mainContent?.scrollHeight || 0,
           mainContent?.offsetHeight || 0
         );
-        measuredHeight = Math.max(contentHeight, FALLBACK_HEIGHT);
+        measuredHeight = Math.max(contentHeight, 1100);
         console.warn('Bubble chart content height below threshold; using fallback height:', measuredHeight);
       }
 

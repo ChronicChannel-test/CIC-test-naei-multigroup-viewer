@@ -42,6 +42,8 @@ if (!window.Colors) {
   };
 }
 
+
+
 // Load Google Charts and set up callback
 google.charts.load('current', {packages:['corechart']});
 google.charts.setOnLoadCallback(() => {
@@ -823,6 +825,9 @@ function updateChart(){
   const chartContainer = document.getElementById('chart_div');
   if (chartContainer) {
     chartContainer.style.minHeight = '500px';
+  } else {
+    console.error('chart_div element not found when attempting to draw line chart');
+    return;
   }
 
   const options = {
@@ -873,7 +878,7 @@ function updateChart(){
   google.visualization.events.addListener(chart, 'ready', addCustomXAxisLabels);
 
   // Compute safe width/height to avoid negative SVG dimensions
-  const safeWidth = Math.max(chartContainer.offsetWidth || 0, 300);
+  const safeWidth = Math.max(chartContainer.offsetWidth || 0, 200);
   const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
   options.width = safeWidth;
   options.height = safeHeight;
@@ -882,7 +887,6 @@ function updateChart(){
   const isMobile = window.innerWidth < 600;
   if (isMobile) {
     options.hAxis.slantedText = true;
-    options.hAxis.slantedTextAngle = 90;
     options.chartArea.width = '70%';
   }
 

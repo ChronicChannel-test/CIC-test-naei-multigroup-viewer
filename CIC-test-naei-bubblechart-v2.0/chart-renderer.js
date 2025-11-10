@@ -398,13 +398,12 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     console.error('Error calling chart.draw():', err);
   }
   
+  
   // Show chart with animation (add visible class to wrapper, not chart_div)
   const chartWrapper = document.querySelector('.chart-wrapper');
   if (chartWrapper) {
     chartWrapper.classList.add('visible');
-  }
-  
-  // Enable share and download buttons
+  }  // Enable share and download buttons
   const shareBtnEl = document.getElementById('shareBtn');
   const downloadBtnEl = document.getElementById('downloadBtn');
   const downloadCSVBtnEl = document.getElementById('downloadCSVBtn');

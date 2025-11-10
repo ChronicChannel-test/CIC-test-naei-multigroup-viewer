@@ -43,10 +43,10 @@
   <script src="https://cdn.tailwindcss.com"></script>  <style>
     /* Chart interface - no transition needed, overlay fade handles visibility */
     
-    /* Chart containers with fade-in effect */
+    /* Chart containers render immediately; parent overlay handles fade */
     .chart-container {
-      opacity: 0;
-      transition: opacity 0.35s ease;
+      opacity: 1;
+      transition: none;
       padding: 0;
     }
     
@@ -374,7 +374,7 @@
         src="CIC-test-naei-linechart-v2.4/index.html"
         frameborder="0"
         scrolling="no"
-        style="width: 100%; min-height: 1100px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
+        style="width: 100%; min-height: 900px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
         title="NAEI Activity Data Line Chart"></iframe>
     </div>
 
@@ -626,28 +626,13 @@
       // Hide all charts
       document.querySelectorAll('.chart-container').forEach(container => {
         container.classList.add('hidden');
+        container.style.opacity = '';
       });
       
       // Show selected chart
       const chartContainer = document.getElementById(`chart-${chartId}`);
       chartContainer.classList.remove('hidden');
-      
-      // Fade in the chart container
-      setTimeout(() => {
-        chartContainer.style.opacity = '1';
-        
-        // Ensure iframe is loaded and visible
-        const iframe = chartContainer.querySelector('iframe');
-        if (iframe && !iframe.getAttribute('data-loaded')) {
-          iframe.setAttribute('data-loaded', 'true');
-          // Reload iframe if needed to ensure it displays properly
-          const src = iframe.src;
-          iframe.src = '';
-          setTimeout(() => {
-            iframe.src = src;
-          }, 50);
-        }
-      }, 100);
+      chartContainer.style.opacity = '';
     }
 
     // Simplified initialization for iframe-based charts
@@ -719,7 +704,7 @@
         
         if (iframe) {
           const reportedHeight = Number(event.data.height);
-          const fallbackHeight = chartKey === 'line' ? 1200 : 1100;
+          const fallbackHeight = 900;
           const safeHeight = Number.isFinite(reportedHeight) && reportedHeight > 0
             ? reportedHeight
             : fallbackHeight;
