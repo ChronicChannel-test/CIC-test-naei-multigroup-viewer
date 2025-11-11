@@ -150,7 +150,7 @@ button, .add-btn, .remove-btn, .dragHandle {
 
 /* Group management */
 #groupContainer { 
-  margin-top: 10px; 
+  margin-top: 0; 
 }
 
 .groupRow { 
@@ -214,7 +214,7 @@ button, .add-btn, .remove-btn, .dragHandle {
   justify-content: flex-start;
   align-items: center;
   margin-bottom: 12px;
-  padding-right: 150px; /* Increased to prevent icon overlap (110px sidebar + 40px margin) */
+  padding-right: 150px; /* Match bubble chart spacing and avoid sidebar overlap */
 }
 
 .button-row {
@@ -224,15 +224,15 @@ button, .add-btn, .remove-btn, .dragHandle {
   justify-content: flex-start;
   align-items: center;
   margin-bottom: 12px;
-  padding-right: 150px; /* Increased to prevent icon overlap (110px sidebar + 40px margin) */
 }
 
 .controls-wrapper {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  justify-content: flex-start;
   align-items: center;
-  padding-right: 130px;
+  padding-right: 150px;
   margin-bottom: 12px;
 }
 
@@ -399,11 +399,7 @@ button, .add-btn, .remove-btn, .dragHandle {
 }
 
 #mainContentTop { 
-  padding-right: 0; 
-}
-
-#mainContentBottom { 
-  padding-right: 0; 
+  padding-right: 150px; 
 }
 
 #mainContent.loaded { 
