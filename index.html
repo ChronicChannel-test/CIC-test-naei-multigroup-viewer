@@ -355,12 +355,14 @@
     <div class="bg-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="border-b border-gray-200">
-          <nav class="-mb-px flex space-x-8">
-            <button id="tab-1" onclick="switchChart('1')" class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
-              🫧 Bubble Chart
+          <nav class="-mb-px flex items-center gap-6">
+            <button id="tab-1" onclick="switchChart('1')" class="py-4 px-2 border-b-2 font-semibold text-base transition-colors flex items-center gap-2">
+              <img src="SharedResources/images/Bubble_Chart_Icon_viewer.png" alt="Bubble chart icon" class="h-8 w-auto">
+              <span>Bubble Chart</span>
             </button>
-            <button id="tab-2" onclick="switchChart('2')" class="py-4 px-1 border-b-2 font-medium text-sm transition-colors">
-              📈 Line Chart
+            <button id="tab-2" onclick="switchChart('2')" class="py-4 px-2 border-b-2 font-semibold text-base transition-colors flex items-center gap-2">
+              <img src="SharedResources/images/Bubble_Chart_Icon_viewer.png" alt="Line chart icon" class="h-8 w-auto">
+              <span>Line Chart</span>
             </button>
           </nav>
         </div>
@@ -729,13 +731,13 @@
 
     function updateTabStates() {
       // Update tab appearance
+  const baseClasses = 'py-4 px-2 border-b-2 font-semibold text-base transition-colors flex items-center gap-2';
+      const activeClasses = `${baseClasses} tab-active`;
+      const inactiveClasses = `${baseClasses} border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300`;
+
       document.querySelectorAll('[id^="tab-"]').forEach(tab => {
         const tabChart = tab.id.split('-')[1];
-        if (tabChart === currentChart) {
-          tab.className = 'py-4 px-1 border-b-2 font-medium text-sm transition-colors tab-active';
-        } else {
-          tab.className = 'py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors';
-        }
+        tab.className = tabChart === currentChart ? activeClasses : inactiveClasses;
       });
     }
 
