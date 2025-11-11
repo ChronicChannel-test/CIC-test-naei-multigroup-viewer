@@ -20,6 +20,11 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 - Configure credentials in `SharedResources/supabase-config.js`; the helper exports `initSupabaseClient()` used everywhere.
 - Supabase functions live under `supabase/functions/` and can be deployed via the Supabase CLI when backend updates are needed.
 
+## Tailwind Build
+- Run `npm install` once to pull in the Tailwind/PostCSS toolchain.
+- Execute `npm run build:css` to regenerate `dist/tailwind.css` for production (GitHub Pages, Netlify, etc.).
+- Use `npm run watch:css` during local development to keep the compiled stylesheet in sync.
+
 ## Debugging Console Output
 - Logging is suppressed by default to keep the browser console quiet.
 - Append `?debug=1` (or `?logs=1`) to the URL to re-enable verbose logs across the shell and both iframes.
