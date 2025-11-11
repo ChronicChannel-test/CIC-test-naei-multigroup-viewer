@@ -89,7 +89,9 @@ async function init() {
     console.log('Created window.allGroups with', window.allGroups.length, 'groups');
     if (window.groupsWithoutActivityData && window.groupsWithoutActivityData.length) {
       console.log('Groups hidden due to missing activity data:', window.groupsWithoutActivityData);
-      showNotification(`Hiding ${window.groupsWithoutActivityData.length} group(s) that lack Activity Data`, 'info');
+      if (bubbleDebugLoggingEnabled) {
+        showNotification(`Hiding ${window.groupsWithoutActivityData.length} group(s) that lack Activity Data`, 'info');
+      }
     }
 
     // Create allGroupsList EXACTLY like linechart setupSelectors function
