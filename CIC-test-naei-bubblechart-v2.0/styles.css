@@ -78,7 +78,7 @@
 
 .controls-wrapper select { 
   margin-left: 0; 
-  margin-right: 8px; 
+  margin-right: 0; 
 }
 
 select,
@@ -114,8 +114,8 @@ select,
 }
 
 .controls-wrapper button { 
-  margin-left: 4px; 
-  margin-right: 4px; 
+  margin-left: 0; 
+  margin-right: 0; 
 }
 
 .year-pair { 
@@ -161,7 +161,7 @@ select,
 
 .button-row select {
   margin-left: 0;
-  margin-right: 8px;
+  margin-right: 0;
 }
 
 /* Main content opacity control (matching linechart v2.3) */

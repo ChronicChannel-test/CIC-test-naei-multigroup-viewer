@@ -97,7 +97,22 @@ select, button {
 }
 
 /* Button styling */
-#downloadBtn, #toggleSmoothBtn, #downloadCSVBtn, #downloadXLSXBtn, #downloadCleanBtn, #shareBtn, .add-btn, .remove-btn {
+#downloadBtn, #toggleSmoothBtn, #downloadCSVBtn, #downloadXLSXBtn, #downloadCleanBtn, #shareBtn {
+  background: #EFEFEF !important;
+  cursor: pointer !important;
+  margin: 0 !important;
+  padding: 6px 10px !important;
+  border-radius: 6px !important;
+  border: 1px solid #ccc !important;
+  font-family: system-ui, sans-serif !important;
+  color: inherit !important;
+}
+
+#downloadBtn:hover, #toggleSmoothBtn:hover, #downloadCSVBtn:hover, #downloadXLSXBtn:hover, #downloadCleanBtn:hover, #shareBtn:hover {
+  background: #E0E0E0 !important;
+}
+
+.add-btn, .remove-btn {
   background: #EFEFEF !important;
   cursor: pointer !important;
   margin: 6px !important;
@@ -108,7 +123,7 @@ select, button {
   color: inherit !important;
 }
 
-#downloadBtn:hover, #toggleSmoothBtn:hover, #downloadCSVBtn:hover, #downloadXLSXBtn:hover, #downloadCleanBtn:hover, #shareBtn:hover, .add-btn:hover, .remove-btn:hover {
+.add-btn:hover, .remove-btn:hover {
   background: #E0E0E0 !important;
 }
 
@@ -239,12 +254,12 @@ button, .add-btn, .remove-btn, .dragHandle {
 
 .controls-wrapper select { 
   margin-left: 0; 
-  margin-right: 8px; 
+  margin-right: 0; 
 }
 
 .controls-wrapper button { 
-  margin-left: 4px; 
-  margin-right: 4px; 
+  margin-left: 0; 
+  margin-right: 0; 
 }
 
 .year-pair { 
