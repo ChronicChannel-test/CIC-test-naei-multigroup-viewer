@@ -233,17 +233,16 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   if (chartTitleElement) {
     chartTitleElement.style.display = 'block';
     chartTitleElement.style.textAlign = 'center';
-    chartTitleElement.style.marginBottom = '10px';
+  chartTitleElement.style.marginBottom = '100px';
 
     // Add year as the first line
     const yearElement = document.createElement('div');
-    yearElement.style.fontSize = '28px';
-    yearElement.style.fontWeight = 'bold';
+    yearElement.className = 'chart-title__year-range';
     yearElement.textContent = `${year}`;
 
     // Add pollutant and emission unit as the second line
     const pollutantElement = document.createElement('div');
-    pollutantElement.style.fontSize = '20px';
+    pollutantElement.className = 'chart-title__pollutant';
     pollutantElement.textContent = `${yAxisTitle}`;
 
     // Clear previous content and append new elements

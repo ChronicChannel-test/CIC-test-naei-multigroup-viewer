@@ -541,6 +541,20 @@ body {
 
 #chartTitle {
   background: #fff9c4;
+  text-align: center;
+  margin-bottom: 100px;
+}
+
+#chartTitle .chart-title__year-range {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+#chartTitle .chart-title__pollutant {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 #chart_div {

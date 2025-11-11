@@ -96,7 +96,8 @@ async function generateChartImage() {
           const pollutantUnit = chartData.pollutantUnit;
           const year = chartData.year;
           const padding = 50;
-          const yearHeight = 112; // Space tuned for 120px year label
+          const yearTopOffset = padding + 90;
+          const yearHeight = 152; // Space tuned for 120px year label plus additional top offset
           const titleHeight = 162; // Space for enlarged pollutant title
           const subtitleHeight = 40; // Space for subtitle line
           const footerHeight = 190; // Extra room for enlarged footer text
@@ -128,7 +129,7 @@ async function generateChartImage() {
           ctx.font = 'bold 120px system-ui, sans-serif'; // Dramatically larger than title
           ctx.fillStyle = '#000000';
           ctx.textAlign = 'center';
-          ctx.fillText(year, canvasWidth / 2, padding + 50);
+          ctx.fillText(year, canvasWidth / 2, yearTopOffset);
 
           // Title - Pollutant name
           ctx.font = 'bold 95px system-ui, sans-serif'; // Larger title while remaining below year size

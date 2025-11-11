@@ -271,6 +271,18 @@ button, .add-btn, .remove-btn, .dragHandle {
   text-align: center; 
 }
 
+#chartTitle .chart-title__year-range {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+#chartTitle .chart-title__pollutant {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
 .chart-wrapper {
   width: calc(100% - 140px);
   padding: 4px 4px 0 4px;

@@ -840,6 +840,10 @@ function updateChart(){
     return;
   }
 
+  const yearLabel = startYear === endYear ? String(startYear) : `${startYear} - ${endYear}`;
+  const pollutantTitle = unit ? `${pollutant} - ${unit}` : pollutant;
+  const emissionAxisTitle = 'Emissions' + (unit ? ` - ${unit}` : '');
+
   const options = {
     title: '',
     width: '100%',
@@ -858,15 +862,15 @@ function updateChart(){
       baselineColor: '#666'
     },
     vAxis: {
-      title: 'Emissions' + (unit ? ' (' + unit + ')' : ''),
+      title: emissionAxisTitle,
       viewWindow: { 
         min: 0 
       },
       textStyle: { 
-        fontSize: 12 
+        fontSize: 14 
       },
       titleTextStyle: {
-        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 12 : 14,
+        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 14 : 16,
         bold: true,
         wrap: false
       },
@@ -929,7 +933,19 @@ function updateChart(){
 
   // update visible title on page
   const titleEl = document.getElementById('chartTitle');
-  titleEl.textContent = pollutant + (unit ? " (" + unit + ")" : "");
+  if (titleEl) {
+    titleEl.innerHTML = '';
+
+    const yearElement = document.createElement('div');
+    yearElement.className = 'chart-title__year-range';
+    yearElement.textContent = yearLabel;
+    titleEl.appendChild(yearElement);
+
+    const pollutantElement = document.createElement('div');
+    pollutantElement.className = 'chart-title__pollutant';
+    pollutantElement.textContent = pollutantTitle;
+    titleEl.appendChild(pollutantElement);
+  }
 
   // build custom legend (interactive)
   const legendDiv = document.getElementById('customLegend');
