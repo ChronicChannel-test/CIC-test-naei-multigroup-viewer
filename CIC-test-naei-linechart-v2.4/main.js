@@ -857,7 +857,11 @@ function updateChart(){
     hAxis: {
       title: 'Year',
       textStyle: { color: 'transparent' }, // Hide Google Charts labels
-      titleTextStyle: { fontSize: 13, bold: false, italic: false },
+      titleTextStyle: {
+        fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 14 : 16,
+        bold: false,
+        italic: false
+      },
       gridlines: { color: '#e0e0e0' },
       baselineColor: '#666'
     },
