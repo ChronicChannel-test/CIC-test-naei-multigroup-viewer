@@ -12,6 +12,80 @@ const bubbleDebugWarn = (...args) => {
 };
 window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || bubbleDebugLoggingEnabled;
 
+let bubbleLayoutProbeTimer = null;
+function bubbleCaptureLayoutMetrics(context) {
+  const root = document.querySelector('.chart-shell') || document.getElementById('mainContent') || document.body;
+  const rootRect = root?.getBoundingClientRect();
+  const rootStyles = root ? window.getComputedStyle(root) : null;
+
+  const measure = (selector) => {
+    const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+    if (!el || !rootRect) {
+      return null;
+    }
+    const rect = el.getBoundingClientRect();
+    const styles = window.getComputedStyle(el);
+    return {
+      left: Math.round(rect.left - rootRect.left),
+      top: Math.round(rect.top - rootRect.top),
+      height: Math.round(rect.height),
+      width: Math.round(rect.width),
+      marginLeft: parseFloat(styles.marginLeft) || 0,
+      marginRight: parseFloat(styles.marginRight) || 0,
+      marginTop: parseFloat(styles.marginTop) || 0,
+      marginBottom: parseFloat(styles.marginBottom) || 0,
+      paddingLeft: parseFloat(styles.paddingLeft) || 0,
+      paddingRight: parseFloat(styles.paddingRight) || 0
+    };
+  };
+
+  const metrics = {
+    context,
+    timestamp: new Date().toISOString(),
+    viewportWidth: Math.round(window.innerWidth || 0),
+    rootPaddingLeft: rootStyles ? parseFloat(rootStyles.paddingLeft) || 0 : null,
+    rootPaddingRight: rootStyles ? parseFloat(rootStyles.paddingRight) || 0 : null,
+    buttonRow: measure('.button-row'),
+    groupContainer: measure('#groupContainer'),
+    groupInfoDetails: measure('#groupInfoDetails'),
+    controlsWrapper: measure('.controls-wrapper'),
+    chartWrapper: measure('.chart-wrapper'),
+    mainContentTop: measure('#mainContentTop'),
+    mainContentBottom: measure('#mainContentBottom')
+  };
+
+  console.warn('[LayoutProbe:bubble]', metrics);
+
+  if (window.parent && window.parent !== window) {
+    try {
+      window.parent.postMessage({
+        type: 'layoutMetrics',
+        chart: 'bubble',
+        metrics
+      }, '*');
+    } catch (postError) {
+      bubbleDebugWarn('Failed to post layout metrics to parent', postError);
+    }
+  }
+}
+
+function bubbleScheduleLayoutProbe(context) {
+  clearTimeout(bubbleLayoutProbeTimer);
+  bubbleLayoutProbeTimer = setTimeout(() => bubbleCaptureLayoutMetrics(context), 0);
+}
+
+window.addEventListener('resize', () => bubbleScheduleLayoutProbe('window resize'));
+window.addEventListener('focus', () => bubbleScheduleLayoutProbe('window focus'));
+document.addEventListener('visibilitychange', () => {
+  bubbleScheduleLayoutProbe(`visibilitychange:${document.visibilityState}`);
+});
+window.addEventListener('message', (event) => {
+  if (event?.data?.type === 'layoutProbe') {
+    const { context = 'parent request' } = event.data;
+    bubbleScheduleLayoutProbe(context);
+  }
+});
+
 if (!bubbleDebugLoggingEnabled) {
   console.log = () => {};
   console.info = () => {};
@@ -116,7 +190,8 @@ async function init() {
     await renderInitialView();
 
     // Finally, reveal the main content and draw the chart
-    await revealMainContent();
+  await revealMainContent();
+  bubbleScheduleLayoutProbe('init complete');
 
     // Chart ready signal is now sent from revealMainContent after loading overlay fades
 
@@ -268,7 +343,8 @@ async function revealMainContent() {
     // Render the chart
     console.log('Drawing chart...');
     console.log('Pre-draw sanity:', { selectedYear, selectedPollutantId, groups: getSelectedGroups() });
-    drawChart();
+  drawChart();
+  bubbleScheduleLayoutProbe('post draw initiation');
     
     // Wait for chart to render, then complete the loading process
     setTimeout(() => {
@@ -281,7 +357,8 @@ async function revealMainContent() {
       
       // Complete after transition
       setTimeout(() => {
-        console.log('Bubble chart fully loaded');
+  console.log('Bubble chart fully loaded');
+  bubbleScheduleLayoutProbe('revealMainContent complete');
         notifyParentChartReady();
         resolve();
       }, 400);
@@ -1030,6 +1107,7 @@ function drawChart(skipHeightUpdate = false) {
 
   // Draw chart
   window.ChartRenderer.drawBubbleChart(selectedYear, selectedPollutantId, selectedGroupIds);
+  bubbleScheduleLayoutProbe('drawBubbleChart complete');
 
   // Update the comparison statement based on checked comparison checkboxes
   const checkedCheckboxes = document.querySelectorAll('.comparison-checkbox:checked');

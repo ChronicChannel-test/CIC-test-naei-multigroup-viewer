@@ -81,6 +81,14 @@
   margin-right: 8px; 
 }
 
+select,
+#pollutantSelect,
+#yearSelect,
+#groupContainer select {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
 /* Button styling - match line chart */
 .add-btn, .remove-btn {
   background: #EFEFEF !important;
@@ -134,6 +142,7 @@
 
 #groupContainer {
   padding-right: 0; /* Remove - padding is on individual rows instead */
+  margin-top: 0; /* Align with line chart spacing */
 }
 
 .button-row {

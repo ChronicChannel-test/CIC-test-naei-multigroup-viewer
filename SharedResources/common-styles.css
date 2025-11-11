@@ -257,6 +257,45 @@ button {
   padding-right: 130px;
 }
 
+@media (min-width: 1100px) {
+  .controls-wrapper.controls-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    column-gap: 8px;
+    row-gap: 8px;
+    align-items: stretch;
+  }
+
+  .controls-wrapper.controls-grid > * {
+    width: 100%;
+  }
+
+  .controls-wrapper.controls-grid .year-pair {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .controls-wrapper.controls-grid .year-pair label {
+    margin-right: 0;
+  }
+
+  .controls-wrapper.controls-grid .year-pair select {
+    flex: 1 1 auto;
+  }
+
+  .controls-wrapper.controls-grid button,
+  .controls-wrapper.controls-grid select {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .controls-wrapper.controls-grid button {
+    justify-self: stretch;
+  }
+}
+
 /* Group management */
 #groupContainer { 
   margin-top: 10px; 

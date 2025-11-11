@@ -129,7 +129,8 @@ button:disabled {
 
 /* Select dropdown styling */
 select, #pollutantSelect, #startYear, #endYear, #groupContainer select {
-  margin: 6px !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
   padding: 6px 10px !important;
   border-radius: 6px !important;
   border: 1px solid #ccc !important;
