@@ -237,6 +237,11 @@ button, .add-btn, .remove-btn, .dragHandle {
   margin-bottom: 12px;
 }
 
+.button-row select {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
 .controls-wrapper {
   display: flex;
   flex-wrap: wrap;
