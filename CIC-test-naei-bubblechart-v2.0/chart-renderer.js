@@ -384,6 +384,8 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     chart.draw(data, currentOptions);
     console.log('chart.draw() completed without error');
 
+  registerTooltipPositionHandlers(chart, data);
+
     // Create custom legend after chart is drawn
     createCustomLegend(chart, data, groupIds, dataPoints);
     
@@ -501,6 +503,83 @@ function createCustomLegend(chart, data, groupIds, dataPoints) {
     });
 
     legendContainer.appendChild(legendItem);
+  });
+}
+
+function registerTooltipPositionHandlers(chartInstance, dataTable) {
+  if (!chartInstance) return;
+
+  if (!chartInstance.__tooltipHandlers) {
+    chartInstance.__tooltipHandlers = [];
+  }
+
+  if (chartInstance.__tooltipHandlers.length) {
+    chartInstance.__tooltipHandlers.forEach(handlerId => {
+      google.visualization.events.removeListener(handlerId);
+    });
+    chartInstance.__tooltipHandlers = [];
+  }
+
+  const mouseOverHandler = google.visualization.events.addListener(chartInstance, 'onmouseover', (event) => {
+    adjustTooltipForTopBubbles(event, dataTable, chartInstance);
+  });
+  const mouseOutHandler = google.visualization.events.addListener(chartInstance, 'onmouseout', () => {
+    resetTooltipPosition();
+  });
+
+  chartInstance.__tooltipHandlers.push(mouseOverHandler, mouseOutHandler);
+}
+
+function adjustTooltipForTopBubbles(event, dataTable, chartInstance) {
+  if (!event || event.row == null) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    const tooltipEl = document.querySelector('.google-visualization-tooltip');
+    if (!tooltipEl) {
+      return;
+    }
+
+    const layout = chartInstance.getChartLayoutInterface();
+    if (!layout) {
+      return;
+    }
+
+    const chartArea = layout.getChartAreaBoundingBox();
+    const yValue = dataTable.getValue(event.row, 1);
+    const bubbleCenterY = layout.getYLocation(yValue);
+    const tooltipHeight = tooltipEl.offsetHeight;
+    const topBuffer = 40;
+    const downwardOffset = 14;
+
+    tooltipEl.dataset.defaultTop = tooltipEl.style.top || '';
+    tooltipEl.dataset.defaultTransform = tooltipEl.style.transform || '';
+
+    if (bubbleCenterY - tooltipHeight <= chartArea.top + topBuffer) {
+      const proposedTop = bubbleCenterY + downwardOffset;
+      const maxTop = chartArea.top + chartArea.height - tooltipHeight - 10;
+      tooltipEl.style.top = `${Math.min(proposedTop, maxTop)}px`;
+      tooltipEl.style.transform = 'translate(-50%, 0)';
+      tooltipEl.dataset.tooltipAdjusted = 'true';
+    } else if (tooltipEl.dataset.tooltipAdjusted === 'true') {
+      tooltipEl.style.top = tooltipEl.dataset.defaultTop;
+      tooltipEl.style.transform = tooltipEl.dataset.defaultTransform;
+      tooltipEl.dataset.tooltipAdjusted = '';
+    }
+  });
+}
+
+function resetTooltipPosition() {
+  requestAnimationFrame(() => {
+    const tooltipEl = document.querySelector('.google-visualization-tooltip');
+    if (tooltipEl && tooltipEl.dataset.tooltipAdjusted === 'true') {
+      tooltipEl.style.top = tooltipEl.dataset.defaultTop || '';
+      tooltipEl.style.transform = tooltipEl.dataset.defaultTransform || '';
+      tooltipEl.dataset.tooltipAdjusted = '';
+      tooltipEl.dataset.defaultTop = '';
+      tooltipEl.dataset.defaultTransform = '';
+    }
   });
 }
 

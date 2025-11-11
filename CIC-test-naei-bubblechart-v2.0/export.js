@@ -855,6 +855,30 @@ function exportData(format = 'csv') {
     
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // Size Column A by its longest entry and other columns by row 3 headers
+    const measuredWidths = [];
+    rows.forEach((row, rowIndex) => {
+      row.forEach((cell, colIndex) => {
+        if (cell == null) {
+          return;
+        }
+
+        const shouldMeasure = colIndex === 0 || rowIndex === 2;
+        if (!shouldMeasure) {
+          return;
+        }
+
+        const length = String(cell).length + 2; // add padding for readability
+        if (!measuredWidths[colIndex] || length > measuredWidths[colIndex]) {
+          measuredWidths[colIndex] = length;
+        }
+      });
+    });
+
+    const columnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
+    ws['!cols'] = Array.from({ length: columnCount }, (_, idx) => ({ wch: measuredWidths[idx] || 12 }));
+
     XLSX.utils.book_append_sheet(wb, ws, 'Data');
     XLSX.writeFile(wb, `${filename}.xlsx`);
   }
