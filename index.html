@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" style="background: #f8bbd0;"> <!-- pink for debug -->
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <title>NAEI Multi-Group Pollutant Viewer v3.0 Shared</title>
@@ -357,29 +357,29 @@
     </div>
 
     <!-- Bubble Chart Container -->
-    <div id="chart-1" class="chart-container" style="outline: 3px solid magenta;">
+  <div id="chart-1" class="chart-container">
       <iframe
         id="bubblechart-iframe"
         src="CIC-test-naei-bubblechart-v2.0/index.html"
         frameborder="0"
         scrolling="no"
-        style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
+  style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden;"
         title="NAEI Activity Data Bubble Chart"></iframe>
     </div>
 
     <!-- Line Chart Container -->
-    <div id="chart-2" class="chart-container" style="outline: 3px solid magenta; visibility: hidden; height: 0; overflow: hidden;">
+  <div id="chart-2" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;">
       <iframe
         id="linechart-iframe"
         src="CIC-test-naei-linechart-v2.4/index.html"
         frameborder="0"
         scrolling="no"
-        style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden; outline: 3px solid yellow;"
+  style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden;"
         title="NAEI Activity Data Line Chart"></iframe>
     </div>
 
     <!-- Footer (inside chart-interface so it fades in with the chart) -->
-    <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; outline: 5px solid orange; opacity: 1;">
+  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; opacity: 1;">
       <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via
       <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
       <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
