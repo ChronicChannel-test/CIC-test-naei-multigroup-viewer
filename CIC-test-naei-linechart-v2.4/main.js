@@ -8,82 +8,6 @@ const lineUrlParams = new URLSearchParams(window.location.search || '');
 const lineDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => lineUrlParams.has(flag));
 window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || lineDebugLoggingEnabled;
 
-let lineLayoutProbeTimer = null;
-function lineCaptureLayoutMetrics(context) {
-  const root = document.querySelector('.chart-shell') || document.getElementById('mainContent') || document.body;
-  const rootRect = root?.getBoundingClientRect();
-  const rootStyles = root ? window.getComputedStyle(root) : null;
-
-  const measure = (selector) => {
-    const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
-    if (!el || !rootRect) {
-      return null;
-    }
-    const rect = el.getBoundingClientRect();
-    const styles = window.getComputedStyle(el);
-    return {
-      left: Math.round(rect.left - rootRect.left),
-      top: Math.round(rect.top - rootRect.top),
-      height: Math.round(rect.height),
-      width: Math.round(rect.width),
-      marginLeft: parseFloat(styles.marginLeft) || 0,
-      marginRight: parseFloat(styles.marginRight) || 0,
-      marginTop: parseFloat(styles.marginTop) || 0,
-      marginBottom: parseFloat(styles.marginBottom) || 0,
-      paddingLeft: parseFloat(styles.paddingLeft) || 0,
-      paddingRight: parseFloat(styles.paddingRight) || 0
-    };
-  };
-
-  const metrics = {
-    context,
-    timestamp: new Date().toISOString(),
-    viewportWidth: Math.round(window.innerWidth || 0),
-    rootPaddingLeft: rootStyles ? parseFloat(rootStyles.paddingLeft) || 0 : null,
-    rootPaddingRight: rootStyles ? parseFloat(rootStyles.paddingRight) || 0 : null,
-    buttonRow: measure('.button-row'),
-    groupContainer: measure('#groupContainer'),
-    groupInfoDetails: measure('#groupInfoDetails'),
-    controlsWrapper: measure('.controls-wrapper'),
-    chartWrapper: measure('.chart-wrapper'),
-    mainContentTop: measure('#mainContentTop'),
-    mainContentBottom: measure('#mainContentBottom')
-  };
-
-  console.warn('[LayoutProbe:line]', metrics);
-
-  if (window.parent && window.parent !== window) {
-    try {
-      window.parent.postMessage({
-        type: 'layoutMetrics',
-        chart: 'line',
-        metrics
-      }, '*');
-    } catch (postError) {
-      if (lineDebugLoggingEnabled) {
-        console.warn('Failed to post layout metrics to parent', postError);
-      }
-    }
-  }
-}
-
-function lineScheduleLayoutProbe(context) {
-  clearTimeout(lineLayoutProbeTimer);
-  lineLayoutProbeTimer = setTimeout(() => lineCaptureLayoutMetrics(context), 0);
-}
-
-window.addEventListener('resize', () => lineScheduleLayoutProbe('window resize'));
-window.addEventListener('focus', () => lineScheduleLayoutProbe('window focus'));
-document.addEventListener('visibilitychange', () => {
-  lineScheduleLayoutProbe(`visibilitychange:${document.visibilityState}`);
-});
-window.addEventListener('message', (event) => {
-  if (event?.data?.type === 'layoutProbe') {
-    const { context = 'parent request' } = event.data;
-    lineScheduleLayoutProbe(context);
-  }
-});
-
 if (!lineDebugLoggingEnabled) {
   console.log = () => {};
   console.info = () => {};
@@ -777,8 +701,6 @@ function updateChart(){
   const selectedGroups = getSelectedGroups();
   if (!pollutant || !startYear || !endYear || !selectedGroups.length) return;
 
-  lineScheduleLayoutProbe('updateChart start');
-
   // Update the URL with the new state (debounced)
   updateUrlFromChartState();
 
@@ -986,7 +908,6 @@ function updateChart(){
   // Delay slightly to let layout stabilize (prevents negative sizes and bouncing)
   setTimeout(() => {
     chart.draw(dataTable, options);
-    lineScheduleLayoutProbe('chart.draw');
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
       chartContainer.classList.add('visible');
@@ -1235,7 +1156,6 @@ async function revealMainContent() {
                   type: 'chartReady',
                   chart: 'line'
                 }, '*');
-                  lineScheduleLayoutProbe('revealMainContent afterDraw');
                 resolve();
               }, 200);
             }, 350);
@@ -1428,7 +1348,6 @@ async function init() {
 
     // Finally, reveal the main content and draw the chart
   await revealMainContent();
-  lineScheduleLayoutProbe('init complete');
     
     // Chart ready signal is now sent from revealMainContent after loading overlay fades
 

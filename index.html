@@ -462,101 +462,6 @@
       line: false
     };
 
-    const latestLayoutMetrics = {
-      bubble: null,
-      line: null
-    };
-
-    function compareLayoutMetrics(triggerLabel) {
-      const bubble = latestLayoutMetrics.bubble;
-      const line = latestLayoutMetrics.line;
-
-      if (!bubble || !line) {
-        return;
-      }
-
-      const fields = [
-        'buttonRow',
-        'groupContainer',
-        'groupInfoDetails',
-        'chartWrapper',
-        'controlsWrapper',
-        'mainContentTop',
-        'mainContentBottom'
-      ];
-
-      const comparisons = fields.reduce((acc, field) => {
-        const bubbleValue = bubble.metrics?.[field] || null;
-        const lineValue = line.metrics?.[field] || null;
-
-        if (!bubbleValue && !lineValue) {
-          return acc;
-        }
-
-        const deltaTop = (bubbleValue && lineValue)
-          ? Math.round((lineValue.top - bubbleValue.top) * 100) / 100
-          : null;
-
-        const deltaLeft = (bubbleValue && lineValue)
-          ? Math.round((lineValue.left - bubbleValue.left) * 100) / 100
-          : null;
-
-        const deltaHeight = (bubbleValue && lineValue)
-          ? Math.round((lineValue.height - bubbleValue.height) * 100) / 100
-          : null;
-
-        acc[field] = {
-          bubble: bubbleValue,
-          line: lineValue,
-          deltaTop,
-          deltaLeft,
-          deltaHeight,
-          deltaMarginTop: (bubbleValue && lineValue)
-            ? Math.round((lineValue.marginTop - bubbleValue.marginTop) * 100) / 100
-            : null,
-          deltaMarginBottom: (bubbleValue && lineValue)
-            ? Math.round((lineValue.marginBottom - bubbleValue.marginBottom) * 100) / 100
-            : null
-        };
-
-        return acc;
-      }, {});
-
-      const tableRows = Object.entries(comparisons)
-        .filter(([, value]) => value?.bubble && value?.line)
-        .map(([field, value]) => ({
-          target: field,
-          bubbleTop: value.bubble.top,
-          lineTop: value.line.top,
-          deltaTop: value.deltaTop,
-          bubbleLeft: value.bubble.left,
-          lineLeft: value.line.left,
-          deltaLeft: value.deltaLeft,
-          bubbleHeight: value.bubble.height,
-          lineHeight: value.line.height,
-          deltaHeight: value.deltaHeight,
-          bubbleMarginTop: value.bubble.marginTop,
-          lineMarginTop: value.line.marginTop,
-          deltaMarginTop: value.deltaMarginTop,
-          bubbleMarginBottom: value.bubble.marginBottom,
-          lineMarginBottom: value.line.marginBottom,
-          deltaMarginBottom: value.deltaMarginBottom,
-          bubbleWidth: value.bubble.width,
-          lineWidth: value.line.width
-        }));
-
-      console.warn('[LayoutCompare]', {
-        triggeredBy: triggerLabel,
-        bubbleContext: bubble.metrics?.context,
-        lineContext: line.metrics?.context,
-        comparisons
-      });
-
-      if (tableRows.length) {
-        console.table(tableRows);
-      }
-    }
-
     const iframeElements = {
       bubble: document.getElementById('bubblechart-iframe'),
       line: document.getElementById('linechart-iframe')
@@ -846,15 +751,6 @@
       chartContainer.style.height = 'auto';
       chartContainer.style.overflow = 'visible';
 
-      const activeKey = chartId === '1' ? 'bubble' : 'line';
-      Object.entries(iframeElements).forEach(([key, iframe]) => {
-        if (iframe && iframe.contentWindow) {
-          iframe.contentWindow.postMessage({
-            type: 'layoutProbe',
-            context: `parent showChart:${chartId}:${key === activeKey ? 'active' : 'hidden'}`
-          }, '*');
-        }
-      });
     }
 
     // Simplified initialization for iframe-based charts
@@ -881,20 +777,6 @@
     window.addEventListener('message', function(event) {
       console.log('🔥 Parent received message:', event.data);
 
-      if (event.data && event.data.type === 'layoutMetrics') {
-        const chartKey = event.data.chart;
-
-        if (chartKey === 'bubble' || chartKey === 'line') {
-          latestLayoutMetrics[chartKey] = {
-            receivedAt: Date.now(),
-            metrics: event.data.metrics
-          };
-
-          const contextLabel = event.data.metrics?.context || 'unknown';
-          compareLayoutMetrics(`layoutMetrics:${chartKey}:${contextLabel}`);
-        }
-      }
-      
       // Handle URL updates from iframes
       if (event.data && event.data.type === 'updateUrl') {
         console.log('🔗 Updating URL to:', event.data.url);
