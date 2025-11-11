@@ -22,8 +22,8 @@ function exportData(format = 'csv') {
     return;
   }
 
-  // Track export analytics
-  window.supabaseModule.window.supabaseModule.trackAnalytics('data_export', {
+  // Track export analytics when available
+  const exportAnalyticsPayload = {
     format: format,
     pollutant: pollutant,
     start_year: startYear,
@@ -32,7 +32,13 @@ function exportData(format = 'csv') {
     groups_count: selectedGroups.length,
     year_range: endYear - startYear + 1,
     filename: pollutant.replace(/[^a-z0-9_\-]/gi, '_') + '_' + startYear + '-' + endYear + '_comparison'
-  });
+  };
+
+  if (window.supabaseModule?.trackAnalytics) {
+    window.supabaseModule
+      .trackAnalytics('data_export', exportAnalyticsPayload)
+      .catch(err => console.warn('Export analytics tracking failed:', err));
+  }
 
   // Use the global year keys / labels determined earlier
   const yearsAll = window.globalYears || [];

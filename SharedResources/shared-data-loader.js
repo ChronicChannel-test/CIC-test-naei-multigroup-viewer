@@ -4,6 +4,20 @@
  * Prevents duplicate data loading when switching between charts
  */
 
+// Determine whether to surface verbose logging (opt-in via URL params)
+const __sharedDataDebugParams = (() => {
+  try {
+    return new URLSearchParams(window.location.search || '');
+  } catch (error) {
+    return new URLSearchParams('');
+  }
+})();
+
+const __sharedDataDebugEnabled = ['debug', 'debugLogs', 'logs', 'sharedLogs']
+  .some(flag => __sharedDataDebugParams.has(flag));
+
+const sharedDataDebugLog = __sharedDataDebugEnabled ? console.log.bind(console) : () => {};
+
 // Global data cache
 window.SharedDataCache = window.SharedDataCache || {
   isLoaded: false,
@@ -42,13 +56,13 @@ async function loadSharedData() {
   
   // If data is already loaded, return immediately
   if (cache.isLoaded) {
-    console.log("Using cached shared data");
+    sharedDataDebugLog("Using cached shared data");
     return cache.data;
   }
   
   // If loading is in progress, return the existing promise
   if (cache.isLoading && cache.loadPromise) {
-    console.log("Waiting for existing data load to complete");
+    sharedDataDebugLog("Waiting for existing data load to complete");
     return await cache.loadPromise;
   }
   
@@ -72,7 +86,7 @@ async function loadSharedData() {
  * Actually fetch data from Supabase
  */
 async function loadDataFromSupabase() {
-  console.log("Loading shared data from Supabase...");
+  sharedDataDebugLog("Loading shared data from Supabase...");
   
   const client = getSupabaseClient();
   const cache = window.SharedDataCache;
@@ -102,7 +116,7 @@ async function loadDataFromSupabase() {
   window.allPollutantsData = pollutants;
   window.allGroupsData = groups;
   
-  console.log(`Loaded ${pollutants.length} pollutants, ${groups.length} groups, ${timeseries.length} data points`);
+  sharedDataDebugLog(`Loaded ${pollutants.length} pollutants, ${groups.length} groups, ${timeseries.length} data points`);
   
   return cache.data;
 }
@@ -134,9 +148,10 @@ function buildLookupMaps(pollutants, groups) {
   
   // Build group maps
   groups.forEach(g => {
-    if (g.id && g.group_name) {
-      maps.groupIdToName[g.id] = g.group_name;
-      maps.groupNameToId[g.group_name.toLowerCase()] = g.id;
+    const name = g.group_title || g.group_name;
+    if (g.id && name) {
+      maps.groupIdToName[g.id] = name;
+      maps.groupNameToId[name.toLowerCase()] = g.id;
     }
   });
 }
@@ -226,4 +241,4 @@ window.SharedDataLoader = {
   clearCache
 };
 
-console.log('Shared Data Loader initialized');
+sharedDataDebugLog('Shared Data Loader initialized');

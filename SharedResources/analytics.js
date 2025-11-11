@@ -4,6 +4,20 @@
  * Used by all NAEI viewer applications
  */
 
+// Allow verbose logging to be toggled via URL parameters (debug, logs, analyticsDebug)
+const __analyticsDebugParams = (() => {
+  try {
+    return new URLSearchParams(window.location.search || '');
+  } catch (error) {
+    return new URLSearchParams('');
+  }
+})();
+
+const __analyticsDebugEnabled = ['debug', 'debugLogs', 'analyticsDebug', 'logs']
+  .some(flag => __analyticsDebugParams.has(flag));
+
+const analyticsDebugLog = __analyticsDebugEnabled ? console.log.bind(console) : () => {};
+
 // Analytics tracking variables
 let sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 let userFingerprint = null;
@@ -86,7 +100,7 @@ async function trackAnalytics(supabaseClient, eventName, details = {}) {
   // Check for analytics opt-out flag in URL
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.get('analytics') === 'off') {
-    console.log('Analytics is turned off via URL parameter. Skipping event:', eventName);
+    analyticsDebugLog('Analytics is turned off via URL parameter. Skipping event:', eventName);
     return; // Do not track if analytics=off is in the URL
   }
 
@@ -109,7 +123,7 @@ async function trackAnalytics(supabaseClient, eventName, details = {}) {
     referrer: document.referrer || null
   };
 
-  console.log('📊 Analytics:', eventName, details);
+  analyticsDebugLog('📊 Analytics:', eventName, details);
 
   const { error } = await supabaseClient
     .from('analytics_events')

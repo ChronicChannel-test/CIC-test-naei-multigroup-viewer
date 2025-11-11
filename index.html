@@ -408,6 +408,22 @@
   <script>
     // Chart routing system with tabbed interface
     let currentChart = null;
+    const globalUrlParams = new URLSearchParams(window.location.search || '');
+    const debugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => globalUrlParams.has(flag));
+    const debugWarn = (...args) => {
+      if (debugLoggingEnabled) {
+        console.warn(...args);
+      }
+    };
+    window.__NAEI_DEBUG__ = debugLoggingEnabled;
+
+    if (!debugLoggingEnabled) {
+      console.log = () => {};
+      console.info = () => {};
+      if (console.debug) {
+        console.debug = () => {};
+      }
+    }
     
     // Store last known state for each chart (populated by messages from iframes)
     const chartStates = {
@@ -440,6 +456,22 @@
       bubble: document.getElementById('bubblechart-iframe'),
       line: document.getElementById('linechart-iframe')
     };
+
+    if (debugLoggingEnabled) {
+      Object.values(iframeElements).forEach(iframe => {
+        if (!iframe) return;
+
+        try {
+          const iframeUrl = new URL(iframe.getAttribute('src'), window.location.href);
+          if (!iframeUrl.searchParams.has('debug')) {
+            iframeUrl.searchParams.set('debug', '1');
+            iframe.src = iframeUrl.toString();
+          }
+        } catch (error) {
+          debugWarn('Unable to append debug flag to iframe source', error);
+        }
+      });
+    }
 
     function areAllChartsReady() {
       return Object.values(chartReadyState).every(Boolean);
@@ -753,7 +785,7 @@
           chartReadyState[chartKey] = true;
           console.log(`✅ ${keyLabel} chart is ready`);
         } else {
-          console.warn('⚠️ Unknown chart reported ready:', chartKey);
+          debugWarn('⚠️ Unknown chart reported ready:', chartKey);
         }
         
         if (areAllChartsReady()) {
@@ -786,7 +818,7 @@
             : fallbackHeight;
 
           if (!Number.isFinite(reportedHeight) || reportedHeight <= 0) {
-            console.warn(`⚠️ Received invalid height (${event.data.height}) from ${chartKey}; using fallback ${safeHeight}px`);
+            debugWarn(`⚠️ Received invalid height (${event.data.height}) from ${chartKey}; using fallback ${safeHeight}px`);
           } else {
             console.log(`📏 Received content height from ${chartKey}: ${reportedHeight}px`);
           }
@@ -831,12 +863,6 @@
       }
     });
     
-    // Test the message listener immediately
-    setTimeout(() => {
-      console.log('🧪 Testing message listener with self-message...');
-      window.postMessage({ type: 'test', message: 'Self test message' }, '*');
-    }, 100);
-    
     // Hide loading overlay function - make it global for iframe onload
     window.hideLoadingOverlay = function() {
       if (overlayHidden) {
@@ -872,23 +898,6 @@
       }
     };
     
-    // Debug: Check if spinner is animating
-    window.addEventListener('DOMContentLoaded', function() {
-      const spinner = document.querySelector('.main-spinner');
-      if (spinner) {
-        console.log('Spinner element found, checking animation...');
-        const computedStyle = window.getComputedStyle(spinner);
-        console.log('Spinner animation:', computedStyle.animation);
-        console.log('Spinner transform:', computedStyle.transform);
-        
-        // Check again after 100ms to see if transform changes
-        setTimeout(() => {
-          const newStyle = window.getComputedStyle(spinner);
-          console.log('Spinner transform after 100ms:', newStyle.transform);
-        }, 100);
-      }
-    });
-    
     // Initialize when DOM ready
     window.addEventListener('DOMContentLoaded', function() {
       console.log('Main page DOM loaded');
@@ -908,50 +917,52 @@
     const bubbleIframe = iframeElements.bubble;
       
       if (lineIframe) {
-        console.log('Line chart iframe found, src:', lineIframe.src);
-        
-        lineIframe.addEventListener('load', () => {
-          console.log('Line chart iframe loaded event fired');
-          console.log('⏰ Waiting for chartReady message from iframe...');
-          
-          // Debug iframe script execution
-          setTimeout(() => {
-            console.log('🔍 Checking if iframe scripts loaded...');
-            try {
-              const iframeDoc = lineIframe.contentDocument || lineIframe.contentWindow.document;
-              console.log('🔍 Iframe document readyState:', iframeDoc.readyState);
-              console.log('🔍 Iframe body exists:', !!iframeDoc.body);
-              
-              // Check if scripts are present
-              const scripts = iframeDoc.querySelectorAll('script');
-              console.log('🔍 Number of scripts found in iframe:', scripts.length);
-              
-              if (scripts.length === 0) {
-                console.log('⚠️ NO SCRIPTS IN IFRAME - This is abnormal!');
-                console.log('🔍 Checking iframe HTML source...');
-                console.log('🔍 First 500 chars of iframe HTML:', iframeDoc.documentElement.innerHTML.substring(0, 500));
-                
-                // The iframe HTML is not loading scripts - possible iframe security issue
-                // Let's force a reload
-                console.log('🔄 Attempting iframe reload...');
-                lineIframe.src = lineIframe.src; // Force reload
-              } else {
-                // List script details
-                scripts.forEach((script, index) => {
-                  console.log(`🔍 Script ${index + 1}:`, {
-                    src: script.src || 'inline',
-                    hasContent: !!script.textContent.trim(),
-                    type: script.type || 'text/javascript'
+        if (debugLoggingEnabled) {
+          console.log('Line chart iframe found, src:', lineIframe.src);
+
+          lineIframe.addEventListener('load', () => {
+            console.log('Line chart iframe loaded event fired');
+            console.log('⏰ Waiting for chartReady message from iframe...');
+
+            // Debug iframe script execution
+            setTimeout(() => {
+              console.log('🔍 Checking if iframe scripts loaded...');
+              try {
+                const iframeDoc = lineIframe.contentDocument || lineIframe.contentWindow.document;
+                console.log('🔍 Iframe document readyState:', iframeDoc.readyState);
+                console.log('🔍 Iframe body exists:', !!iframeDoc.body);
+
+                // Check if scripts are present
+                const scripts = iframeDoc.querySelectorAll('script');
+                console.log('🔍 Number of scripts found in iframe:', scripts.length);
+
+                if (scripts.length === 0) {
+                  console.log('⚠️ NO SCRIPTS IN IFRAME - This is abnormal!');
+                  console.log('🔍 Checking iframe HTML source...');
+                  console.log('🔍 First 500 chars of iframe HTML:', iframeDoc.documentElement.innerHTML.substring(0, 500));
+
+                  // The iframe HTML is not loading scripts - possible iframe security issue
+                  // Let's force a reload
+                  console.log('🔄 Attempting iframe reload...');
+                  lineIframe.src = lineIframe.src; // Force reload
+                } else {
+                  // List script details
+                  scripts.forEach((script, index) => {
+                    console.log(`🔍 Script ${index + 1}:`, {
+                      src: script.src || 'inline',
+                      hasContent: !!script.textContent.trim(),
+                      type: script.type || 'text/javascript'
+                    });
                   });
-                });
+                }
+
+              } catch (e) {
+                console.log('🔍 Cannot access iframe document (security restrictions):', e.message);
               }
-              
-            } catch (e) {
-              console.log('🔍 Cannot access iframe document (security restrictions):', e.message);
-            }
-          }, 1000);
-        });
-        
+            }, 1000);
+          });
+        }
+
         lineIframe.addEventListener('error', (e) => {
           console.error('Line chart iframe error:', e);
           // Hide overlay even on error
@@ -962,7 +973,7 @@
         });
       }
       
-      if (bubbleIframe) {
+      if (bubbleIframe && debugLoggingEnabled) {
         console.log('Bubble chart iframe found, src:', bubbleIframe.src);
         bubbleIframe.addEventListener('load', () => {
           console.log('Bubble chart iframe loaded');

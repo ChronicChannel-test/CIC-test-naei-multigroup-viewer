@@ -6,6 +6,18 @@
 
 // Initialize Supabase client and analytics lazily to avoid dependency issues
 let supabase = null;
+
+const lineSupabaseUrlParams = new URLSearchParams(window.location.search || '');
+const lineSupabaseDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => lineSupabaseUrlParams.has(flag));
+window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || lineSupabaseDebugLoggingEnabled;
+
+if (!lineSupabaseDebugLoggingEnabled) {
+  console.log = () => {};
+  console.info = () => {};
+  if (console.debug) {
+    console.debug = () => {};
+  }
+}
 let supabaseUnavailableLogged = false;
 let localSessionId = null;
 

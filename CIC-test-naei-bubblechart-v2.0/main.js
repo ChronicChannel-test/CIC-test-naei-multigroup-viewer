@@ -3,6 +3,23 @@
  * Handles UI initialization, user interactions, and coordination between modules
  */
 
+const bubbleUrlParams = new URLSearchParams(window.location.search || '');
+const bubbleDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => bubbleUrlParams.has(flag));
+const bubbleDebugWarn = (...args) => {
+  if (bubbleDebugLoggingEnabled) {
+    console.warn(...args);
+  }
+};
+window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || bubbleDebugLoggingEnabled;
+
+if (!bubbleDebugLoggingEnabled) {
+  console.log = () => {};
+  console.info = () => {};
+  if (console.debug) {
+    console.debug = () => {};
+  }
+}
+
 console.log('main.js loaded');
 
 // Debounce function
@@ -173,7 +190,7 @@ function sendContentHeightToParent(force = false) {
           mainContent?.offsetHeight || 0
         );
         measuredHeight = Math.max(contentHeight, 1100);
-        console.warn('Bubble chart content height below threshold; using fallback height:', measuredHeight);
+        bubbleDebugWarn('Bubble chart content height below threshold; using fallback height:', measuredHeight);
       }
 
       if (!force && lastSentHeight && Math.abs(measuredHeight - lastSentHeight) < MIN_HEIGHT_DELTA) {
@@ -336,14 +353,14 @@ async function renderInitialView() {
           console.log('Adding Ecodesign Stove Ready To Burn group:', ecodesignGroup);
           addGroupSelector(ecodesignGroup, false);
         } else {
-          console.warn('Could not find Ecodesign Stove - Ready To Burn group');
+          bubbleDebugWarn('Could not find Ecodesign Stove - Ready To Burn group');
         }
         
         if (gasBoilerGroup) {
           console.log('Adding Gas Boilers group:', gasBoilerGroup);
           addGroupSelector(gasBoilerGroup, false);
         } else {
-          console.warn('Could not find Gas Boilers group');
+          bubbleDebugWarn('Could not find Gas Boilers group');
         }
         
         // If we didn't find either specific group, add first 2 available groups
@@ -466,7 +483,7 @@ function parseUrlParameters() {
         const group = groups.find(g => g.id === id);
         if (group) {
           if (activeGroupIdSet.size && !activeGroupIdSet.has(group.id)) {
-            console.warn('Ignoring group without activity data for bubble chart:', group.group_title || `Group ${group.id}`);
+            bubbleDebugWarn('Ignoring group without activity data for bubble chart:', group.group_title || `Group ${group.id}`);
             return;
           }
           groupNames.push(group.group_title);

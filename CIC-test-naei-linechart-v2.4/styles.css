@@ -280,7 +280,6 @@ button, .add-btn, .remove-btn, .dragHandle {
   box-sizing: border-box;
   background-color: #fff;
   overflow: visible;
-  outline: 5px solid red; /* TEMPORARY DEBUG - shows chart-wrapper boundary */
 }
 
 #chart_div { 
@@ -294,7 +293,6 @@ button, .add-btn, .remove-btn, .dragHandle {
   border-radius: 0; 
   padding: 0; 
   box-sizing: border-box;
-  outline: 3px solid blue; /* TEMPORARY DEBUG - shows chart_div boundary */
 }
 
 #chart_div.visible { 

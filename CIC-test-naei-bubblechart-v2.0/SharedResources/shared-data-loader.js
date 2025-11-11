@@ -134,9 +134,10 @@ function buildLookupMaps(pollutants, groups) {
   
   // Build group maps
   groups.forEach(g => {
-    if (g.id && g.group_name) {
-      maps.groupIdToName[g.id] = g.group_name;
-      maps.groupNameToId[g.group_name.toLowerCase()] = g.id;
+    const name = g.group_title || g.group_name;
+    if (g.id && name) {
+      maps.groupIdToName[g.id] = name;
+      maps.groupNameToId[name.toLowerCase()] = g.id;
     }
   });
 }

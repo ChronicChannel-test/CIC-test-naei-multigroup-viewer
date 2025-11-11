@@ -4,6 +4,18 @@
  * v2.4 - Now uses shared color module
  */
 
+const lineUrlParams = new URLSearchParams(window.location.search || '');
+const lineDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => lineUrlParams.has(flag));
+window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || lineDebugLoggingEnabled;
+
+if (!lineDebugLoggingEnabled) {
+  console.log = () => {};
+  console.info = () => {};
+  if (console.debug) {
+    console.debug = () => {};
+  }
+}
+
 // Global chart instance and state
 let chart; // global chart instance
 let seriesVisibility = [];
@@ -67,7 +79,7 @@ google.charts.setOnLoadCallback(() => {
     const build = 'v2.4-embed-gate-2025-11-04T20:26Z';
     window.__LINECHART_BUILD__ = build;
     document.documentElement.setAttribute('data-linechart-build', build);
-    console.log('🧩 Linechart build loaded: ' + build);
+  console.log('Linechart build loaded: ' + build);
   } catch (e) { /* no-op */ }
 })();
 
@@ -124,19 +136,16 @@ window.smoothLines = smoothLines; // Expose for export.js
 // Listen for messages from parent
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'overlayHidden') {
-    console.log('✅ Received overlayHidden message from parent - enabling resize handler');
     initialLoadComplete = true;
     
     // Now that overlay is hidden and layout is stable, send final accurate height
     setTimeout(() => {
-      console.log('📐 Layout stable, sending final content height');
       sendContentHeightToParent();
     }, 100);
   }
   
   // Handle height request from parent (sent before hiding overlay to prevent layout shift)
   if (event.data && event.data.type === 'requestHeight') {
-    console.log('📐 Parent requested height - sending immediately');
     sendContentHeightToParent();
   }
 });
@@ -318,11 +327,6 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   div.className = 'groupRow';
   div.draggable = true;
 
-  // drag handle
-  const dragHandle = document.createElement('span');
-  dragHandle.className = 'dragHandle';
-  dragHandle.textContent = '⠿';
-  dragHandle.style.marginRight = '6px';
   // group control wrapper (keeps drag handle and select together)
   const controlWrap = document.createElement('div');
   controlWrap.className = 'group-control';
@@ -599,13 +603,8 @@ function updateUrlFromChartState() {
   // Ensure the data needed for ID lookups is available.
   const pollutants = window.allPollutantsData || [];
   const groups = window.allGroupsData || [];
-  
-  console.log('🔗 updateUrlFromChartState called');
-  console.log('🔗 Pollutants available:', pollutants.length);
-  console.log('🔗 Groups available:', groups.length);
-  
+
   if (!pollutants.length || !groups.length) {
-    console.log("🔗 URL update skipped: lookup data not yet available.");
     return;
   }
 
@@ -617,10 +616,7 @@ function updateUrlFromChartState() {
       const endYear = document.getElementById('endYear')?.value;
       const groupNames = getSelectedGroups();
 
-      console.log('🔗 URL update values:', { pollutantName, startYear, endYear, groupNames });
-
       if (!pollutantName || !startYear || !endYear || groupNames.length === 0) {
-        console.log('🔗 URL update skipped: missing values');
         return; // Not enough info to create a valid URL
       }
 
@@ -635,13 +631,13 @@ function updateUrlFromChartState() {
       }).filter(id => id !== null);
 
       if (!pollutantId || groupIds.length !== groupNames.length) {
-        console.warn("🔗 Could not map all names to IDs for URL update.");
-        console.warn('🔗 pollutantId:', pollutantId, 'groupIds:', groupIds, 'groupNames:', groupNames);
+        console.warn("Could not map all names to IDs for URL update.");
+        console.warn('pollutantId:', pollutantId, 'groupIds:', groupIds, 'groupNames:', groupNames);
         return;
       }
 
       if (parseInt(startYear) >= parseInt(endYear)) {
-        console.warn(`🔗 URL update skipped: Invalid year range (start=${startYear}, end=${endYear}).`);
+        console.warn(`URL update skipped: Invalid year range (start=${startYear}, end=${endYear}).`);
         return;
       }
 
@@ -652,8 +648,6 @@ function updateUrlFromChartState() {
         `start_year=${encodeURIComponent(startYear)}`,
         `end_year=${encodeURIComponent(endYear)}`
       ];
-      
-      console.log('🔗 Sending URL update to parent:', queryParts);
       
       // Send URL update to parent window
       // But ONLY if this is the active chart (chart=2 in parent URL)
@@ -668,9 +662,8 @@ function updateUrlFromChartState() {
               type: 'updateURL',
               params: queryParts
             }, '*');
-            console.log('🔗 URL update message sent');
           } else {
-            console.log('🚫 Not active chart (chart=' + chartParam + '), not sending URL update');
+            return;
           }
         } catch (e) {
           // Cross-origin restriction - send anyway (standalone mode)
@@ -678,10 +671,9 @@ function updateUrlFromChartState() {
             type: 'updateURL',
             params: queryParts
           }, '*');
-          console.log('🔗 URL update message sent (standalone mode)');
         }
       } else {
-        console.log('🔗 No parent window to send URL update to');
+        window.history.replaceState({}, '', `${window.location.pathname}?${queryParts.join('&')}`);
       }
 
     } catch (error) {
@@ -1005,8 +997,6 @@ function sendContentHeightToParent() {
     console.warn('Line chart content height below threshold; using fallback height:', measuredHeight);
   }
   
-  console.log('📐 Sending content height to parent:', measuredHeight + 'px');
-  
   window.parent.postMessage({
     type: 'contentHeight',
     chart: 'line',
@@ -1038,14 +1028,13 @@ window.addEventListener('resize', () => {
     
     // Only proceed if width actually changed (real user resize, not parent adjusting iframe height)
     if (currentWidth !== lastWindowWidth) {
-      console.log(`📐 Width changed from ${lastWindowWidth}px to ${currentWidth}px - updating chart and height`);
       lastWindowWidth = currentWidth;
       
       window._pendingHeightUpdate = true;
       updateChart();
       // Height will be sent after chart finishes drawing (see updateChart's setTimeout callback)
     } else {
-      console.log('📐 Height-only resize (parent adjusted iframe) - ignoring to prevent loop');
+      return;
     }
   }, 200);
 });
@@ -1106,65 +1095,18 @@ async function revealMainContent() {
     mainContent.classList.add('loaded'); // Add loaded class immediately
     
     // Since iframe has fixed height, we can render immediately
-    // Log all available dimension information
-    console.log('📐 === DIMENSION DEBUG ===');
-    console.log('📐 window.innerWidth:', window.innerWidth);
-    console.log('📐 window.innerHeight:', window.innerHeight);
-    console.log('📐 document.documentElement.clientWidth:', document.documentElement.clientWidth);
-    console.log('📐 document.documentElement.clientHeight:', document.documentElement.clientHeight);
-    console.log('📐 document.body.clientWidth:', document.body.clientWidth);
-    console.log('📐 document.body.clientHeight:', document.body.clientHeight);
-    
-    const chartContainer = document.getElementById('chart_div');
-    if (chartContainer) {
-      console.log('📐 chartContainer.offsetWidth:', chartContainer.offsetWidth);
-      console.log('📐 chartContainer.offsetHeight:', chartContainer.offsetHeight);
-      console.log('📐 chartContainer.clientWidth:', chartContainer.clientWidth);
-      console.log('📐 chartContainer.clientHeight:', chartContainer.clientHeight);
-      const computedStyle = window.getComputedStyle(chartContainer);
-      console.log('📐 chartContainer computed width:', computedStyle.width);
-      console.log('📐 chartContainer computed height:', computedStyle.height);
-      console.log('📐 chartContainer computed display:', computedStyle.display);
-      console.log('📐 chartContainer computed visibility:', computedStyle.visibility);
-    }
-    console.log('📐 === END DIMENSION DEBUG ===');
-    
     // Now render the chart at the correct size
     (function gateFirstRender(){
           let tries = 0;
           const maxTries = 30; // ~3s
           function tick(){
             if (selectionsReady()) {
-              // Pre-render diagnostics
-              try {
-                const params = parseUrlParameters();
-                const dbg = {
-                  stage: 'preRender',
-                  params,
-                  pollutantSelect: document.getElementById('pollutantSelect')?.value || null,
-                  startYear: document.getElementById('startYear')?.value || null,
-                  endYear: document.getElementById('endYear')?.value || null,
-                  groupSelectCount: document.querySelectorAll('#groupContainer select').length,
-                  selectedGroups: (function(){ try { return getSelectedGroups(); } catch(e){ return []; } })(),
-                  globalYearsCount: (window.globalYears || []).length
-                };
-                if (window.groupedData && dbg.pollutantSelect) {
-                  dbg.groupedDataPresence = (dbg.selectedGroups || []).map(g => ({ group: g, hasRow: !!(groupedData[dbg.pollutantSelect] && groupedData[dbg.pollutantSelect][g]) }));
-                }
-                console.log('🧪 Pre-render diagnostics:', dbg);
-                if (window.parent && window.parent !== window) {
-                  window.parent.postMessage({ type: 'lineDebug', payload: dbg }, '*');
-                }
-              } catch (e) {
-                console.warn('Pre-render diagnostics failed:', e);
-              }
-              console.log('✅ Selections ready – rendering chart');
               updateChart();
               afterDraw();
             } else if (++tries < maxTries) {
               setTimeout(tick, 100);
             } else {
-              console.warn('⚠️ Selections not ready after waiting — drawing anyway');
+              console.warn('Selections not ready after waiting — drawing anyway');
               updateChart();
               afterDraw();
             }
@@ -1172,7 +1114,6 @@ async function revealMainContent() {
           function afterDraw(){
             // Wait for chart to actually render in the DOM
             setTimeout(() => {
-              console.log('Line chart rendering complete');
               // Make chart visible
               const chartDiv = document.getElementById('chart_div');
               if (chartDiv) {
@@ -1188,20 +1129,16 @@ async function revealMainContent() {
               }
               // Wait longer to ensure Google Chart is fully painted and stable
               setTimeout(() => {
-                console.log('Line chart fully loaded and visible');
-                
                 // Update URL with initial chart state
                 updateUrlFromChartState();
                 
                 // Chart is rendered - send chartReady
                 // Height will be sent after overlay is hidden and layout is stable
-                console.log('📤 Sending chartReady message to parent...');
+                console.log('Chart Ready');
                 window.parent.postMessage({
                   type: 'chartReady',
                   chart: 'line'
                 }, '*');
-                // DON'T enable resize handler yet - wait for parent to confirm overlay is hidden
-                console.log('⏳ Waiting for overlay to be hidden before enabling resize handler...');
                 resolve();
               }, 200);
             }, 350);
@@ -1220,15 +1157,12 @@ function parseUrlParameters() {
   try {
     if (window.parent && window.parent !== window && window.parent.location.search) {
       searchParams = window.parent.location.search;
-      console.log('Reading URL params from parent:', searchParams);
     } else {
       searchParams = window.location.search;
-      console.log('Reading URL params from own window:', searchParams);
     }
   } catch (e) {
     // Cross-origin restriction, use own window
     searchParams = window.location.search;
-    console.log('Cross-origin restriction, using own window params:', searchParams);
   }
   
   const params = new URLSearchParams(searchParams);
@@ -1236,7 +1170,6 @@ function parseUrlParameters() {
   // Check if this is the active chart - only parse params if chart=2 (line chart)
   const chartParam = params.get('chart');
   if (chartParam && chartParam !== '2') {
-    console.log('URL is for chart', chartParam, 'not chart 2 (line). Using defaults.');
     // Return empty params so defaults will be used
     return {
       pollutantName: null,
@@ -1371,7 +1304,6 @@ async function init() {
       throw new Error('supabaseModule not available after waiting. Check console for loading errors.');
     }
     
-    console.log('supabaseModule found, proceeding with initialization...');
     
     // First, load all necessary data from Supabase
     const { pollutants, groups, yearKeys, pollutantUnits, groupedData } = await window.supabaseModule.loadData();
@@ -1438,7 +1370,7 @@ function notifyParentOfInitFailure(error) {
   try {
     if (window.parent && window.parent !== window) {
       const message = (error && error.message) ? error.message : 'Unknown initialization error';
-      console.warn('📣 Notifying parent about initialization failure');
+  console.warn('Notifying parent about initialization failure');
       window.parent.postMessage({
         type: 'chartReady',
         chart: 'line',
