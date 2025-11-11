@@ -275,6 +275,12 @@ button {
     flex: 0 0 auto;
   }
 
+
+@media (max-width: 1375px) {
+  .controls-wrapper.controls-grid {
+    flex-wrap: wrap;
+  }
+}
   .controls-wrapper.controls-grid .year-pair {
     display: flex;
     align-items: center;
