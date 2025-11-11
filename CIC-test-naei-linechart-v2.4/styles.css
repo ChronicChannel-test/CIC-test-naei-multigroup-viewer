@@ -1,11 +1,11 @@
 /* Extracted styles from v2.2 index.html */
 
 /* Base styles */
-body { 
-  font-family: system-ui, sans-serif; 
-  margin: 20px 10px 0 10px;
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
   padding-bottom: 0;
-  color: #000; 
+  color: #000;
   background: #fff;
 }
 
@@ -178,11 +178,6 @@ button, .add-btn, .remove-btn, .dragHandle {
   gap: 8px; 
 }
 
-.add-btn, .remove-btn { 
-  display: inline-flex; 
-  align-items: center; 
-  gap: 6px; 
-}
 
 .remove-icon { 
   display: inline-block; 

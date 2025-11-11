@@ -51,7 +51,7 @@
     body {
       background: white !important;
       margin: 0 !important;
-      padding: 20px !important;
+      padding: 0 !important;
     }
     
     /* Remove any gray lines/borders */
@@ -65,83 +65,84 @@
 </head>
 
 <body>
-  <div id="loadingOverlay">
-    <div class="spinner" aria-hidden="true"></div>
-    <div class="loading-text">Loading chart...</div>
-  </div>
-
-  <div id="mainContent" aria-hidden="true">
-    <div id="mainContentTop">
-      <div class="title-row">
-        <h2 class="main-title"><span class="title-part title-part-1">Multi-Group</span> <span class="title-part title-part-2">Pollutant Line Chart</span></h2>
-      </div>
-
-      <script>
-        (function detectOpera() {
-          const isOpera = (!!window.opr && !!window.opr.addons) || !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0;
-          if (isOpera) {
-            document.documentElement.classList.add('opera-browser');
-          }
-        })();
-      </script>
-
-      <div class="button-row">
-        <label for="pollutantSelect">Pollutant:</label>
-        <select id="pollutantSelect" name="pollutantSelect"><option value="">Select pollutant</option></select>
-      </div>
-      <div id="groupContainer"></div>
-  <details id="groupInfoDetails" class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
-  <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
-    📘 See Group Info
-  </summary>
-
-  <div id="group-info" class="mt-3 text-gray-800 leading-relaxed overflow-x-auto" style="cursor: pointer;">
-    <p>Loading group information...</p>
-  </div>
-</details>
-
-  <script>
-    // Add click handler for See Group Info - click anywhere to close and scroll to top
-    document.addEventListener('DOMContentLoaded', function() {
-      const groupInfo = document.getElementById('group-info');
-      const groupInfoDetails = document.getElementById('groupInfoDetails');
-      
-      if (groupInfo && groupInfoDetails) {
-        groupInfo.addEventListener('click', function() {
-          if (groupInfoDetails.hasAttribute('open')) {
-            groupInfoDetails.removeAttribute('open');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }
-        });
-      }
-    });
-  </script>
+  <div class="chart-shell">
+    <div id="loadingOverlay">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="loading-text">Loading chart...</div>
     </div>
 
-    <div id="mainContentBottom">
-      <div class="controls-wrapper">
-        <span class="year-pair">
-          <label for="startYear">Start Year:</label>
-          <select id="startYear" name="startYear"></select>
-        </span>
-        <span class="year-pair">
-          <label for="endYear">End Year:</label>
-          <select id="endYear" name="endYear"></select>
-        </span>
-        <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
-        <button id="downloadBtn" class="control-button">⬇️ Download Chart Image – PNG</button>
-        <button id="downloadCSVBtn">📄 Download Data - CSV</button>
-        <button id="downloadXLSXBtn">📊 Download Data - Excel</button>
-        <button id="shareBtn">🔗 Share Chart</button>
+    <div id="mainContent" aria-hidden="true">
+      <div id="mainContentTop">
+        <div class="title-row">
+          <h2 class="main-title"><span class="title-part title-part-1">Multi-Group</span> <span class="title-part title-part-2">Pollutant Line Chart</span></h2>
+        </div>
+
+        <script>
+          (function detectOpera() {
+            const isOpera = (!!window.opr && !!window.opr.addons) || !!window.opera || navigator.userAgent.indexOf(' OPR/') >= 0;
+            if (isOpera) {
+              document.documentElement.classList.add('opera-browser');
+            }
+          })();
+        </script>
+
+        <div class="button-row">
+          <label for="pollutantSelect">Pollutant:</label>
+          <select id="pollutantSelect" name="pollutantSelect"><option value="">Select pollutant</option></select>
+        </div>
+        <div id="groupContainer"></div>
+        <details id="groupInfoDetails" class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
+          <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
+            📘 See Group Info
+          </summary>
+
+          <div id="group-info" class="mt-3 text-gray-800 leading-relaxed overflow-x-auto" style="cursor: pointer;">
+            <p>Loading group information...</p>
+          </div>
+        </details>
+
+        <script>
+          // Add click handler for See Group Info - click anywhere to close and scroll to top
+          document.addEventListener('DOMContentLoaded', function() {
+            const groupInfo = document.getElementById('group-info');
+            const groupInfoDetails = document.getElementById('groupInfoDetails');
+            
+            if (groupInfo && groupInfoDetails) {
+              groupInfo.addEventListener('click', function() {
+                if (groupInfoDetails.hasAttribute('open')) {
+                  groupInfoDetails.removeAttribute('open');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }
+              });
+            }
+          });
+        </script>
       </div>
 
-      <div class="chart-wrapper">
-        <div id="chartTitle" aria-hidden="false"></div>
-        <div id="customLegend" aria-hidden="true"></div>
-        <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
+      <div id="mainContentBottom">
+        <div class="controls-wrapper">
+          <span class="year-pair">
+            <label for="startYear">Start Year:</label>
+            <select id="startYear" name="startYear"></select>
+          </span>
+          <span class="year-pair">
+            <label for="endYear">End Year:</label>
+            <select id="endYear" name="endYear"></select>
+          </span>
+          <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
+          <button id="downloadBtn" class="control-button">⬇️ Download Chart Image – PNG</button>
+          <button id="downloadCSVBtn">📄 Download Data - CSV</button>
+          <button id="downloadXLSXBtn">📊 Download Data - Excel</button>
+          <button id="shareBtn">🔗 Share Chart</button>
+        </div>
+
+        <div class="chart-wrapper">
+          <div id="chartTitle" aria-hidden="false"></div>
+          <div id="customLegend" aria-hidden="true"></div>
+          <div id="chart_div" role="img" aria-label="Pollutant time series chart"></div>
+        </div>
       </div>
     </div>
-
   </div>
 
   <!-- Shared Resources -->

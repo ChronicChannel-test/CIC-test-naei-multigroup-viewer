@@ -4,11 +4,20 @@
  */
 
 /* Base styles */
-body { 
-  font-family: system-ui, sans-serif; 
-  margin: 20px; 
-  color: #000; 
-  background: #fff; 
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  color: #000;
+  background: #fff;
+}
+
+.chart-shell {
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+#mainContent {
+  box-sizing: border-box;
 }
 
 label { 
@@ -290,6 +299,8 @@ button {
   border: 1px solid #ccc;
   font-family: system-ui, sans-serif;
   color: inherit;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .add-btn:hover, .remove-btn:hover {
