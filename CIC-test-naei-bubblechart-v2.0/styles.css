@@ -497,12 +497,12 @@
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 1px; /* Minimize spacing between legend items */
-  margin-top: 2px; /* Minimize spacing above the legend */
-  margin-bottom: 2px; /* Minimize spacing below the legend */
-  padding: 1px; /* Minimize padding inside the legend */
-  background-color: transparent; /* Remove white background */
-  border: none !important; /* Force removal of red dotted border */
+  gap: 10px;
+  margin-top: 10px;
+  margin-bottom: 2px;
+  padding: 1px;
+  background-color: transparent;
+  border: none !important;
   z-index: 20;
 }
 
@@ -569,6 +569,24 @@ body {
 
 .chart-wrapper {
   background: white;
+}
+
+/* Bubble chart title styling matches line chart defaults */
+#chartTitle {
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+#chartTitle .chart-title__year-range {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+#chartTitle .chart-title__pollutant {
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 /* Comparison statement pill styling */

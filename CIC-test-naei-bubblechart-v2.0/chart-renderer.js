@@ -233,7 +233,7 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   if (chartTitleElement) {
     chartTitleElement.style.display = 'block';
     chartTitleElement.style.textAlign = 'center';
-  chartTitleElement.style.marginBottom = '100px';
+  chartTitleElement.style.marginBottom = '6px';
 
     // Add year as the first line
     const yearElement = document.createElement('div');
@@ -314,7 +314,8 @@ function drawBubbleChart(year, pollutantId, groupIds) {
         count: 4  // 4 minor gridlines between each major gridline
       },
       titleTextStyle: {
-        italic: false
+        italic: false,
+        bold: false
       },
       viewWindow: {
         min: 0,
@@ -329,6 +330,10 @@ function drawBubbleChart(year, pollutantId, groupIds) {
       },
       minorGridlines: {
         count: 4  // 4 minor gridlines between each major gridline
+      },
+      titleTextStyle: {
+        italic: false,
+        bold: false
       },
       viewWindow: {
         min: 0,

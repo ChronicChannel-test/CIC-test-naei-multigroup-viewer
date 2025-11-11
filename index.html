@@ -148,6 +148,16 @@
       object-fit: contain;
     }
 
+    .tab-active {
+      color: #FF9301;
+      border-bottom-color: #FF9301;
+    }
+
+    .tab-active:hover {
+      color: #FF9301;
+      border-bottom-color: #FF9301;
+    }
+
     a[href*="facebook.com"] img {
       width: 36px;
       height: 36px;
@@ -721,7 +731,7 @@
       document.querySelectorAll('[id^="tab-"]').forEach(tab => {
         const tabChart = tab.id.split('-')[1];
         if (tabChart === currentChart) {
-          tab.className = 'py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600';
+          tab.className = 'py-4 px-1 border-b-2 font-medium text-sm transition-colors tab-active';
         } else {
           tab.className = 'py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors';
         }

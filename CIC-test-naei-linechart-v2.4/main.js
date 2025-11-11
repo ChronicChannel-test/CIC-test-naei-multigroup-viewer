@@ -857,7 +857,7 @@ function updateChart(){
     hAxis: {
       title: 'Year',
       textStyle: { color: 'transparent' }, // Hide Google Charts labels
-      titleTextStyle: { fontSize: 13, bold: true },
+      titleTextStyle: { fontSize: 13, bold: false, italic: false },
       gridlines: { color: '#e0e0e0' },
       baselineColor: '#666'
     },
@@ -871,7 +871,8 @@ function updateChart(){
       },
       titleTextStyle: {
         fontSize: window.innerWidth < 768 && window.innerHeight < window.innerWidth ? 14 : 16,
-        bold: true,
+        bold: false,
+        italic: false,
         wrap: false
       },
       textPosition: 'out', // Ensure title is positioned outside to avoid overlap

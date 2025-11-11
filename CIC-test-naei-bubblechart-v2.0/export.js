@@ -355,7 +355,7 @@ async function generateChartImage() {
               ? window.Colors.getColorForGroup(point.groupName)
               : '#000000';
 
-            ctx.font = '400 60px "Tiresias Infofont", sans-serif';
+            ctx.font = '400 70px "Tiresias Infofont", sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
             
