@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>NAEI Viewer Resources</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="dist/tailwind.css">
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #ffffff;
+      color: #111827;
+      margin: 0;
+    }
+
+    .resources-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem 3rem;
+    }
+
+    .resources-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 2.5rem;
+    }
+
+    .resources-header h1 {
+      font-size: clamp(2rem, 4vw, 2.75rem);
+      font-weight: 600;
+      line-height: 1.1;
+      color: #0f172a;
+      margin: 0;
+    }
+
+    .resources-header p {
+      color: #475569;
+      font-size: 1rem;
+      max-width: 48ch;
+      margin: 0;
+    }
+
+    .resources-icon {
+      width: 56px;
+      height: 56px;
+      object-fit: contain;
+    }
+
+    .placeholder-panel {
+      border: 1px dashed #cbd5f5;
+      background: linear-gradient(135deg, rgba(219, 234, 254, 0.45), rgba(219, 234, 254, 0.15));
+      border-radius: 16px;
+      padding: 2.5rem;
+      text-align: center;
+      color: #1d4ed8;
+      font-size: 1rem;
+      font-weight: 500;
+    }
+  </style>
+</head>
+<body>
+  <main class="resources-shell">
+    <header class="resources-header">
+      <img src="SharedResources/images/chain-link-icon-CIC.png" alt="Resources icon" class="resources-icon">
+      <div>
+        <h1>Resources &amp; Links</h1>
+        <p>A curated hub for supplementary documentation, downloads, partner content, and training materials. Coming soon.</p>
+      </div>
+    </header>
+
+    <section class="placeholder-panel" aria-live="polite">
+      Resource directory in progress. Check back shortly.
+    </section>
+  </main>
+
+  <script>
+    (function() {
+      function measureHeight() {
+        const body = document.body;
+        const docEl = document.documentElement;
+        let height = Math.max(
+          body ? body.scrollHeight : 0,
+          body ? body.offsetHeight : 0,
+          docEl ? docEl.scrollHeight : 0,
+          docEl ? docEl.offsetHeight : 0,
+          500
+        );
+        if (!Number.isFinite(height) || height <= 0) {
+          height = 700;
+        }
+        return height;
+      }
+
+      function sendHeightToParent() {
+        try {
+          const height = measureHeight();
+          window.parent.postMessage({
+            type: 'contentHeight',
+            chart: 'resources',
+            height
+          }, '*');
+        } catch (error) {
+          console.warn('Unable to send resources height to parent:', error);
+        }
+      }
+
+      function scheduleHeightUpdate(delay = 40) {
+        setTimeout(() => {
+          requestAnimationFrame(sendHeightToParent);
+        }, delay);
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        scheduleHeightUpdate(30);
+      });
+
+      window.addEventListener('load', () => {
+        scheduleHeightUpdate(60);
+      });
+
+      window.addEventListener('message', event => {
+        if (event?.data?.type === 'requestHeight') {
+          scheduleHeightUpdate(20);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

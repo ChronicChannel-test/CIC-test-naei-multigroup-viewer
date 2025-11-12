@@ -357,11 +357,11 @@
         <div class="border-b border-gray-200">
           <nav class="-mb-px flex flex-wrap items-center gap-6">
             <button id="tab-1" onclick="switchChart('1')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
-              <img src="SharedResources/images/Bubble_Chart_Icon_viewer.png" alt="Bubble chart icon" class="h-8 w-auto">
+              <img src="SharedResources/images/Bubble_Chart_Icon_viewer2.png" alt="Bubble chart icon" class="h-8 w-auto">
               <span>Bubble Chart</span>
             </button>
             <button id="tab-2" onclick="switchChart('2')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
-              <img src="SharedResources/images/Line_Chart_Icon.001.png" alt="Line chart icon" class="h-8 w-auto">
+              <img src="SharedResources/images/Line-Chart-Icon2.png" alt="Line chart icon" class="h-8 w-auto">
               <span>Line Chart</span>
             </button>
             <button id="tab-3" onclick="switchChart('3')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
@@ -369,8 +369,12 @@
               <span>Group Info</span>
             </button>
             <button id="tab-4" onclick="switchChart('4')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
-              <img src="SharedResources/images/instructions-alpha-v3.png" alt="User guide icon" class="h-8 w-auto">
+              <img src="SharedResources/images/instructions-alpha-v4.png" alt="User guide icon" class="h-8 w-auto">
               <span>User Guide</span>
+            </button>
+            <button id="tab-5" onclick="switchChart('5')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+              <img src="SharedResources/images/chain-link-icon-CIC.png" alt="Resources icon" class="h-8 w-auto">
+              <span>Resources</span>
             </button>
           </nav>
         </div>
@@ -419,6 +423,17 @@
         scrolling="no"
         style="width: 100%; height: 900px; border: none; background: white; display: block; overflow: hidden;"
         title="NAEI User Guide"></iframe>
+    </div>
+
+    <!-- Resources Container -->
+  <div id="chart-5" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;">
+      <iframe
+        id="resources-iframe"
+        src="resources.html"
+        frameborder="0"
+        scrolling="no"
+        style="width: 100%; height: 900px; border: none; background: white; display: block; overflow: hidden;"
+        title="NAEI Resources"></iframe>
     </div>
 
     <!-- Footer (inside chart-interface so it fades in with the chart) -->
@@ -472,8 +487,9 @@
     const chartStates = {
       '1': null, // Bubble chart state
       '2': null, // Line chart state
-      '3': [],   // Group info state (static)
-      '4': []    // User guide state (static)
+  '3': [],   // Group info state (static)
+  '4': [],   // User guide state (static)
+  '5': []    // Resources state (static)
     };
     
     // Load shared resources
@@ -501,7 +517,8 @@
       bubble: document.getElementById('bubblechart-iframe'),
       line: document.getElementById('linechart-iframe'),
       'group-info': document.getElementById('groupinfo-iframe'),
-      'user-guide': document.getElementById('userguide-iframe')
+      'user-guide': document.getElementById('userguide-iframe'),
+      resources: document.getElementById('resources-iframe')
     };
 
     if (debugLoggingEnabled) {
@@ -737,6 +754,8 @@
           newParams.set('group_ids', '1');
           newParams.set('start_year', '1970');
           newParams.set('end_year', '2023');
+        } else if (chartId === '3' || chartId === '4' || chartId === '5') {
+          // Static tabs do not require additional parameters beyond chart identifier
         }
 
         const paramsArray = [];
@@ -757,7 +776,7 @@
           chartStates['1'] = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
         } else if (chartId === '2') {
           chartStates['2'] = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
-        } else if (chartId === '3' || chartId === '4') {
+        } else if (chartId === '3' || chartId === '4' || chartId === '5') {
           chartStates[chartId] = [];
         }
       }
@@ -825,6 +844,12 @@
     if (userGuideIframe) {
       userGuideIframe.style.height = '1000px';
       console.log('📏 User guide iframe initial height: 1000px');
+    }
+
+    const resourcesIframe = iframeElements.resources;
+    if (resourcesIframe) {
+      resourcesIframe.style.height = '800px';
+      console.log('📏 Resources iframe initial height: 800px');
     }
     
     // Set up message listener IMMEDIATELY (before DOM is ready)
