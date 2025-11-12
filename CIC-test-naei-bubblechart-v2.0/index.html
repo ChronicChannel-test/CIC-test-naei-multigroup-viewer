@@ -56,6 +56,23 @@
     hr, .border, .border-t, .border-b {
       display: none !important;
     }
+
+    #downloadBtn,
+    #downloadCSVBtn,
+    #downloadXLSXBtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35em;
+      padding-left: 7px !important;
+    }
+
+    #downloadBtn .control-button-icon,
+    #downloadCSVBtn .control-button-icon,
+    #downloadXLSXBtn .control-button-icon {
+      width: 1.2em;
+      height: 1.2em;
+      flex-shrink: 0;
+    }
   </style>
   
   <!-- External libraries -->
@@ -122,9 +139,18 @@
               <option value="">Select year</option>
             </select>
           </span>
-          <button id="downloadBtn" disabled>⬇️ Download Chart Image – PNG</button>
-          <button id="downloadCSVBtn" disabled>📄 Download Data – CSV</button>
-          <button id="downloadXLSXBtn" disabled>📊 Download Data – Excel</button>
+          <button id="downloadBtn" disabled>
+            <img src="../SharedResources/images/download-icon1-alpha.svg" alt="" aria-hidden="true" class="control-button-icon">
+            <span>Download Chart Image – PNG</span>
+          </button>
+          <button id="downloadCSVBtn" disabled>
+            <img src="../SharedResources/images/csv_icon_mjh_12-11v3-alpha.png" alt="" aria-hidden="true" class="control-button-icon">
+            <span>Download Data – CSV</span>
+          </button>
+          <button id="downloadXLSXBtn" disabled>
+            <img src="../SharedResources/images/Microsoft_Office_Excel_2019–2025.svg" alt="" aria-hidden="true" class="control-button-icon">
+            <span>Download Data – Excel</span>
+          </button>
           <button id="shareBtn" disabled>🔗 Share Chart</button>
         </div>
 

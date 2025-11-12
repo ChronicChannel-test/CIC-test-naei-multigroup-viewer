@@ -264,8 +264,8 @@ button {
 @media (min-width: 1100px) {
   .controls-wrapper.controls-grid {
     display: flex;
-    flex-wrap: nowrap;
-    gap: 4px;
+    flex-wrap: wrap;
+    gap: 8px;
     justify-content: flex-start;
     align-items: center;
     overflow-x: auto;

@@ -113,9 +113,9 @@ select,
   gap: 6px; 
 }
 
-.controls-wrapper button { 
-  margin-left: 0; 
-  margin-right: 0; 
+.controls-wrapper button {
+  margin-left: 0;
+  margin-right: 0;
 }
 
 .year-pair { 
