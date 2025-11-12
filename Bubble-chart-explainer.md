@@ -2,7 +2,7 @@ How to Read This Bubble Chart
 
 The chart uses data published by the National Atmospheric Emissions Inventory (NAEI), combining one or more sources and fuel types into groups to make it easier to compare how much pollution is released nationally from different sources, relative to how much heat/energy they produce . 
 
-Each bubble represents a pollution source. All bubbles are for the same type of pollutant. 
+All bubbles are for the same pollutant. Each bubble represents a pollution source. All bubbles are for the same pollutant. 
 
 The horizontal position (left to right) shows how much energy it produced in 2023 (measured in terajoules, or TJ).
 
