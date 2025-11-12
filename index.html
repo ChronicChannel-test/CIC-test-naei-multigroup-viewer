@@ -384,24 +384,24 @@
     <div class="bg-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="border-b border-gray-200">
-          <nav class="-mb-px flex flex-wrap items-center gap-6">
-            <button id="tab-1" data-chart="1" onclick="switchChart('1')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+          <nav class="-mb-px flex flex-wrap items-center gap-6" role="tablist" aria-label="Chart views">
+            <button type="button" id="tab-1" data-chart="1" onclick="switchChart('1')" role="tab" aria-controls="chart-1" aria-selected="true" tabindex="0" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Bubble_Chart_Icon_viewer2.png" alt="Bubble chart icon" class="w-auto" style="height: 37px;">
               <span>Bubble Chart</span>
             </button>
-            <button id="tab-2" data-chart="2" onclick="switchChart('2')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+            <button type="button" id="tab-2" data-chart="2" onclick="switchChart('2')" role="tab" aria-controls="chart-2" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Line-Chart-Icon5.png" alt="Line chart icon" class="w-auto" style="height: 37px;">
               <span>Line Chart</span>
             </button>
-            <button id="tab-group-info" data-chart="group-info" onclick="switchChart('group-info')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+            <button type="button" id="tab-group-info" data-chart="group-info" onclick="switchChart('group-info')" role="tab" aria-controls="chart-group-info" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Group Info - Icon.png" alt="Group info icon" class="h-8 w-auto">
               <span>Group Info</span>
             </button>
-            <button id="tab-user-guide" data-chart="user-guide" onclick="switchChart('user-guide')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+            <button type="button" id="tab-user-guide" data-chart="user-guide" onclick="switchChart('user-guide')" role="tab" aria-controls="chart-user-guide" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/instructions-alpha-v4.png" alt="User guide icon" class="w-auto" style="height: 37px;">
               <span>User Guide</span>
             </button>
-            <button id="tab-resources" data-chart="resources" onclick="switchChart('resources')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+            <button type="button" id="tab-resources" data-chart="resources" onclick="switchChart('resources')" role="tab" aria-controls="chart-resources" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/chain-link-icon-CIC.png" alt="Resources icon" class="h-8 w-auto">
               <span>Resources</span>
             </button>
@@ -411,7 +411,7 @@
     </div>
 
     <!-- Bubble Chart Container -->
-  <div id="chart-1" class="chart-container">
+  <div id="chart-1" class="chart-container" role="tabpanel" aria-labelledby="tab-1" aria-hidden="false">
       <iframe
         id="bubblechart-iframe"
         src="CIC-test-naei-bubblechart-v2.0/index.html"
@@ -422,7 +422,7 @@
     </div>
 
     <!-- Line Chart Container -->
-  <div id="chart-2" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;">
+  <div id="chart-2" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-2" aria-hidden="true">
       <iframe
         id="linechart-iframe"
         src="CIC-test-naei-linechart-v2.4/index.html"
@@ -433,7 +433,7 @@
     </div>
 
     <!-- Group Info Container -->
-  <div id="chart-group-info" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;">
+  <div id="chart-group-info" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-group-info" aria-hidden="true">
       <iframe
         id="groupinfo-iframe"
         src="group-info.html"
@@ -444,7 +444,7 @@
     </div>
 
     <!-- User Guide Container -->
-  <div id="chart-user-guide" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;">
+  <div id="chart-user-guide" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-user-guide" aria-hidden="true">
       <iframe
         id="userguide-iframe"
         src="user-guide.html"
@@ -455,7 +455,7 @@
     </div>
 
     <!-- Resources Container -->
-  <div id="chart-resources" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;">
+  <div id="chart-resources" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-resources" aria-hidden="true">
       <iframe
         id="resources-iframe"
         src="resources.html"
@@ -513,6 +513,14 @@
     }
     
     const STATIC_CHART_IDS = new Set(['group-info', 'user-guide', 'resources']);
+    const CHART_SEQUENCE = ['1', '2', 'group-info', 'user-guide', 'resources'];
+    const TAB_ID_MAP = {
+      '1': 'tab-1',
+      '2': 'tab-2',
+      'group-info': 'tab-group-info',
+      'user-guide': 'tab-user-guide',
+      'resources': 'tab-resources'
+    };
 
     // Store last known state for each chart (populated by messages from iframes)
     const chartStates = {
@@ -883,8 +891,29 @@
         if (!tabChart) {
           return;
         }
-        tab.className = tabChart === currentChart ? activeClasses : inactiveClasses;
+        const isActive = tabChart === currentChart;
+        tab.className = isActive ? activeClasses : inactiveClasses;
+        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        tab.tabIndex = isActive ? 0 : -1;
       });
+    }
+
+    function focusTab(chartId) {
+      const normalizedId = normalizeChartId(chartId) || '1';
+      const tabId = TAB_ID_MAP[normalizedId];
+      if (!tabId) {
+        return;
+      }
+      const tabElement = document.getElementById(tabId);
+      if (!tabElement) {
+        return;
+      }
+
+      try {
+        tabElement.focus({ preventScroll: true });
+      } catch (error) {
+        tabElement.focus();
+      }
     }
 
     function showChart(chartId) {
@@ -893,14 +922,69 @@
         container.style.visibility = 'hidden';
         container.style.height = '0';
         container.style.overflow = 'hidden';
+        container.setAttribute('aria-hidden', 'true');
       });
       
       const normalizedId = normalizeChartId(chartId) || '1';
       const chartContainer = document.getElementById(`chart-${normalizedId}`);
+      if (!chartContainer) {
+        debugWarn('Unable to locate chart container for', normalizedId);
+        return;
+      }
       chartContainer.style.visibility = 'visible';
       chartContainer.style.height = 'auto';
       chartContainer.style.overflow = 'visible';
+      chartContainer.setAttribute('aria-hidden', 'false');
 
+    }
+
+    function handleTabKeyboardNavigation(event) {
+      if (event.defaultPrevented) {
+        return;
+      }
+
+      if (event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+
+      if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+        return;
+      }
+
+      const activeElement = document.activeElement;
+      if (activeElement && (activeElement.isContentEditable || ['input', 'textarea', 'select'].includes(activeElement.tagName.toLowerCase()))) {
+        return;
+      }
+
+      if (!currentChart) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const normalizedCurrent = normalizeChartId(currentChart) || '1';
+      const currentIndex = CHART_SEQUENCE.indexOf(normalizedCurrent);
+      if (currentIndex === -1) {
+        return;
+      }
+
+      const delta = event.key === 'ArrowRight' ? 1 : -1;
+      const nextIndex = (currentIndex + delta + CHART_SEQUENCE.length) % CHART_SEQUENCE.length;
+      const nextChartId = CHART_SEQUENCE[nextIndex];
+
+      if (nextChartId === normalizedCurrent) {
+        return;
+      }
+
+      const preservedScrollX = window.scrollX;
+      const preservedScrollY = window.scrollY;
+
+      switchChart(nextChartId);
+
+      requestAnimationFrame(() => {
+        window.scrollTo({ top: preservedScrollY, left: preservedScrollX });
+        focusTab(nextChartId);
+      });
     }
 
 
@@ -1109,6 +1193,8 @@
       chartParam = normalizeChartId(chartParam) || '1';
       console.log('Initial chart selection:', chartParam);
       switchChart(chartParam);
+
+      document.addEventListener('keydown', handleTabKeyboardNavigation);
       
     // Comprehensive iframe debugging
     const lineIframe = iframeElements.line;
