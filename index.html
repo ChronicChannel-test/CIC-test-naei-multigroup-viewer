@@ -512,10 +512,12 @@
       }
     }
     
+    const STATIC_CHART_IDS = new Set(['group-info', 'user-guide', 'resources']);
+
     // Store last known state for each chart (populated by messages from iframes)
     const chartStates = {
-      '1': null,          // Bubble chart state
-      '2': null,          // Line chart state
+      '1': [],            // Bubble chart state
+      '2': [],            // Line chart state
       'group-info': [],   // Group info view (static)
       'user-guide': [],   // User guide view (static)
       'resources': []     // Resources view (static)
@@ -570,9 +572,49 @@
       return Object.values(chartReadyState).every(Boolean);
     }
 
+    function resolveChartFromPath() {
+      try {
+        const segments = (window.location.pathname || '').split('/').filter(Boolean);
+        if (segments.length === 0) {
+          return null;
+        }
+        const lastSegment = segments[segments.length - 1].toLowerCase();
+        return STATIC_CHART_IDS.has(lastSegment) ? lastSegment : null;
+      } catch (error) {
+        debugWarn('Unable to resolve chart from path:', error);
+        return null;
+      }
+    }
+
+    function getBasePath() {
+      const pathname = window.location.pathname || '/';
+      const segments = pathname.split('/').filter(Boolean);
+
+      if (segments.length === 0) {
+        return '/';
+      }
+
+      const lastSegment = segments[segments.length - 1].toLowerCase();
+      const hasFileExtension = /\.[^/.]+$/.test(lastSegment);
+
+      if (STATIC_CHART_IDS.has(lastSegment) || hasFileExtension) {
+        segments.pop();
+      }
+
+      if (segments.length === 0) {
+        return '/';
+      }
+
+      return '/' + segments.join('/') + '/';
+    }
+
     function getChartParam() {
+      const pathChart = resolveChartFromPath();
+      if (pathChart) {
+        return pathChart;
+      }
       const params = new URLSearchParams(window.location.search);
-      return params.get('chart');
+      return normalizeChartId(params.get('chart'));
     }
 
     function hasRequiredParams() {
@@ -598,33 +640,22 @@
     }
 
     function getDefaultUrl(chartId) {
-      // Handle both local and GitHub Pages URLs
-      let baseUrl = window.location.pathname;
-      if (!baseUrl.endsWith('/')) {
-        baseUrl += '/';
-      }
-      
-      // For GitHub Pages, we need the repo name, but for local dev the server
-      // is already serving from inside the repo directory
-      const isGitHubPages = window.location.hostname.includes('github.io');
-      if (isGitHubPages && !baseUrl.includes('CIC-test-naei-multigroup-viewer')) {
-        baseUrl = '/CIC-test-naei-multigroup-viewer/';
-      }
-      
-      const normalizedId = normalizeChartId(chartId);
-      const effectiveId = normalizedId || '1';
+      const basePath = getBasePath();
+      const queryBase = basePath;
 
-      if (effectiveId === '1') {
-        // Bubble chart defaults: PM2.5 (id=5), Ecodesign+Gas groups (ids 20,37), most recent year (2023)
-        return `${baseUrl}?chart=1&pollutant_id=5&group_ids=20,37&year=2023`;
-      } else if (effectiveId === '2') {
-        // Line chart defaults: PM2.5 (id=5), All group (id=1), 1970-2023
-        return `${baseUrl}?chart=2&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
-      } else if (effectiveId === 'group-info' || effectiveId === 'user-guide' || effectiveId === 'resources') {
-        return `${baseUrl}?chart=${effectiveId}`;
+      const normalizedId = normalizeChartId(chartId) || '1';
+
+      if (normalizedId === '1') {
+        return `${queryBase}?chart=1&pollutant_id=5&group_ids=20,37&year=2023`;
       }
-      
-      return `${baseUrl}?chart=${effectiveId}`;
+      if (normalizedId === '2') {
+        return `${queryBase}?chart=2&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+      }
+      if (STATIC_CHART_IDS.has(normalizedId)) {
+        return `${basePath}${normalizedId}`;
+      }
+
+      return queryBase;
     }
 
     function selectChart(chartId) {
@@ -633,11 +664,11 @@
       if (loadingEl) {
         loadingEl.classList.remove('hidden');
       }
-      
+
       // Set default URL and load chart interface
       const defaultUrl = getDefaultUrl(chartId);
       window.history.replaceState({}, '', defaultUrl);
-      
+
       setTimeout(async () => {
         await loadChartInterface(chartId);
       }, 500);
@@ -674,8 +705,9 @@
         }
 
         document.getElementById('chart-interface').classList.remove('hidden');
+        currentChart = normalizeChartId(chartId) || '1';
         updateTabStates();
-        showChart(chartId);
+        showChart(currentChart);
       }
     }
 
@@ -683,7 +715,7 @@
       console.log('Starting fade to complete interface');
       
       // Set the active chart
-      currentChart = chartId;
+      currentChart = normalizeChartId(chartId) || '1';
       
       // Ensure chart containers are ready
       const chartContainers = Array.from(document.querySelectorAll('.chart-container'));
@@ -711,7 +743,7 @@
       requestAnimationFrame(() => {
         document.getElementById('chart-interface').classList.remove('hidden');
         updateTabStates();
-        showChart(chartId);
+        showChart(currentChart);
         
         // Mark charts as ready
         chartContainers.forEach(container => container.classList.add('ready'));
@@ -777,12 +809,14 @@
       }
 
       const storedState = chartStates[chartId];
+      const basePath = getBasePath();
+      const queryBase = basePath;
 
       if (storedState && storedState.length > 0) {
         console.log('Using stored state for chart', chartId, storedState);
         const paramsArray = ['chart=' + chartId, ...storedState];
         const newQuery = paramsArray.join('&');
-        const newUrl = window.location.pathname + '?' + newQuery;
+        const newUrl = `${queryBase}?${newQuery}`;
         const historyMethod = currentChart ? 'pushState' : 'replaceState';
 
         if (window.location.search.substring(1) !== newQuery || normalizeChartId(urlParams.get('chart')) !== chartId) {
@@ -791,40 +825,44 @@
       } else {
         console.log('No stored state for chart', chartId, '- using defaults');
 
-        const newParams = new URLSearchParams();
-        newParams.set('chart', chartId);
-
-        if (chartId === '1') {
-          newParams.set('pollutant_id', '5');
-          newParams.set('group_ids', '20,37');
-          newParams.set('year', '2023');
-        } else if (chartId === '2') {
-          newParams.set('pollutant_id', '5');
-          newParams.set('group_ids', '1');
-          newParams.set('start_year', '1970');
-          newParams.set('end_year', '2023');
-        }
-
-        const paramsArray = [];
-        for (const [key, value] of newParams) {
-          if (key === 'group_ids' || key === 'start_year' || key === 'end_year' || key === 'year') {
-            paramsArray.push(`${key}=${value}`);
-          } else {
-            paramsArray.push(`${key}=${encodeURIComponent(value)}`);
-          }
-        }
-
-        const newQuery = paramsArray.join('&');
-        const newUrl = window.location.pathname + '?' + newQuery;
         const historyMethod = currentChart ? 'pushState' : 'replaceState';
-        window.history[historyMethod]({}, '', newUrl);
+        let newUrl = null;
 
-        if (chartId === '1') {
-          chartStates['1'] = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
-        } else if (chartId === '2') {
-          chartStates['2'] = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
-        } else if (chartId === 'group-info' || chartId === 'user-guide' || chartId === 'resources') {
+        if (chartId === '1' || chartId === '2') {
+          const newParams = new URLSearchParams();
+          newParams.set('chart', chartId);
+
+          if (chartId === '1') {
+            newParams.set('pollutant_id', '5');
+            newParams.set('group_ids', '20,37');
+            newParams.set('year', '2023');
+            chartStates['1'] = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
+          } else if (chartId === '2') {
+            newParams.set('pollutant_id', '5');
+            newParams.set('group_ids', '1');
+            newParams.set('start_year', '1970');
+            newParams.set('end_year', '2023');
+            chartStates['2'] = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
+          }
+
+          const paramsArray = [];
+          for (const [key, value] of newParams) {
+            if (key === 'group_ids' || key === 'start_year' || key === 'end_year' || key === 'year') {
+              paramsArray.push(`${key}=${value}`);
+            } else {
+              paramsArray.push(`${key}=${encodeURIComponent(value)}`);
+            }
+          }
+
+          const newQuery = paramsArray.join('&');
+          newUrl = `${queryBase}?${newQuery}`;
+        } else if (STATIC_CHART_IDS.has(chartId)) {
+          newUrl = `${basePath}${chartId}`;
           chartStates[chartId] = [];
+        }
+
+        if (newUrl) {
+          window.history[historyMethod]({}, '', newUrl);
         }
       }
 
@@ -836,7 +874,7 @@
 
     function updateTabStates() {
       // Update tab appearance
-  const baseClasses = 'py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2';
+      const baseClasses = 'py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2';
       const activeClasses = `${baseClasses} tab-active`;
       const inactiveClasses = `${baseClasses} border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300`;
 
@@ -857,8 +895,8 @@
         container.style.overflow = 'hidden';
       });
       
-  const normalizedId = normalizeChartId(chartId) || '1';
-  const chartContainer = document.getElementById(`chart-${normalizedId}`);
+      const normalizedId = normalizeChartId(chartId) || '1';
+      const chartContainer = document.getElementById(`chart-${normalizedId}`);
       chartContainer.style.visibility = 'visible';
       chartContainer.style.height = 'auto';
       chartContainer.style.overflow = 'visible';
@@ -985,16 +1023,37 @@
       
       // URL update messages from iframe
       if (event.data && event.data.type === 'updateURL') {
-        const urlParams = new URLSearchParams(window.location.search);
-        const chartKey = normalizeChartId(urlParams.get('chart')) || '1';
-        
-        // Store the state for this chart
-        chartStates[chartKey] = event.data.params;
-        
-        // Combine chart parameter with params from iframe
-        const newParams = ['chart=' + chartKey, ...event.data.params];
-        const newUrl = `${window.location.pathname}?${newParams.join('&')}`;
-        
+        const iframeEntry = Object.entries(iframeElements).find(([, iframe]) => iframe && iframe.contentWindow === event.source);
+        let chartKey = null;
+
+        if (iframeEntry) {
+          const sourceKey = iframeEntry[0];
+          if (sourceKey === 'bubble') {
+            chartKey = '1';
+          } else if (sourceKey === 'line') {
+            chartKey = '2';
+          } else {
+            chartKey = normalizeChartId(sourceKey) || null;
+          }
+        }
+
+        if (!chartKey) {
+          const fallbackParam = normalizeChartId(new URLSearchParams(window.location.search).get('chart'));
+          chartKey = fallbackParam || currentChart || '1';
+        }
+
+        const paramsArray = Array.isArray(event.data.params) ? event.data.params : [];
+        chartStates[chartKey] = paramsArray;
+
+        if (currentChart !== chartKey) {
+          console.log(`ℹ️ Stored state for inactive chart ${chartKey}; URL unchanged`);
+          return;
+        }
+
+        const basePath = getBasePath();
+        const newParams = ['chart=' + chartKey, ...paramsArray];
+        const newUrl = `${basePath}?${newParams.join('&')}`;
+
         window.history.replaceState({ path: newUrl }, '', newUrl);
         console.log('🔗 URL updated:', newUrl);
       }
@@ -1043,14 +1102,11 @@
     // Initialize when DOM ready
     window.addEventListener('DOMContentLoaded', function() {
       console.log('Main page DOM loaded');
+      const pathChart = resolveChartFromPath();
       const urlParams = new URLSearchParams(window.location.search);
-      let chartParam = urlParams.get('chart');
-      
-      // If no chart param, default to chart 1
-      if (!chartParam) {
-        chartParam = '1';
-      }
-      
+      let chartParam = pathChart || urlParams.get('chart') || '1';
+
+      chartParam = normalizeChartId(chartParam) || '1';
       console.log('Initial chart selection:', chartParam);
       switchChart(chartParam);
       
