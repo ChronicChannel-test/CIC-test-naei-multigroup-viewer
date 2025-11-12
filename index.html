@@ -159,6 +159,35 @@
       border-bottom-color: #FF9301;
     }
 
+    /* Brand link styling */
+    :root {
+      --brand-link-color: #FF9301;
+      --brand-link-hover: #cc7500;
+    }
+
+    a[href]:not(.kofi-button),
+    a[href]:not(.kofi-button):visited {
+      color: var(--brand-link-color);
+      transition: color 0.2s ease-in-out;
+    }
+
+    a[href]:not(.kofi-button):hover,
+    a[href]:not(.kofi-button):focus-visible,
+    a[href]:not(.kofi-button):active {
+      color: var(--brand-link-hover);
+    }
+
+    .kofi-button,
+    .kofi-button:visited,
+    .kofi-button:hover,
+    .kofi-button:focus-visible {
+      color: #ffffff;
+    }
+
+    .kofi-button .kofi-text {
+      color: inherit;
+    }
+
     a[href*="facebook.com"] img {
       width: 36px;
       height: 36px;
@@ -361,7 +390,7 @@
               <span>Bubble Chart</span>
             </button>
             <button id="tab-2" onclick="switchChart('2')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
-              <img src="SharedResources/images/Line-Chart-Icon2.png" alt="Line chart icon" class="w-auto" style="height: 37px;">
+              <img src="SharedResources/images/Line-Chart-Icon5.png" alt="Line chart icon" class="w-auto" style="height: 37px;">
               <span>Line Chart</span>
             </button>
             <button id="tab-3" onclick="switchChart('3')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">

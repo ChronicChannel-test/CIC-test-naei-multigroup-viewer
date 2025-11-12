@@ -58,6 +58,23 @@
     hr, .border, .border-t, .border-b {
       display: none !important;
     }
+
+    #downloadBtn,
+    #downloadCSVBtn,
+    #downloadXLSXBtn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35em;
+      padding-left: 7px !important;
+    }
+
+    #downloadBtn .control-button-icon,
+    #downloadCSVBtn .control-button-icon,
+    #downloadXLSXBtn .control-button-icon {
+      width: 1.2em;
+      height: 1.2em;
+      flex-shrink: 0;
+    }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://www.gstatic.com/charts/loader.js"></script>
@@ -130,9 +147,18 @@
             <select id="endYear" name="endYear"></select>
           </span>
           <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
-          <button id="downloadBtn" class="control-button">⬇️ Download Chart Image – PNG</button>
-          <button id="downloadCSVBtn">📄 Download Data - CSV</button>
-          <button id="downloadXLSXBtn">📊 Download Data - Excel</button>
+          <button id="downloadBtn" class="control-button">
+            <img src="../SharedResources/images/download-icon1-alpha.svg" alt="" aria-hidden="true" class="control-button-icon">
+            <span>Download Chart Image – PNG</span>
+          </button>
+          <button id="downloadCSVBtn">
+            <img src="../SharedResources/images/csv_icon_mjh_12-11v3-alpha.png" alt="" aria-hidden="true" class="control-button-icon">
+            <span>Download Data - CSV</span>
+          </button>
+          <button id="downloadXLSXBtn">
+            <img src="../SharedResources/images/Microsoft_Office_Excel_2019–2025.svg" alt="" aria-hidden="true" class="control-button-icon">
+            <span>Download Data - Excel</span>
+          </button>
           <button id="shareBtn">🔗 Share Chart</button>
         </div>
 
