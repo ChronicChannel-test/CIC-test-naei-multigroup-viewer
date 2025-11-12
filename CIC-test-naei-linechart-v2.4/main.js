@@ -468,6 +468,19 @@ function refreshButtons() {
     addBtn.innerHTML = '<span class="add-icon">+</span> Add Group';
     addBtn.disabled = false;
   }
+
+  // Notify parent about layout changes when control stack grows/shrinks
+  if (window.parent && window.parent !== window) {
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        try {
+          sendContentHeightToParent();
+        } catch (err) {
+          console.warn('Failed to send height after refreshButtons:', err);
+        }
+      }, 0);
+    });
+  }
 }
 
 function calculateYearTicks(years, chartWidth) {
