@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>NAEI Group Information</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="dist/tailwind.css">
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #ffffff;
+      color: #1f2937;
+      margin: 0;
+      padding: 0;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      font-size: 0.93rem;
+      color: #111827;
+    }
+
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 10px 12px;
+      vertical-align: top;
+      white-space: pre-line;
+    }
+
+    th {
+      background: #f3f4f6;
+      font-weight: 600;
+    }
+
+    tbody tr:hover {
+      background: #f9fafb;
+    }
+
+    .status-text {
+      font-size: 0.75rem;
+      color: #6b7280;
+      min-height: 1.25rem;
+    }
+
+    .copy-hint {
+      font-size: 0.75rem;
+      color: #4b5563;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="SharedResources/supabase-config.js"></script>
+  <script src="SharedResources/shared-data-loader.js"></script>
+</head>
+<body>
+  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <header class="flex items-start sm:items-center gap-4 mb-6">
+      <img src="SharedResources/images/Group Info - Icon.png" alt="Group information icon" class="h-12 w-12 object-contain">
+      <div>
+        <h1 class="text-3xl font-semibold text-gray-900">Group Information</h1>
+        <p class="text-sm text-gray-600">
+          Explore how each NAEI group is assembled, including source categories, fuel types, and NFR code coverage. Click any row to copy its details.
+        </p>
+      </div>
+    </header>
+
+    <p class="copy-hint mb-2">💡 Tip: Click a table row to copy a formatted summary to your clipboard.</p>
+    <p id="group-info-status" class="status-text mb-4"></p>
+
+    <div class="rounded-xl border border-gray-200 shadow-sm overflow-hidden bg-white">
+      <div id="group-info-content" class="p-4 text-sm text-gray-800">
+        Loading group information…
+      </div>
+    </div>
+  </main>
+
+  <script>
+    (function() {
+      const statusEl = document.getElementById('group-info-status');
+      const contentEl = document.getElementById('group-info-content');
+      let statusTimer = null;
+
+      function setStatus(message, persist = false) {
+        if (!statusEl) return;
+        statusEl.textContent = message || '';
+        if (!persist) {
+          clearTimeout(statusTimer);
+          statusTimer = setTimeout(() => {
+            statusEl.textContent = '';
+          }, 4000);
+        }
+      }
+
+      function measureHeight() {
+        const body = document.body;
+        const docEl = document.documentElement;
+        let height = Math.max(
+          body ? body.scrollHeight : 0,
+          body ? body.offsetHeight : 0,
+          docEl ? docEl.scrollHeight : 0,
+          docEl ? docEl.offsetHeight : 0,
+          600
+        );
+        if (!Number.isFinite(height) || height <= 0) {
+          height = 800;
+        }
+        return height;
+      }
+
+      function sendHeightToParent() {
+        try {
+          const height = measureHeight();
+          window.parent.postMessage({
+            type: 'contentHeight',
+            chart: 'group-info',
+            height
+          }, '*');
+        } catch (error) {
+          console.warn('Unable to send group info height to parent:', error);
+        }
+      }
+
+      function scheduleHeightUpdate(delay = 50) {
+        setTimeout(() => {
+          requestAnimationFrame(sendHeightToParent);
+        }, delay);
+      }
+
+      async function ensureSharedDataLoaded() {
+        try {
+          if (window.SharedDataLoader && !window.SharedDataLoader.isDataLoaded()) {
+            await window.SharedDataLoader.loadSharedData();
+          }
+        } catch (error) {
+          console.warn('Shared data loader unavailable when preparing group info page:', error);
+        }
+      }
+
+      function buildGroupMaps(groupRows, nfrRows) {
+        const nfrMap = {};
+        if (Array.isArray(nfrRows)) {
+          nfrRows.forEach(row => {
+            const code = row?.nfr_code || row?.code;
+            const description = row?.description;
+            if (code && description && description !== 'NULL') {
+              nfrMap[code] = description;
+            }
+          });
+        }
+
+        const groupMap = {};
+        groupRows.forEach(row => {
+          const groupTitle = row?.group_title || row?.group_name || row?.name;
+          if (!groupTitle) return;
+
+          if (!groupMap[groupTitle]) {
+            groupMap[groupTitle] = {
+              name: groupTitle,
+              sources: new Set(),
+              activities: new Set(),
+              nfrCodes: new Set()
+            };
+          }
+
+          const sourceName = row?.source_name || row?.source || row?.Source;
+          const activityName = row?.activity_name || row?.activity || row?.Activity;
+          const nfrField = row?.nfr_code || row?.nfr_codes || '';
+
+          if (sourceName && sourceName !== 'NULL') {
+            groupMap[groupTitle].sources.add(sourceName);
+          }
+
+          if (activityName && activityName !== 'NULL') {
+            groupMap[groupTitle].activities.add(activityName);
+          }
+
+          if (typeof nfrField === 'string' && nfrField.trim()) {
+            nfrField
+              .split(/[;,]/)
+              .map(code => code.trim())
+              .filter(Boolean)
+              .forEach(code => groupMap[groupTitle].nfrCodes.add(code));
+          }
+        });
+
+        const groups = Object.values(groupMap)
+          .map(g => ({
+            name: g.name,
+            sources: Array.from(g.sources).filter(Boolean).sort(),
+            activities: Array.from(g.activities).filter(Boolean).sort(),
+            nfrCodes: Array.from(g.nfrCodes).filter(Boolean).sort()
+          }))
+          .sort((a, b) => {
+            if (a.name?.toLowerCase() === 'all') return -1;
+            if (b.name?.toLowerCase() === 'all') return 1;
+            return a.name.localeCompare(b.name);
+          });
+
+        return { groups, nfrMap };
+      }
+
+      function attachCopyHandlers(tableEl, usedSupabase) {
+        if (!tableEl) return;
+
+        tableEl.addEventListener('click', event => {
+          const row = event.target.closest('tbody tr');
+          if (!row) return;
+
+          const textToCopy = Array.from(row.cells)
+            .map(cell => cell.innerText.trim())
+            .filter(Boolean)
+            .join('\n\n');
+
+          if (!textToCopy) return;
+
+          const successMessage = 'Copied group details to clipboard.';
+
+          const onSuccess = () => {
+            setStatus(successMessage, false);
+            scheduleHeightUpdate(20);
+          };
+
+          const fallbackCopy = () => {
+            const textarea = document.createElement('textarea');
+            textarea.value = textToCopy;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'absolute';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            const selection = document.getSelection();
+            const priorRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+            textarea.select();
+            try {
+              const ok = document.execCommand('copy');
+              if (ok) {
+                onSuccess();
+              } else {
+                console.warn('document.execCommand copy returned false');
+              }
+            } catch (error) {
+              console.warn('Fallback copy failed:', error);
+            }
+            document.body.removeChild(textarea);
+            if (priorRange && selection) {
+              selection.removeAllRanges();
+              selection.addRange(priorRange);
+            }
+          };
+
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            navigator.clipboard.writeText(textToCopy)
+              .then(onSuccess)
+              .catch(error => {
+                console.warn('navigator.clipboard.writeText failed:', error);
+                fallbackCopy();
+              });
+          } else {
+            fallbackCopy();
+          }
+
+          clearTimeout(statusTimer);
+          statusTimer = setTimeout(() => {
+            setStatus(usedSupabase ? 'Live data loaded from Supabase.' : 'Showing cached group information.', true);
+          }, 3200);
+        });
+      }
+
+      async function loadGroupInfo() {
+        setStatus('Loading group information…', true);
+        contentEl.textContent = 'Loading group information…';
+
+        await ensureSharedDataLoaded();
+
+        let groupRows = [];
+        let nfrRows = [];
+        let usedSupabase = false;
+
+        try {
+          if (window.SharedDataLoader && window.SharedDataLoader.isDataLoaded()) {
+            const cached = window.SharedDataLoader.getCachedData();
+            if (cached && Array.isArray(cached.groups) && cached.groups.length) {
+              groupRows = cached.groups.slice();
+            }
+          }
+        } catch (error) {
+          console.warn('Unable to access cached group information:', error);
+        }
+
+        try {
+          const client = window.SupabaseConfig ? window.SupabaseConfig.initSupabaseClient() : null;
+          if (client) {
+            const [groupResp, nfrResp] = await Promise.all([
+              client.from('NAEI_global_t_Group').select('id,group_title,source_name,activity_name,nfr_code'),
+              client.from('NAEI_global_t_NFRCode').select('nfr_code,description')
+            ]);
+
+            if (!groupResp?.error && Array.isArray(groupResp?.data) && groupResp.data.length) {
+              groupRows = groupResp.data;
+              usedSupabase = true;
+            } else if (groupResp?.error) {
+              console.warn('Supabase group info query failed:', groupResp.error);
+            }
+
+            if (!nfrResp?.error && Array.isArray(nfrResp?.data) && nfrResp.data.length) {
+              nfrRows = nfrResp.data;
+              usedSupabase = true;
+            } else if (nfrResp?.error) {
+              console.warn('Supabase NFR code query failed:', nfrResp.error);
+            }
+          } else {
+            console.warn('Supabase client unavailable when loading group info. Relying on cached data.');
+          }
+        } catch (error) {
+          console.warn('Error loading group information from Supabase:', error);
+        }
+
+        if (!groupRows.length) {
+          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Unable to load group information right now. Please try again later.</p>";
+          setStatus('', true);
+          scheduleHeightUpdate();
+          return;
+        }
+
+        const { groups, nfrMap } = buildGroupMaps(groupRows, nfrRows);
+
+        if (!groups.length) {
+          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ No group information is available.</p>";
+          setStatus('', true);
+          scheduleHeightUpdate();
+          return;
+        }
+
+        let tableHtml = `
+          <table aria-label="NAEI group information">
+            <thead>
+              <tr>
+                <th style="width:24%;">Group Name</th>
+                <th style="width:42%;">Sources / NFR Codes</th>
+                <th style="width:34%;">Fuel Types (Activity)</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        groups.forEach(group => {
+          const validSources = group.sources.length ? group.sources : [];
+          const validActivities = group.activities.length ? group.activities : [];
+          const validCodes = group.nfrCodes.length ? group.nfrCodes : [];
+
+          let sourcesContent = '';
+          if (validCodes.length) {
+            sourcesContent += '<span style="display:block;font-weight:600;margin-bottom:4px;">NFR code coverage:</span>';
+            sourcesContent += '<div style="white-space:pre-line;">';
+            validCodes.forEach(code => {
+              const description = nfrMap[code];
+              sourcesContent += description ? `${code}: ${description}\n` : `${code}\n`;
+            });
+            sourcesContent += '</div>';
+          }
+
+          if (!sourcesContent) {
+            sourcesContent = validSources.length ? validSources.join('\n') : 'All Sources';
+          }
+
+          const activitiesContent = validActivities.length ? validActivities.join('\n') : 'All Fuel Types';
+
+          tableHtml += `
+            <tr style="cursor: pointer;">
+              <td style="font-weight:600;">${group.name}</td>
+              <td>${sourcesContent}</td>
+              <td>${activitiesContent}</td>
+            </tr>
+          `;
+        });
+
+        tableHtml += '</tbody></table>';
+        contentEl.innerHTML = tableHtml;
+
+        const tableEl = contentEl.querySelector('table');
+        attachCopyHandlers(tableEl, usedSupabase);
+
+        setStatus(usedSupabase ? 'Live data loaded from Supabase.' : 'Showing cached group information.', true);
+        scheduleHeightUpdate();
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        loadGroupInfo().catch(error => {
+          console.error('Failed to load group info page:', error);
+          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Something went wrong while loading group information.</p>";
+          setStatus('', true);
+          scheduleHeightUpdate();
+        });
+      });
+
+      window.addEventListener('message', event => {
+        if (event?.data?.type === 'requestHeight') {
+          scheduleHeightUpdate(10);
+        }
+      });
+
+      window.addEventListener('load', () => {
+        scheduleHeightUpdate(20);
+      });
+    })();
+  </script>
+</body>
+</html>

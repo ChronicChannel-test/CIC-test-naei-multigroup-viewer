@@ -355,7 +355,7 @@
     <div class="bg-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="border-b border-gray-200">
-          <nav class="-mb-px flex items-center gap-6">
+          <nav class="-mb-px flex flex-wrap items-center gap-6">
             <button id="tab-1" onclick="switchChart('1')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Bubble_Chart_Icon_viewer.png" alt="Bubble chart icon" class="h-8 w-auto">
               <span>Bubble Chart</span>
@@ -363,6 +363,14 @@
             <button id="tab-2" onclick="switchChart('2')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Line_Chart_Icon.001.png" alt="Line chart icon" class="h-8 w-auto">
               <span>Line Chart</span>
+            </button>
+            <button id="tab-3" onclick="switchChart('3')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+              <img src="SharedResources/images/Group Info - Icon.png" alt="Group info icon" class="h-8 w-auto">
+              <span>Group Info</span>
+            </button>
+            <button id="tab-4" onclick="switchChart('4')" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+              <img src="SharedResources/images/instructions-alpha-v3.png" alt="User guide icon" class="h-8 w-auto">
+              <span>User Guide</span>
             </button>
           </nav>
         </div>
@@ -389,6 +397,28 @@
         scrolling="no"
   style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden;"
         title="NAEI Activity Data Line Chart"></iframe>
+    </div>
+
+    <!-- Group Info Container -->
+  <div id="chart-3" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;">
+      <iframe
+        id="groupinfo-iframe"
+        src="group-info.html"
+        frameborder="0"
+        scrolling="no"
+        style="width: 100%; height: 900px; border: none; background: white; display: block; overflow: hidden;"
+        title="NAEI Group Information"></iframe>
+    </div>
+
+    <!-- User Guide Container -->
+  <div id="chart-4" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;">
+      <iframe
+        id="userguide-iframe"
+        src="user-guide.html"
+        frameborder="0"
+        scrolling="no"
+        style="width: 100%; height: 900px; border: none; background: white; display: block; overflow: hidden;"
+        title="NAEI User Guide"></iframe>
     </div>
 
     <!-- Footer (inside chart-interface so it fades in with the chart) -->
@@ -441,7 +471,9 @@
     // Store last known state for each chart (populated by messages from iframes)
     const chartStates = {
       '1': null, // Bubble chart state
-      '2': null  // Line chart state
+      '2': null, // Line chart state
+      '3': [],   // Group info state (static)
+      '4': []    // User guide state (static)
     };
     
     // Load shared resources
@@ -467,7 +499,9 @@
 
     const iframeElements = {
       bubble: document.getElementById('bubblechart-iframe'),
-      line: document.getElementById('linechart-iframe')
+      line: document.getElementById('linechart-iframe'),
+      'group-info': document.getElementById('groupinfo-iframe'),
+      'user-guide': document.getElementById('userguide-iframe')
     };
 
     if (debugLoggingEnabled) {
@@ -520,6 +554,10 @@
       } else if (chartId === '2') {
         // Line chart defaults: PM2.5 (id=5), All group (id=1), 1970-2023
         return `${baseUrl}?chart=2&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+      } else if (chartId === '3') {
+        return `${baseUrl}?chart=3`;
+      } else if (chartId === '4') {
+        return `${baseUrl}?chart=4`;
       }
       
       return baseUrl;
@@ -584,9 +622,7 @@
       currentChart = chartId;
       
       // Ensure chart containers are ready
-      const chartContainers = ['1', '2']
-        .map(id => document.getElementById(`chart-${id}`))
-        .filter(Boolean);
+      const chartContainers = Array.from(document.querySelectorAll('.chart-container'));
       
       chartContainers.forEach(container => {
         container.style.display = 'block';
@@ -721,12 +757,15 @@
           chartStates['1'] = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
         } else if (chartId === '2') {
           chartStates['2'] = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
+        } else if (chartId === '3' || chartId === '4') {
+          chartStates[chartId] = [];
         }
       }
 
       currentChart = chartId;
       updateTabStates();
       showChart(chartId);
+
     }
 
     function updateTabStates() {
@@ -756,6 +795,7 @@
 
     }
 
+
     // Simplified initialization for iframe-based charts
     
     // Simple loading overlay control - MESSAGE BASED APPROACH
@@ -773,6 +813,18 @@
     if (bubbleIframe) {
       bubbleIframe.style.height = '1100px';
       console.log('📏 Bubble chart iframe initial height: 1100px');
+    }
+
+    const groupInfoIframe = iframeElements['group-info'];
+    if (groupInfoIframe) {
+      groupInfoIframe.style.height = '1000px';
+      console.log('📏 Group info iframe initial height: 1000px');
+    }
+
+    const userGuideIframe = iframeElements['user-guide'];
+    if (userGuideIframe) {
+      userGuideIframe.style.height = '1000px';
+      console.log('📏 User guide iframe initial height: 1000px');
     }
     
     // Set up message listener IMMEDIATELY (before DOM is ready)
