@@ -65,6 +65,10 @@
       margin-bottom: 4px;
     }
 
+    .group-info-source-heading mark.group-info-highlight {
+      text-decoration: inherit;
+    }
+
     .group-info-item-list {
       display: grid;
       grid-template-columns: 1fr;
@@ -74,6 +78,15 @@
     .group-info-item {
       display: block;
       line-height: 1.25;
+    }
+
+    mark.group-info-highlight {
+      background: rgba(255, 147, 1, 0.25);
+      color: #7c2d12;
+      padding: 0;
+      border-radius: 2px;
+      box-decoration-break: clone;
+      -webkit-box-decoration-break: clone;
     }
 
     @media (min-width: 980px) {
@@ -116,20 +129,23 @@
 
     .group-info-filter-block {
       display: flex;
-      flex-direction: column;
-      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
       margin: 28px 0 16px;
       max-width: 100%;
     }
 
     .group-info-filter-label {
-      font-size: 20px;
+      font-size: 1.1rem;
       font-weight: 600;
       color: #1f2937;
+      white-space: nowrap;
     }
 
     .group-info-filter-input {
-      width: 100%;
+      flex: 1 1 320px;
+      min-width: 240px;
       padding: 10px 14px;
       border: 1px solid #cbd5e1;
       border-radius: 6px;
@@ -146,8 +162,9 @@
 
     .group-info-column-filters {
       display: flex;
-      flex-direction: column;
-      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 12px;
       margin-bottom: 24px;
     }
 
@@ -155,6 +172,7 @@
       font-size: 0.95rem;
       font-weight: 600;
       color: #1f2937;
+      white-space: nowrap;
     }
 
     .group-info-column-options {
@@ -183,6 +201,12 @@
       margin-bottom: 16px;
     }
 
+    #group-info-status:empty {
+      min-height: 0;
+      height: 0;
+      margin-bottom: 0;
+    }
+
     @media (max-width: 1100px) {
       .group-info-frame {
         width: 100%;
@@ -206,12 +230,12 @@
       </header>
 
       <div class="group-info-filter-block">
-        <label for="group-info-filter-input" class="group-info-filter-label">Filter</label>
+        <label for="group-info-filter-input" class="group-info-filter-label">Filter:</label>
         <input type="search" id="group-info-filter-input" class="group-info-filter-input" placeholder="Search groups, sources, or fuel types" autocomplete="off" aria-describedby="group-info-filter-columns-label">
       </div>
 
       <div class="group-info-column-filters" role="group" aria-labelledby="group-info-filter-columns-label">
-        <span class="group-info-column-label" id="group-info-filter-columns-label">Filter Columns</span>
+        <span class="group-info-column-label" id="group-info-filter-columns-label">Filter Columns:</span>
         <div class="group-info-column-options">
           <label class="group-info-column-option">
             <input type="checkbox" id="group-info-filter-column-all" value="all" checked>
@@ -246,7 +270,12 @@
     (function() {
       const statusEl = document.getElementById('group-info-status');
       const contentEl = document.getElementById('group-info-content');
+      const filterInput = document.getElementById('group-info-filter-input');
+      const columnOptionsEl = document.querySelector('.group-info-column-options');
+      const columnCheckboxes = columnOptionsEl ? Array.from(columnOptionsEl.querySelectorAll('input[type="checkbox"]')) : [];
       let statusTimer = null;
+      let groupInfoState = null;
+      const highlightMatchesEnabled = true;
 
       function setStatus(message, persist = false) {
         if (!statusEl) return;
@@ -326,7 +355,8 @@
       }
 
       function escapeHtml(value) {
-        return value.replace(/[&<>"']/g, char => ({
+        const stringValue = String(value ?? '');
+        return stringValue.replace(/[&<>"']/g, char => ({
           '&': '&amp;',
           '<': '&lt;',
           '>': '&gt;',
@@ -335,7 +365,68 @@
         })[char] || char);
       }
 
-      function buildItemList(items, options = {}) {
+      function escapeRegExp(value) {
+        const stringValue = String(value ?? '');
+        return stringValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      }
+
+      function normalizeSearchTerm(rawTerm) {
+        if (typeof rawTerm !== 'string') {
+          return {
+            tokens: [],
+            combined: ''
+          };
+        }
+
+        const decoded = rawTerm.normalize('NFKC');
+        const squashed = decoded.replace(/[\s\u00A0]+/g, ' ').trim();
+        if (!squashed) {
+          return {
+            tokens: [],
+            combined: ''
+          };
+        }
+
+        const tokens = Array.from(new Set(
+          squashed
+          .split(' ')
+          .map(part => part.trim())
+          .filter(Boolean)
+          .map(part => part.toLowerCase())
+        ));
+
+        const combined = tokens.join('');
+        return {
+          tokens,
+          combined
+        };
+      }
+
+      function createHighlightRegex(normalized) {
+        if (!highlightMatchesEnabled) {
+          return null;
+        }
+        if (!normalized || !normalized.tokens || !normalized.tokens.length) {
+          return null;
+        }
+        try {
+          const pattern = normalized.tokens.map(token => escapeRegExp(token)).join('|');
+          return new RegExp(pattern, 'gi');
+        } catch (error) {
+          console.warn('Unable to create highlight regex for tokens:', normalized, error);
+          return null;
+        }
+      }
+
+      function highlightText(value, highlightRegex) {
+        const safeValue = escapeHtml(value);
+        if (!highlightRegex) {
+          return safeValue;
+        }
+        return safeValue.replace(highlightRegex, match => `<mark class="group-info-highlight">${match}</mark>`);
+      }
+
+      function buildItemList(items, options = {}, highlightRegex = null) {
         const normalizedItems = [];
         items.forEach(item => {
           const exploded = splitMultiValue(item);
@@ -353,7 +444,7 @@
         const threshold = Number.isFinite(options.multiColumnThreshold) ? options.multiColumnThreshold : 6;
         const multiClass = filteredItems.length >= threshold ? ' group-info-item-list--multi' : '';
         const itemsHtml = filteredItems
-          .map(item => `<span class="group-info-item">${escapeHtml(item)}</span>`)
+          .map(item => `<span class="group-info-item">${highlightText(item, highlightRegex)}</span>`)
           .join('');
 
         return `<div class="group-info-item-list${multiClass}">${itemsHtml}</div>`;
@@ -450,6 +541,244 @@
           });
 
         return { groups, nfrMap };
+      }
+
+      function collectSourceStrings(group, nfrMap) {
+        const results = [];
+        if (group.nfrCodes.length) {
+          results.push('All Sources from the following NFR Code categories:');
+          group.nfrCodes.forEach(code => {
+            const description = nfrMap[code];
+            results.push(description ? `${code}: ${description}` : code);
+          });
+        } else if (group.sources.length) {
+          results.push(...group.sources);
+        } else {
+          results.push('All Sources');
+        }
+        return results;
+      }
+
+      function collectFuelStrings(group) {
+        if (group.activities.length) {
+          return [...group.activities];
+        }
+        return ['All Fuel Types'];
+      }
+
+      function formatSourcesCell(group, nfrMap, highlightRegex) {
+        if (group.nfrCodes.length) {
+          const nfrItems = group.nfrCodes.map(code => {
+            const description = nfrMap[code];
+            return description ? `${code}: ${description}` : code;
+          });
+          const heading = `<span class="group-info-source-heading">${highlightText('All Sources from the following NFR Code categories:', highlightRegex)}</span>`;
+          return `${heading}${buildItemList(nfrItems, { multiColumnThreshold: 8 }, highlightRegex)}`;
+        }
+
+        if (group.sources.length) {
+          return buildItemList(group.sources, { multiColumnThreshold: 8 }, highlightRegex);
+        }
+
+        return highlightText('All Sources', highlightRegex);
+      }
+
+      function formatFuelCell(group, highlightRegex) {
+        if (group.activities.length) {
+          return buildItemList(group.activities, { multiColumnThreshold: 8 }, highlightRegex);
+        }
+        return highlightText('All Fuel Types', highlightRegex);
+      }
+
+      function getSelectedColumnKeys() {
+        if (!columnCheckboxes.length) {
+          return ['name', 'sources', 'fuels'];
+        }
+
+        const checkedValues = columnCheckboxes
+          .filter(box => box.checked)
+          .map(box => box.value);
+
+        if (!checkedValues.length || checkedValues.includes('all')) {
+          return ['name', 'sources', 'fuels'];
+        }
+
+        const keys = [];
+        if (checkedValues.includes('name')) {
+          keys.push('name');
+        }
+        if (checkedValues.includes('sources')) {
+          keys.push('sources');
+        }
+        if (checkedValues.includes('fuels')) {
+          keys.push('fuels');
+        }
+
+        return keys.length ? keys : ['name', 'sources', 'fuels'];
+      }
+
+      function matchesGroup(group, normalizedTerm, columnKeys, nfrMap) {
+        if (!normalizedTerm || !normalizedTerm.tokens || !normalizedTerm.tokens.length) {
+          return true;
+        }
+        const tokens = normalizedTerm.tokens;
+        const combinedNeedle = normalizedTerm.combined;
+        const whitespaceRegex = /[\s\u00A0]+/g;
+
+        if (columnKeys.includes('name')) {
+          const lowerName = group.name.toLowerCase();
+          const haystack = lowerName.replace(whitespaceRegex, '');
+          if (haystack.includes(combinedNeedle)) {
+            return true;
+          }
+          const wordsMatch = tokens.every(token => lowerName.includes(token));
+          if (wordsMatch) {
+            return true;
+          }
+        }
+
+        if (columnKeys.includes('sources')) {
+          const sourceStrings = collectSourceStrings(group, nfrMap);
+          if (sourceStrings.some(entry => entry.toLowerCase().replace(whitespaceRegex, '').includes(combinedNeedle))) {
+            return true;
+          }
+          if (sourceStrings.some(entry => {
+            const lowerEntry = entry.toLowerCase();
+            return tokens.every(token => lowerEntry.includes(token));
+          })) {
+            return true;
+          }
+        }
+
+        if (columnKeys.includes('fuels')) {
+          const fuelStrings = collectFuelStrings(group);
+          if (fuelStrings.some(entry => entry.toLowerCase().replace(whitespaceRegex, '').includes(combinedNeedle))) {
+            return true;
+          }
+          if (fuelStrings.some(entry => {
+            const lowerEntry = entry.toLowerCase();
+            return tokens.every(token => lowerEntry.includes(token));
+          })) {
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      function renderGroupTable(groupList, options = {}) {
+        const highlightRegex = options.highlightRegex || null;
+        const selectedColumns = options.selectedColumns || ['name', 'sources', 'fuels'];
+        const nameHighlight = selectedColumns.includes('name') ? highlightRegex : null;
+        const sourcesHighlight = selectedColumns.includes('sources') ? highlightRegex : null;
+        const fuelHighlight = selectedColumns.includes('fuels') ? highlightRegex : null;
+        const nfrLookup = groupInfoState ? groupInfoState.nfrMap : {};
+
+        if (!Array.isArray(groupList) || !groupList.length) {
+          contentEl.innerHTML = '<p class="text-sm text-gray-600">No groups match the current filter.</p>';
+          scheduleHeightUpdate(40);
+          return;
+        }
+
+        let tableHtml = `
+          <table id="groupTable" aria-label="NAEI group information">
+            <thead>
+              <tr>
+                <th>Group Name</th>
+                <th>Sources</th>
+                <th>Fuel Types (Activity in NAEI data)</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        groupList.forEach(group => {
+          const sourcesHtml = formatSourcesCell(group, nfrLookup, sourcesHighlight);
+          const fuelHtml = formatFuelCell(group, fuelHighlight);
+          tableHtml += `
+            <tr>
+              <td style="font-weight:600;">${highlightText(group.name, nameHighlight)}</td>
+              <td>${sourcesHtml}</td>
+              <td>${fuelHtml}</td>
+            </tr>
+          `;
+        });
+
+        tableHtml += '</tbody></table>';
+        contentEl.innerHTML = tableHtml;
+
+        const tableEl = contentEl.querySelector('table');
+        attachCopyHandlers(tableEl, groupInfoState?.usedSupabase);
+        scheduleHeightUpdate(60);
+      }
+
+      function applyGroupFilters() {
+        if (!groupInfoState) {
+          return;
+        }
+
+        const rawTerm = filterInput ? filterInput.value : '';
+        const normalizedTerm = normalizeSearchTerm(rawTerm);
+        const columnKeys = getSelectedColumnKeys();
+        const filteredGroups = groupInfoState.groups.filter(group => matchesGroup(group, normalizedTerm, columnKeys, groupInfoState.nfrMap));
+        const highlightRegex = createHighlightRegex(normalizedTerm);
+        renderGroupTable(filteredGroups, { highlightRegex, selectedColumns: columnKeys });
+      }
+
+      function handleColumnCheckboxChange(changedBox) {
+        if (!changedBox) {
+          return;
+        }
+
+        const allBox = columnCheckboxes.find(box => box.value === 'all');
+        const dataBoxes = columnCheckboxes.filter(box => box.value !== 'all');
+
+        if (changedBox.value === 'all') {
+          if (!changedBox.checked) {
+            changedBox.checked = true;
+            return;
+          }
+          dataBoxes.forEach(box => {
+            box.checked = true;
+          });
+        } else {
+          if (!changedBox.checked) {
+            const anyChecked = dataBoxes.some(box => box.checked);
+            if (!anyChecked) {
+              changedBox.checked = true;
+              return;
+            }
+          }
+          if (allBox) {
+            allBox.checked = dataBoxes.every(box => box.checked);
+          }
+        }
+
+        if (allBox && !allBox.checked && dataBoxes.every(box => box.checked)) {
+          allBox.checked = true;
+        }
+      }
+
+      let filterControlsInitialized = false;
+
+      function setupFilterControls() {
+        if (filterControlsInitialized) {
+          return;
+        }
+
+        if (filterInput) {
+          filterInput.addEventListener('input', applyGroupFilters);
+          filterInput.addEventListener('search', applyGroupFilters);
+        }
+
+        columnCheckboxes.forEach(box => {
+          box.addEventListener('change', event => {
+            handleColumnCheckboxChange(event.currentTarget);
+            applyGroupFilters();
+          });
+        });
+
+        filterControlsInitialized = true;
       }
 
       function attachCopyHandlers(tableEl, usedSupabase) {
@@ -583,58 +912,15 @@
           return;
         }
 
-        let tableHtml = `
-          <table id="groupTable" aria-label="NAEI group information">
-            <thead>
-              <tr>
-                <th>Group Name</th>
-                <th>Sources</th>
-                <th>Fuel Types (Activity in NAEI data)</th>
-              </tr>
-            </thead>
-            <tbody>
-        `;
+        groupInfoState = {
+          groups,
+          nfrMap,
+          usedSupabase
+        };
 
-        groups.forEach(group => {
-          const validSources = group.sources;
-          const validActivities = group.activities;
-          const validCodes = group.nfrCodes;
-
-          let sourcesContent = '';
-          if (validCodes.length) {
-            const nfrItems = validCodes.map(code => {
-              const description = nfrMap[code];
-              return description ? `${code}: ${description}` : code;
-            });
-            sourcesContent += '<span class="group-info-source-heading">All Sources from the following NFR Code categories:</span>';
-            sourcesContent += buildItemList(nfrItems, { multiColumnThreshold: 8 });
-          }
-
-          if (!sourcesContent) {
-            sourcesContent = validSources.length ? buildItemList(validSources, { multiColumnThreshold: 8 }) : 'All Sources';
-          }
-
-          const activitiesContent = validActivities.length
-            ? buildItemList(validActivities, { multiColumnThreshold: 8 })
-            : 'All Fuel Types';
-
-          tableHtml += `
-            <tr>
-              <td style="font-weight:600;">${group.name}</td>
-              <td>${sourcesContent}</td>
-              <td>${activitiesContent}</td>
-            </tr>
-          `;
-        });
-
-        tableHtml += '</tbody></table>';
-        contentEl.innerHTML = tableHtml;
-
-        const tableEl = contentEl.querySelector('table');
-        attachCopyHandlers(tableEl, usedSupabase);
-
+        setupFilterControls();
+        applyGroupFilters();
         setStatus('', true);
-        scheduleHeightUpdate();
       }
 
       document.addEventListener('DOMContentLoaded', () => {
