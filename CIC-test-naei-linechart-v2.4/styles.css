@@ -203,8 +203,8 @@ button, .add-btn, .remove-btn, .dragHandle {
 
 .remove-icon {
   display: inline-block;
-  width: 18px;
-  height: 18px;
+  width: 19px;
+  height: 19px;
   background-image: url('../SharedResources/images/No-Entry-Icon.svg');
   background-repeat: no-repeat;
   background-position: center;
