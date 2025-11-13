@@ -82,12 +82,6 @@
       }
     }
 
-    .copy-hint {
-      font-size: 0.75rem;
-      color: #4b5563;
-      margin: 20px 0 8px;
-    }
-
     .group-info-shell {
       padding: 28px 28px 40px;
     }
@@ -120,18 +114,61 @@
       color: #0f172a;
     }
 
-    .group-info-title-subtext {
+    .group-info-filter-block {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 28px 0 16px;
+      max-width: 100%;
+    }
+
+    .group-info-filter-label {
       font-size: 20px;
       font-weight: 600;
-      line-height: 1.1;
       color: #1f2937;
     }
 
-    .group-info-description {
-      color: #4b5563;
+    .group-info-filter-input {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-family: inherit;
+      color: #0f172a;
+      background-color: #fff;
+    }
+
+    .group-info-filter-input:focus {
+      outline: 2px solid #ff9301;
+      outline-offset: 1px;
+    }
+
+    .group-info-column-filters {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+
+    .group-info-column-label {
       font-size: 0.95rem;
-      max-width: 720px;
-      margin: 0 auto;
+      font-weight: 600;
+      color: #1f2937;
+    }
+
+    .group-info-column-options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .group-info-column-option {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.95rem;
+      color: #1f2937;
     }
 
     .group-info-table-container {
@@ -166,13 +203,35 @@
     <section class="group-info-frame" aria-labelledby="group-info-heading">
       <header class="group-info-header">
         <div class="group-info-title-main" id="group-info-heading">Group Information</div>
-        <div class="group-info-title-subtext">NAEI multi-group coverage overview</div>
-        <p class="group-info-description">
-          Explore how each NAEI group is assembled, including source categories, fuel types, and NFR code coverage. Click any row to copy its details.
-        </p>
       </header>
 
-      <p class="copy-hint">💡 Tip: Click a table row to copy a formatted summary to your clipboard.</p>
+      <div class="group-info-filter-block">
+        <label for="group-info-filter-input" class="group-info-filter-label">Filter</label>
+        <input type="search" id="group-info-filter-input" class="group-info-filter-input" placeholder="Search groups, sources, or fuel types" autocomplete="off" aria-describedby="group-info-filter-columns-label">
+      </div>
+
+      <div class="group-info-column-filters" role="group" aria-labelledby="group-info-filter-columns-label">
+        <span class="group-info-column-label" id="group-info-filter-columns-label">Filter Columns</span>
+        <div class="group-info-column-options">
+          <label class="group-info-column-option">
+            <input type="checkbox" id="group-info-filter-column-all" value="all" checked>
+            <span>All</span>
+          </label>
+          <label class="group-info-column-option">
+            <input type="checkbox" id="group-info-filter-column-name" value="name" checked>
+            <span>Group Name</span>
+          </label>
+          <label class="group-info-column-option">
+            <input type="checkbox" id="group-info-filter-column-sources" value="sources" checked>
+            <span>Sources &amp; NFR Code</span>
+          </label>
+          <label class="group-info-column-option">
+            <input type="checkbox" id="group-info-filter-column-fuels" value="fuels" checked>
+            <span>Fuel Types</span>
+          </label>
+        </div>
+      </div>
+
       <p id="group-info-status" class="status-text" aria-live="polite"></p>
 
       <div class="group-info-table-container">
@@ -454,7 +513,7 @@
 
           clearTimeout(statusTimer);
           statusTimer = setTimeout(() => {
-            setStatus(usedSupabase ? 'Live data loaded from Supabase.' : 'Showing cached group information.', true);
+            setStatus('', true);
           }, 3200);
         });
       }
@@ -574,7 +633,7 @@
         const tableEl = contentEl.querySelector('table');
         attachCopyHandlers(tableEl, usedSupabase);
 
-        setStatus(usedSupabase ? 'Live data loaded from Supabase.' : 'Showing cached group information.', true);
+        setStatus('', true);
         scheduleHeightUpdate();
       }
 
