@@ -587,8 +587,7 @@
           return null;
         }
         const lastSegment = segments[segments.length - 1].toLowerCase();
-        const segmentWithoutExtension = lastSegment.replace(/\.html?$/, '');
-        return STATIC_CHART_IDS.has(segmentWithoutExtension) ? segmentWithoutExtension : null;
+        return STATIC_CHART_IDS.has(lastSegment) ? lastSegment : null;
       } catch (error) {
         debugWarn('Unable to resolve chart from path:', error);
         return null;
