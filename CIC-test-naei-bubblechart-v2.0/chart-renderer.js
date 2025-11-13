@@ -50,24 +50,45 @@ function ensureGoogleChartsLoaded() {
   }
 
   googleChartsLoadPromise = new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = (timer, poller) => {
+      if (timer) {
+        clearTimeout(timer);
+      }
+      if (poller) {
+        clearInterval(poller);
+      }
+    };
+
     const timeoutId = setTimeout(() => {
-      reject(new Error('Timed out waiting for Google Charts to load.'));
+      if (!settled) {
+        settled = true;
+        cleanup(timeoutId, pollInterval);
+        reject(new Error('Timed out waiting for Google Charts to load.'));
+      }
     }, 15000);
 
-    const markReady = () => {
-      if (!window.google?.visualization?.DataTable) {
-        clearTimeout(timeoutId);
-        reject(new Error('Google Charts loaded but visualization API is unavailable.'));
+    const tryResolve = () => {
+      if (settled) {
         return;
       }
-      clearTimeout(timeoutId);
+      if (!window.google?.visualization?.DataTable) {
+        return;
+      }
+      settled = true;
+      cleanup(timeoutId, pollInterval);
       googleChartsReady = true;
       resolve();
     };
 
     const handleFailure = (error) => {
-      clearTimeout(timeoutId);
-      reject(error instanceof Error ? error : new Error(String(error)));
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup(timeoutId, pollInterval);
+      const normalized = error instanceof Error ? error : new Error(String(error));
+      reject(normalized);
     };
 
     const startLoad = () => {
@@ -76,12 +97,17 @@ function ensureGoogleChartsLoaded() {
           handleFailure(new Error('Google Charts loader API is unavailable.'));
           return;
         }
-        google.charts.load('current', { packages: ['corechart'] });
-        google.charts.setOnLoadCallback(markReady);
+        google.charts.load('current', {
+          packages: ['corechart'],
+          callback: tryResolve
+        });
+        google.charts.setOnLoadCallback(tryResolve);
       } catch (error) {
         handleFailure(error);
       }
     };
+
+    const pollInterval = setInterval(tryResolve, 200);
 
     if (window.google?.charts?.load) {
       startLoad();
