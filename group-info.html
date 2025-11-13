@@ -62,13 +62,13 @@
 
     #groupTable th:nth-child(2),
     #groupTable td:nth-child(2) {
-      width: 8%;
+      width: 6.5%;
       white-space: nowrap;
     }
 
     #groupTable th:nth-child(3),
     #groupTable td:nth-child(3) {
-      width: 38%;
+      width: 39.5%;
     }
 
     #groupTable th:nth-child(4),
@@ -122,15 +122,18 @@
       text-align: left;
       vertical-align: top;
       white-space: nowrap;
-      padding-right: 16px;
+      padding-right: 12px;
+      line-height: 1;
+      position: relative;
+      min-height: 24px;
     }
 
-    .group-info-activity-flag {
-      display: inline-block;
-      min-width: 16px;
-      font-weight: 600;
-      font-size: 0.95rem;
-      line-height: 1.2;
+    .group-info-activity-icon {
+      width: 24px;
+      height: 24px;
+      position: absolute;
+      top: 12px;
+      left: 12px;
     }
 
     @media (min-width: 980px) {
@@ -668,13 +671,15 @@
 
       function getActivityIndicatorInfo(group) {
         const hasData = hasActivityData(group);
-        const flag = hasData ? 'Y' : 'N';
         const message = hasData ? 'Yes' : 'No';
         const description = hasData ? 'Activity data available' : 'Activity data unavailable';
+        const iconSrc = hasData
+          ? 'SharedResources/images/Green-Square-Button-White-Tick.svg'
+          : 'SharedResources/images/Red-Square-Button-White-Cross.svg';
         return {
-          flag,
           message,
-          description
+          description,
+          iconSrc
         };
       }
 
@@ -791,8 +796,8 @@
           tableHtml += `
             <tr>
               <td style="font-weight:600;">${highlightText(group.name, nameHighlight)}</td>
-              <td class="group-info-activity-cell" data-copy-text="${escapeHtml(activityInfo.message)}">
-                <span class="group-info-activity-flag" aria-hidden="true">${activityInfo.flag}</span>
+              <td class="group-info-activity-cell" data-copy-text="${escapeHtml(activityInfo.description)}">
+                <img src="${activityInfo.iconSrc}" alt="" class="group-info-activity-icon" width="24" height="24" loading="lazy">
                 <span class="sr-only">${escapeHtml(activityInfo.description)}</span>
               </td>
               <td>${sourcesHtml}</td>

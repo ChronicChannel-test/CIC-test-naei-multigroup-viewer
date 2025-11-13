@@ -113,6 +113,34 @@ select,
   gap: 6px; 
 }
 
+.add-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background-image: url('../SharedResources/images/Green-Square-Button-White-Plus-Add.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  flex-shrink: 0;
+}
+
+#shareBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.share-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background-image: url('../SharedResources/images/chain-link-icon-grey.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  flex-shrink: 0;
+}
+
 .controls-wrapper button {
   margin-left: 0;
   margin-right: 0;

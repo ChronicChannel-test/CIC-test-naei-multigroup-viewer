@@ -367,26 +367,37 @@ button {
   background: #E0E0E0;
 }
 
-.remove-icon { 
-  display: inline-block; 
-  width: 18px; 
-  height: 18px; 
-  border-radius: 50%; 
-  background: #d33; 
-  color: #fff; 
-  text-align: center; 
-  line-height: 18px; 
-  font-weight: bold; 
+.remove-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background-image: url('images/No-Entry-Icon.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  flex-shrink: 0;
 }
 
-.add-btn .add-icon { 
-  color: #4CAF50; 
-  font-weight: bold; 
-  font-size: 2em; 
+.add-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background-image: url('images/Green-Square-Button-White-Plus-Add.png');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  flex-shrink: 0;
 }
 
-.add-btn:hover .add-icon { 
-  color: #45a049; 
+.share-icon {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  background-image: url('images/chain-link-icon-black.svg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  flex-shrink: 0;
 }
 
 /* Modal/Dialog styles */

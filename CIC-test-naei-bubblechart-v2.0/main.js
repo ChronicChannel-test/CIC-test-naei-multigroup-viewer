@@ -748,7 +748,7 @@ function refreshButtons() {
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'remove-btn';
-      removeBtn.innerHTML = '<span class="remove-icon">−</span> Remove Group';
+      removeBtn.innerHTML = '<span class="remove-icon" aria-hidden="true"></span> Remove Group';
       // make ARIA label include the current group name if available
       const sel = row.querySelector('select');
       const groupName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
@@ -808,7 +808,7 @@ function refreshButtons() {
   if (!addBtn) {
     addBtn = document.createElement('button');
     addBtn.className = 'add-btn';
-    addBtn.innerHTML = '<span class="add-icon">+</span> Add Group';
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
     addBtn.onclick = () => addGroupSelector("", true);
     container.appendChild(addBtn);
   }
@@ -819,7 +819,7 @@ function refreshButtons() {
     addBtn.textContent = 'Maximum 10 groups';
   } else {
     addBtn.disabled = false;
-    addBtn.innerHTML = '<span class="add-icon">+</span> Add Group';
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
   }
   
 }

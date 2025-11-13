@@ -375,7 +375,7 @@ function refreshButtons() {
   if (!addBtn) {
     addBtn = document.createElement('button');
     addBtn.className = 'add-btn';
-    addBtn.innerHTML = '<span class="add-icon">+</span> Add Group';
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
     addBtn.onclick = () => addGroupSelector("", true);
     container.appendChild(addBtn);
   }
@@ -385,7 +385,7 @@ function refreshButtons() {
     addBtn.textContent = 'Max Groups = 10';
     addBtn.disabled = true;
   } else {
-    addBtn.innerHTML = '<span class="add-icon">+</span> Add Group';
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
     addBtn.disabled = false;
   }
 }
