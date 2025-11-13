@@ -37,15 +37,79 @@
       background: #f9fafb;
     }
 
+    .copy-hint {
+      font-size: 0.75rem;
+      color: #4b5563;
+      margin: 20px 0 8px;
+    }
+
+    .group-info-shell {
+      padding: 28px 28px 40px;
+    }
+
+    .group-info-frame {
+      width: calc(100% - 140px);
+      margin: 0 auto 0 0;
+      border-radius: 6px;
+      background: #ffffff;
+      box-sizing: border-box;
+      padding: 28px 32px 36px;
+      overflow: hidden;
+      box-shadow: none;
+      border: none;
+    }
+
+    .group-info-header {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .group-info-title-main {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.1;
+      color: #0f172a;
+    }
+
+    .group-info-title-subtext {
+      font-size: 20px;
+      font-weight: 600;
+      line-height: 1.1;
+      color: #1f2937;
+    }
+
+    .group-info-description {
+      color: #4b5563;
+      font-size: 0.95rem;
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .group-info-table-container {
+      margin-top: 18px;
+      overflow-x: auto;
+    }
+
     .status-text {
       font-size: 0.75rem;
       color: #6b7280;
       min-height: 1.25rem;
+      margin-bottom: 16px;
     }
 
-    .copy-hint {
-      font-size: 0.75rem;
-      color: #4b5563;
+    @media (max-width: 1100px) {
+      .group-info-frame {
+        width: 100%;
+        padding: 24px 24px 32px;
+      }
+
+      .group-info-shell {
+        padding: 24px 20px 32px;
+      }
     }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -53,24 +117,25 @@
   <script src="SharedResources/shared-data-loader.js"></script>
 </head>
 <body>
-  <main class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <header class="flex items-start sm:items-center gap-4 mb-6">
-      <div>
-        <h1 class="text-3xl font-semibold text-gray-900">Group Information</h1>
-        <p class="text-sm text-gray-600">
+  <main class="group-info-shell">
+    <section class="group-info-frame" aria-labelledby="group-info-heading">
+      <header class="group-info-header">
+        <div class="group-info-title-main" id="group-info-heading">Group Information</div>
+        <div class="group-info-title-subtext">NAEI multi-group coverage overview</div>
+        <p class="group-info-description">
           Explore how each NAEI group is assembled, including source categories, fuel types, and NFR code coverage. Click any row to copy its details.
         </p>
-      </div>
-    </header>
+      </header>
 
-    <p class="copy-hint mb-2">💡 Tip: Click a table row to copy a formatted summary to your clipboard.</p>
-    <p id="group-info-status" class="status-text mb-4"></p>
+      <p class="copy-hint">💡 Tip: Click a table row to copy a formatted summary to your clipboard.</p>
+      <p id="group-info-status" class="status-text" aria-live="polite"></p>
 
-    <div class="rounded-xl border border-gray-200 shadow-sm overflow-hidden bg-white">
-      <div id="group-info-content" class="p-4 text-sm text-gray-800">
-        Loading group information…
+      <div class="group-info-table-container">
+        <div id="group-info-content">
+          Loading group information…
+        </div>
       </div>
-    </div>
+    </section>
   </main>
 
   <script>
