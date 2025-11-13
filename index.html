@@ -527,6 +527,14 @@
   </style>
 
   <script>
+    (function() {
+      var redirect = sessionStorage.redirect;
+      delete sessionStorage.redirect;
+      if (redirect && redirect != location.href) {
+        history.replaceState(null, null, redirect);
+      }
+    })();
+
     // Chart routing system with tabbed interface
     let currentChart = null;
     const globalUrlParams = new URLSearchParams(window.location.search || '');
