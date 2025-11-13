@@ -7,6 +7,7 @@ let chart = null;
 let currentChartData = null;
 let currentOptions = null;
 let googleChartsReady = false;
+let googleChartsLoadPromise = null;
 let seriesVisibility = []; // Track which series are visible
 let useLogScale = false; // Track whether logarithmic scaling is being used
 window.seriesVisibility = seriesVisibility; // Expose for export.js
@@ -39,11 +40,78 @@ if (!window.Colors) {
   };
 }
 
-// Load Google Charts and set up callback
-google.charts.load('current', {packages: ['corechart']});
-google.charts.setOnLoadCallback(() => {
-  googleChartsReady = true;
-  console.log('Google Charts loaded successfully');
+function ensureGoogleChartsLoaded() {
+  if (googleChartsReady && window.google?.visualization?.DataTable) {
+    return Promise.resolve();
+  }
+
+  if (googleChartsLoadPromise) {
+    return googleChartsLoadPromise;
+  }
+
+  googleChartsLoadPromise = new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Timed out waiting for Google Charts to load.'));
+    }, 15000);
+
+    const markReady = () => {
+      if (!window.google?.visualization?.DataTable) {
+        clearTimeout(timeoutId);
+        reject(new Error('Google Charts loaded but visualization API is unavailable.'));
+        return;
+      }
+      clearTimeout(timeoutId);
+      googleChartsReady = true;
+      resolve();
+    };
+
+    const handleFailure = (error) => {
+      clearTimeout(timeoutId);
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    const startLoad = () => {
+      try {
+        if (!window.google?.charts?.load) {
+          handleFailure(new Error('Google Charts loader API is unavailable.'));
+          return;
+        }
+        google.charts.load('current', { packages: ['corechart'] });
+        google.charts.setOnLoadCallback(markReady);
+      } catch (error) {
+        handleFailure(error);
+      }
+    };
+
+    if (window.google?.charts?.load) {
+      startLoad();
+    } else {
+      const existingLoader = document.querySelector('script[data-google-charts-loader]');
+      if (existingLoader) {
+        existingLoader.addEventListener('load', startLoad, { once: true });
+        existingLoader.addEventListener('error', () => handleFailure(new Error('Failed to load Google Charts loader script.')), { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://www.gstatic.com/charts/loader.js';
+        script.async = true;
+        script.defer = true;
+        script.dataset.googleChartsLoader = 'true';
+        script.addEventListener('load', startLoad, { once: true });
+        script.addEventListener('error', () => handleFailure(new Error('Failed to load Google Charts loader script.')), { once: true });
+        document.head.appendChild(script);
+      }
+    }
+  }).catch(error => {
+    googleChartsLoadPromise = null;
+    throw error;
+  });
+
+  return googleChartsLoadPromise;
+}
+
+// Kick off loading immediately for faster first paint
+ensureGoogleChartsLoaded().catch(error => {
+  console.error('Unable to initialize Google Charts for bubble chart:', error);
 });
 
 /**
@@ -53,13 +121,17 @@ google.charts.setOnLoadCallback(() => {
  * @param {Array} groupIds - Array of selected group IDs
  */
 function drawBubbleChart(year, pollutantId, groupIds) {
-  // Wait for Google Charts to be ready
-  if (!googleChartsReady) {
-    console.log('Google Charts not ready yet, waiting...');
-    google.charts.setOnLoadCallback(() => {
-      googleChartsReady = true;
-      drawBubbleChart(year, pollutantId, groupIds);
-    });
+  if (!googleChartsReady || !window.google?.visualization?.DataTable) {
+    ensureGoogleChartsLoaded()
+      .then(() => {
+        if (googleChartsReady && window.google?.visualization?.DataTable) {
+          drawBubbleChart(year, pollutantId, groupIds);
+        }
+      })
+      .catch(error => {
+        console.error('Google Charts failed to load; bubble chart render aborted.', error);
+        window.ChartRenderer.showMessage('Unable to load the Google Charts library. Please refresh and try again.', 'error');
+      });
     return;
   }
 

@@ -22,7 +22,7 @@ let seriesVisibility = [];
 window.seriesVisibility = seriesVisibility; // Expose for export.js
 let urlUpdateTimer = null; // Debounce timer for URL updates
 let googleChartsReady = false;
-let chartRenderCallback = null; // Callback for when chart finishes rendering
+let googleChartsLoadPromise = null;
 let initialLoadComplete = false; // Track if initial chart load is done (prevent resize redraw)
 let initFailureNotified = false; // Ensure we only notify parent once on failure
 
@@ -54,23 +54,78 @@ if (!window.Colors) {
   };
 }
 
-
-
-// Load Google Charts and set up callback
-google.charts.load('current', {packages:['corechart']});
-google.charts.setOnLoadCallback(() => {
-  googleChartsReady = true;
-  console.log('Google Charts loaded successfully for line chart');
-
-  if (typeof chartRenderCallback === 'function') {
-    try {
-      const pending = chartRenderCallback;
-      chartRenderCallback = null;
-      pending();
-    } catch (callbackError) {
-      console.error('Failed to run deferred chart render after Google Charts load:', callbackError);
-    }
+function loadGoogleChartsLibrary() {
+  if (googleChartsReady && window.google?.visualization?.DataTable) {
+    return Promise.resolve();
   }
+
+  if (googleChartsLoadPromise) {
+    return googleChartsLoadPromise;
+  }
+
+  googleChartsLoadPromise = new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Timed out waiting for Google Charts to load.'));
+    }, 15000);
+
+    const markReady = () => {
+      if (!window.google?.visualization?.DataTable) {
+        clearTimeout(timeoutId);
+        reject(new Error('Google Charts loaded but visualization API is unavailable.'));
+        return;
+      }
+      clearTimeout(timeoutId);
+      googleChartsReady = true;
+      resolve();
+    };
+
+    const handleFailure = (error) => {
+      clearTimeout(timeoutId);
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    const startLoad = () => {
+      try {
+        if (!window.google?.charts?.load) {
+          handleFailure(new Error('Google Charts loader API is unavailable.'));
+          return;
+        }
+        google.charts.load('current', { packages: ['corechart'] });
+        google.charts.setOnLoadCallback(markReady);
+      } catch (error) {
+        handleFailure(error);
+      }
+    };
+
+    if (window.google?.charts?.load) {
+      startLoad();
+    } else {
+      const existingLoader = document.querySelector('script[data-google-charts-loader]');
+      if (existingLoader) {
+        existingLoader.addEventListener('load', startLoad, { once: true });
+        existingLoader.addEventListener('error', () => handleFailure(new Error('Failed to load Google Charts loader script.')), { once: true });
+      } else {
+        const script = document.createElement('script');
+        script.src = 'https://www.gstatic.com/charts/loader.js';
+        script.async = true;
+        script.defer = true;
+        script.dataset.googleChartsLoader = 'true';
+        script.addEventListener('load', startLoad, { once: true });
+        script.addEventListener('error', () => handleFailure(new Error('Failed to load Google Charts loader script.')), { once: true });
+        document.head.appendChild(script);
+      }
+    }
+  }).catch(error => {
+    googleChartsLoadPromise = null;
+    throw error;
+  });
+
+  return googleChartsLoadPromise;
+}
+
+// Begin loading immediately so the chart can render as soon as data is ready
+loadGoogleChartsLibrary().catch(error => {
+  console.error('Unable to initialize Google Charts:', error);
 });
 
 // Build/version banner for diagnostics
@@ -697,14 +752,17 @@ function updateUrlFromChartState() {
 
 
 function updateChart(){
-  if (!googleChartsReady || !google.visualization || typeof google.visualization.DataTable !== 'function') {
-    if (!chartRenderCallback) {
-      console.warn('Google Charts library not ready yet – deferring chart render.');
-      chartRenderCallback = () => {
-        chartRenderCallback = null;
-        updateChart();
-      };
-    }
+  if (!googleChartsReady || !window.google?.visualization?.DataTable) {
+    loadGoogleChartsLibrary()
+      .then(() => {
+        if (googleChartsReady && window.google?.visualization?.DataTable) {
+          updateChart();
+        }
+      })
+      .catch(error => {
+        console.error('Google Charts failed to load; chart render aborted.', error);
+        showError('Unable to load the Google Charts library. Please refresh the page and try again.');
+      });
     return;
   }
 
