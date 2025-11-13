@@ -205,7 +205,7 @@ button, .add-btn, .remove-btn, .dragHandle {
   display: inline-block;
   width: 19px;
   height: 19px;
-  background-image: url('../SharedResources/images/No-Entry-Icon.svg');
+  background-image: url('../SharedResources/images/No-Entry-Icon-200x200.svg');
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
@@ -216,7 +216,7 @@ button, .add-btn, .remove-btn, .dragHandle {
   display: inline-block;
   width: 18px;
   height: 18px;
-  background-image: url('../SharedResources/images/Green-Square-Button-White-Plus-Add.png');
+  background-image: url('../SharedResources/images/Green-Square-Button-White-Plus-Add-200x200.svg');
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
