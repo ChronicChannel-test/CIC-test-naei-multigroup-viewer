@@ -586,8 +586,22 @@
         if (segments.length === 0) {
           return null;
         }
-        const lastSegment = segments[segments.length - 1].toLowerCase();
-        return STATIC_CHART_IDS.has(lastSegment) ? lastSegment : null;
+
+        let lastSegment = segments[segments.length - 1].toLowerCase();
+        lastSegment = lastSegment.replace(/\.html?$/, '');
+
+        if (STATIC_CHART_IDS.has(lastSegment)) {
+          return lastSegment;
+        }
+
+        if (lastSegment === 'index' && segments.length > 1) {
+          const parentSegment = segments[segments.length - 2].toLowerCase().replace(/\.html?$/, '');
+          if (STATIC_CHART_IDS.has(parentSegment)) {
+            return parentSegment;
+          }
+        }
+
+        return null;
       } catch (error) {
         debugWarn('Unable to resolve chart from path:', error);
         return null;
@@ -602,18 +616,27 @@
         return '/';
       }
 
-      const lastSegment = segments[segments.length - 1].toLowerCase();
-      const hasFileExtension = /\.[^/.]+$/.test(lastSegment);
+      const workingSegments = [...segments];
 
-      if (STATIC_CHART_IDS.has(lastSegment) || hasFileExtension) {
-        segments.pop();
-      }
+      const popIf = (predicate) => {
+        if (!workingSegments.length) {
+          return;
+        }
+        const candidate = workingSegments[workingSegments.length - 1].toLowerCase();
+        if (predicate(candidate)) {
+          workingSegments.pop();
+          popIf(predicate);
+        }
+      };
 
-      if (segments.length === 0) {
+      popIf(segment => /\.[^/.]+$/.test(segment));
+      popIf(segment => STATIC_CHART_IDS.has(segment));
+
+      if (!workingSegments.length) {
         return '/';
       }
 
-      return '/' + segments.join('/') + '/';
+      return '/' + workingSegments.join('/') + '/';
     }
 
     function getChartParam() {
