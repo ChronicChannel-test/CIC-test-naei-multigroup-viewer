@@ -14,27 +14,72 @@
       padding: 0;
     }
 
-    table {
+    #groupTable {
       border-collapse: collapse;
       width: 100%;
-      font-size: 0.93rem;
-      color: #111827;
+      font-size: 0.95rem;
+      color: #0f172a;
+      font-family: inherit;
     }
 
-    th, td {
-      border: 1px solid #d1d5db;
-      padding: 10px 12px;
+    #groupTable th,
+    #groupTable td {
+      border: 1px solid #444;
+      padding: 12px;
+      text-align: left;
       vertical-align: top;
       white-space: pre-line;
     }
 
-    th {
-      background: #f3f4f6;
-      font-weight: 600;
+    #groupTable thead tr {
+      background: #d0d0d0;
     }
 
-    tbody tr:hover {
-      background: #f9fafb;
+    #groupTable tbody tr {
+      cursor: pointer;
+    }
+
+    #groupTable tbody tr:hover {
+      background: #f5f5f5;
+    }
+
+    #groupTable th:nth-child(1),
+    #groupTable td:nth-child(1) {
+      width: 25%;
+    }
+
+    #groupTable th:nth-child(2),
+    #groupTable td:nth-child(2) {
+      width: 40%;
+    }
+
+    #groupTable th:nth-child(3),
+    #groupTable td:nth-child(3) {
+      width: 35%;
+    }
+
+    .group-info-source-heading {
+      text-decoration: underline;
+      font-weight: 600;
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .group-info-item-list {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 4px;
+    }
+
+    .group-info-item {
+      display: block;
+      line-height: 1.25;
+    }
+
+    @media (min-width: 980px) {
+      .group-info-item-list--multi {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
     .copy-hint {
@@ -200,22 +245,103 @@
         }
       }
 
+      function isNullToken(value) {
+        if (value === null || value === undefined) {
+          return true;
+        }
+        if (typeof value === 'string') {
+          const trimmed = value.trim();
+          return !trimmed || trimmed.toUpperCase() === 'NULL';
+        }
+        return false;
+      }
+
+      function normalizeValue(value) {
+        if (value === null || value === undefined) {
+          return '';
+        }
+        if (typeof value === 'string') {
+          return value.trim();
+        }
+        return String(value).trim();
+      }
+
+      function escapeHtml(value) {
+        return value.replace(/[&<>"']/g, char => ({
+          '&': '&amp;',
+          '<': '&lt;',
+          '>': '&gt;',
+          '"': '&quot;',
+          "'": '&#39;'
+        })[char] || char);
+      }
+
+      function buildItemList(items, options = {}) {
+        const normalizedItems = [];
+        items.forEach(item => {
+          const exploded = splitMultiValue(item);
+          if (exploded.length) {
+            normalizedItems.push(...exploded.map(part => normalizeValue(part)));
+          }
+        });
+
+        const filteredItems = normalizedItems.filter(item => !isNullToken(item));
+
+        if (!filteredItems.length) {
+          return '';
+        }
+
+        const threshold = Number.isFinite(options.multiColumnThreshold) ? options.multiColumnThreshold : 6;
+        const multiClass = filteredItems.length >= threshold ? ' group-info-item-list--multi' : '';
+        const itemsHtml = filteredItems
+          .map(item => `<span class="group-info-item">${escapeHtml(item)}</span>`)
+          .join('');
+
+        return `<div class="group-info-item-list${multiClass}">${itemsHtml}</div>`;
+      }
+
+      function splitMultiValue(value) {
+        if (Array.isArray(value)) {
+          return value
+            .map(item => normalizeValue(item))
+            .filter(item => !isNullToken(item));
+        }
+
+        const normalized = normalizeValue(value);
+        if (isNullToken(normalized)) {
+          return [];
+        }
+
+        const separators = /[;\n]+/;
+        if (!separators.test(normalized)) {
+          return [normalized];
+        }
+
+        return normalized
+          .split(separators)
+          .map(item => item.trim())
+          .filter(item => item.length > 0 && !isNullToken(item));
+      }
+
       function buildGroupMaps(groupRows, nfrRows) {
         const nfrMap = {};
         if (Array.isArray(nfrRows)) {
           nfrRows.forEach(row => {
             const code = row?.nfr_code || row?.code;
             const description = row?.description;
-            if (code && description && description !== 'NULL') {
-              nfrMap[code] = description;
+            const normalizedCode = normalizeValue(code);
+            const normalizedDescription = normalizeValue(description);
+            if (!isNullToken(normalizedCode) && !isNullToken(normalizedDescription)) {
+              nfrMap[normalizedCode] = normalizedDescription;
             }
           });
         }
 
         const groupMap = {};
         groupRows.forEach(row => {
-          const groupTitle = row?.group_title || row?.group_name || row?.name;
-          if (!groupTitle) return;
+          const rawTitle = row?.group_title || row?.group_name || row?.name;
+          const groupTitle = normalizeValue(rawTitle);
+          if (isNullToken(groupTitle)) return;
 
           if (!groupMap[groupTitle]) {
             groupMap[groupTitle] = {
@@ -230,19 +356,23 @@
           const activityName = row?.activity_name || row?.activity || row?.Activity;
           const nfrField = row?.nfr_code || row?.nfr_codes || '';
 
-          if (sourceName && sourceName !== 'NULL') {
-            groupMap[groupTitle].sources.add(sourceName);
+          const sourceValues = splitMultiValue(sourceName);
+          if (sourceValues.length) {
+            sourceValues.forEach(item => groupMap[groupTitle].sources.add(item));
           }
 
-          if (activityName && activityName !== 'NULL') {
-            groupMap[groupTitle].activities.add(activityName);
+          const activityValues = splitMultiValue(activityName);
+          if (activityValues.length) {
+            activityValues.forEach(item => groupMap[groupTitle].activities.add(item));
           }
 
-          if (typeof nfrField === 'string' && nfrField.trim()) {
-            nfrField
-              .split(/[;,]/)
+          const normalizedNfrField = typeof nfrField === 'string' ? nfrField : String(nfrField ?? '');
+          if (normalizedNfrField.trim()) {
+            normalizedNfrField
+              .split(/[;,\n]/)
               .map(code => code.trim())
-              .filter(Boolean)
+              .map(normalizeValue)
+              .filter(code => !isNullToken(code))
               .forEach(code => groupMap[groupTitle].nfrCodes.add(code));
           }
         });
@@ -250,9 +380,9 @@
         const groups = Object.values(groupMap)
           .map(g => ({
             name: g.name,
-            sources: Array.from(g.sources).filter(Boolean).sort(),
-            activities: Array.from(g.activities).filter(Boolean).sort(),
-            nfrCodes: Array.from(g.nfrCodes).filter(Boolean).sort()
+            sources: Array.from(g.sources).sort((a, b) => a.localeCompare(b)),
+            activities: Array.from(g.activities).sort((a, b) => a.localeCompare(b)),
+            nfrCodes: Array.from(g.nfrCodes).sort((a, b) => a.localeCompare(b))
           }))
           .sort((a, b) => {
             if (a.name?.toLowerCase() === 'all') return -1;
@@ -395,41 +525,42 @@
         }
 
         let tableHtml = `
-          <table aria-label="NAEI group information">
+          <table id="groupTable" aria-label="NAEI group information">
             <thead>
               <tr>
-                <th style="width:24%;">Group Name</th>
-                <th style="width:42%;">Sources / NFR Codes</th>
-                <th style="width:34%;">Fuel Types (Activity)</th>
+                <th>Group Name</th>
+                <th>Sources</th>
+                <th>Fuel Types (Activity in NAEI data)</th>
               </tr>
             </thead>
             <tbody>
         `;
 
         groups.forEach(group => {
-          const validSources = group.sources.length ? group.sources : [];
-          const validActivities = group.activities.length ? group.activities : [];
-          const validCodes = group.nfrCodes.length ? group.nfrCodes : [];
+          const validSources = group.sources;
+          const validActivities = group.activities;
+          const validCodes = group.nfrCodes;
 
           let sourcesContent = '';
           if (validCodes.length) {
-            sourcesContent += '<span style="display:block;font-weight:600;margin-bottom:4px;">NFR code coverage:</span>';
-            sourcesContent += '<div style="white-space:pre-line;">';
-            validCodes.forEach(code => {
+            const nfrItems = validCodes.map(code => {
               const description = nfrMap[code];
-              sourcesContent += description ? `${code}: ${description}\n` : `${code}\n`;
+              return description ? `${code}: ${description}` : code;
             });
-            sourcesContent += '</div>';
+            sourcesContent += '<span class="group-info-source-heading">All Sources from the following NFR Code categories:</span>';
+            sourcesContent += buildItemList(nfrItems, { multiColumnThreshold: 8 });
           }
 
           if (!sourcesContent) {
-            sourcesContent = validSources.length ? validSources.join('\n') : 'All Sources';
+            sourcesContent = validSources.length ? buildItemList(validSources, { multiColumnThreshold: 8 }) : 'All Sources';
           }
 
-          const activitiesContent = validActivities.length ? validActivities.join('\n') : 'All Fuel Types';
+          const activitiesContent = validActivities.length
+            ? buildItemList(validActivities, { multiColumnThreshold: 8 })
+            : 'All Fuel Types';
 
           tableHtml += `
-            <tr style="cursor: pointer;">
+            <tr>
               <td style="font-weight:600;">${group.name}</td>
               <td>${sourcesContent}</td>
               <td>${activitiesContent}</td>
