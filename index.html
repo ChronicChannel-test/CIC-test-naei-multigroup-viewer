@@ -359,6 +359,35 @@
       width: 24px;
       height: 24px;
     }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-stack {
+      flex: 1 0 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #chart-interface {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #chart-interface > footer {
+      margin-top: auto;
+    }
   </style>
 </head>
 
@@ -399,6 +428,7 @@
     </div>
   </div>
 
+  <div class="page-stack">
   <!-- Header -->
   <div class="bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -517,6 +547,7 @@
       </span>
     </footer>
   </div> <!-- End chart-interface -->
+  </div> <!-- End page-stack -->
 
   <style>
     .chart-iframe {
@@ -1160,13 +1191,32 @@
             ? reportedHeight
             : fallbackHeight;
 
+          let finalHeight = safeHeight;
+
+          if (chartKey === 'group-info') {
+            const container = document.getElementById('chart-group-info');
+            const containerVisible = container && container.getAttribute('aria-hidden') === 'false';
+            if (containerVisible) {
+              const iframeRect = iframe.getBoundingClientRect();
+              const footerEl = document.querySelector('#chart-interface > footer');
+              const footerRect = footerEl ? footerEl.getBoundingClientRect() : null;
+              const footerStyles = footerEl ? window.getComputedStyle(footerEl) : null;
+              const footerMargins = footerStyles
+                ? (parseFloat(footerStyles.marginTop) || 0) + (parseFloat(footerStyles.marginBottom) || 0)
+                : 0;
+              const reservedFooterSpace = (footerRect?.height || 0) + footerMargins;
+              const viewportRemaining = Math.max(window.innerHeight - Math.max(iframeRect.top, 0) - reservedFooterSpace, 0);
+              finalHeight = Math.max(safeHeight, viewportRemaining, 320);
+            }
+          }
+
           if (!Number.isFinite(reportedHeight) || reportedHeight <= 0) {
             debugWarn(`⚠️ Received invalid height (${event.data.height}) from ${chartKey}; using fallback ${safeHeight}px`);
           } else {
             console.log(`📏 Received content height from ${chartKey}: ${reportedHeight}px`);
           }
 
-          iframe.style.height = safeHeight + 'px';
+          iframe.style.height = finalHeight + 'px';
           
           heightsReceived[chartKey] = true;
           

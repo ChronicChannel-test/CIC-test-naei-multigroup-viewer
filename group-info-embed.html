@@ -332,12 +332,20 @@
       let groupInfoState = null;
       const highlightMatchesEnabled = true;
       let filterInputActive = true;
+      const MIN_HEIGHT_DELTA = 8;
+      let lastSentHeight = 0;
+      let contentResizeObserver = null;
       const actDataStatus = {
         ready: false,
         hasActDataByGroupName: new Map(),
         hasActDataByGroupId: new Map(),
         groupsWithoutActData: []
       };
+
+      if (typeof ResizeObserver === 'function' && contentEl) {
+        contentResizeObserver = new ResizeObserver(() => scheduleHeightUpdate(24));
+        contentResizeObserver.observe(contentEl);
+      }
 
       function setFilterInputState(isActive) {
         if (!filterInput) {
@@ -368,24 +376,31 @@
       }
 
       function measureHeight() {
-        const body = document.body;
-        const docEl = document.documentElement;
-        let height = Math.max(
-          body ? body.scrollHeight : 0,
-          body ? body.offsetHeight : 0,
-          docEl ? docEl.scrollHeight : 0,
-          docEl ? docEl.offsetHeight : 0,
-          600
-        );
-        if (!Number.isFinite(height) || height <= 0) {
-          height = 800;
+        const shell = document.querySelector('.group-info-shell');
+        const frame = document.querySelector('.group-info-frame');
+        const frameRect = frame ? frame.getBoundingClientRect() : null;
+        const frameHeight = frameRect?.height || frame?.offsetHeight || frame?.scrollHeight || 0;
+        const shellStyles = shell ? window.getComputedStyle(shell) : null;
+        const paddingTop = shellStyles ? parseFloat(shellStyles.paddingTop) || 0 : 0;
+        const paddingBottom = shellStyles ? parseFloat(shellStyles.paddingBottom) || 0 : 0;
+        let measured = frameHeight + paddingTop + paddingBottom;
+        if (!Number.isFinite(measured) || measured <= 0) {
+          measured = Math.max(document.body?.scrollHeight || 0, 320);
         }
-        return height;
+
+        return Math.max(Math.ceil(measured), 320);
       }
 
-      function sendHeightToParent() {
+      function sendHeightToParent(force = false) {
         try {
+          if (!(window.parent && window.parent !== window)) {
+            return;
+          }
           const height = measureHeight();
+          if (!force && lastSentHeight && Math.abs(height - lastSentHeight) < MIN_HEIGHT_DELTA) {
+            return;
+          }
+          lastSentHeight = height;
           window.parent.postMessage({
             type: 'contentHeight',
             chart: 'group-info',
@@ -398,7 +413,7 @@
 
       function scheduleHeightUpdate(delay = 50) {
         setTimeout(() => {
-          requestAnimationFrame(sendHeightToParent);
+          requestAnimationFrame(() => sendHeightToParent(false));
         }, delay);
       }
 
@@ -1197,6 +1212,7 @@
       });
 
       window.addEventListener('load', () => {
+        sendHeightToParent(true);
         scheduleHeightUpdate(20);
       });
     })();
