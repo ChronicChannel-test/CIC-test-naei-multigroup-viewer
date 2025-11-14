@@ -84,18 +84,24 @@ async function init() {
     // Create window data stores EXACTLY like linechart v2.3
     window.allPollutants = window.supabaseModule.allPollutants;
     window.allGroupsRaw = window.supabaseModule.allGroups;
-    const activeGroupsForSelectors = window.supabaseModule.activeGroups || window.supabaseModule.allGroups || [];
+    const activeGroupsForSelectors = window.supabaseModule.activeActDataGroups
+      || window.supabaseModule.activeGroups
+      || window.supabaseModule.allGroups
+      || [];
     window.allGroups = activeGroupsForSelectors;
     console.log('Created window.allGroups with', window.allGroups.length, 'groups');
-    if (window.groupsWithoutActivityData && window.groupsWithoutActivityData.length) {
-      console.log('Groups hidden due to missing activity data:', window.groupsWithoutActivityData);
+    if (window.groupsWithoutActData && window.groupsWithoutActData.length) {
+      console.log('Groups hidden due to missing Activity Data:', window.groupsWithoutActData);
       if (bubbleDebugLoggingEnabled) {
-        showNotification(`Hiding ${window.groupsWithoutActivityData.length} group(s) that lack Activity Data`, 'info');
+        showNotification(`Hiding ${window.groupsWithoutActData.length} group(s) that lack Activity Data`, 'info');
       }
     }
 
     // Create allGroupsList EXACTLY like linechart setupSelectors function
-    const groups = window.supabaseModule.activeGroups || window.supabaseModule.allGroups || [];
+    const groups = window.supabaseModule.activeActDataGroups
+      || window.supabaseModule.activeGroups
+      || window.supabaseModule.allGroups
+      || [];
     const groupNames = [...new Set(groups.map(g => g.group_title))]
       .filter(Boolean)
       .sort((a, b) => {
@@ -461,7 +467,11 @@ function parseUrlParameters() {
 
   const pollutants = window.supabaseModule.allPollutants || [];
   const groups = window.supabaseModule.allGroups || [];
-  const activeGroupIdSet = new Set(window.supabaseModule.activeGroupIds || []);
+  const activeGroupIdSet = new Set(
+    window.supabaseModule.activeActDataGroupIds
+    || window.supabaseModule.activeGroupIds
+    || []
+  );
   const availableYears = window.supabaseModule.getAvailableYears() || [];
 
   let pollutantName = null;
@@ -548,8 +558,9 @@ function setupYearSelector() {
  * Setup pollutant selector
  */
 function setupPollutantSelector() {
+  const actDataId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
   const pollutants = window.supabaseModule.allPollutants
-    .filter(p => p.id !== window.supabaseModule.activityDataId) // Exclude Activity Data
+    .filter(p => p.id !== actDataId) // Exclude Activity Data
     .sort((a, b) => a.pollutant.localeCompare(b.pollutant));
   
   const select = document.getElementById('pollutantSelect');
@@ -694,7 +705,10 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
 
 // Refresh group dropdown options (like linechart)
 function refreshGroupDropdowns() {
-  const allGroups = window.supabaseModule.activeGroups || window.supabaseModule.allGroups || [];
+  const allGroups = window.supabaseModule.activeActDataGroups
+    || window.supabaseModule.activeGroups
+    || window.supabaseModule.allGroups
+    || [];
   const allGroupNames = allGroups
     .map(g => g.group_title)
     .filter(Boolean)
@@ -1046,7 +1060,7 @@ function drawChart(skipHeightUpdate = false) {
     const lowerPolluter = group1.pollutantValue > group2.pollutantValue ? group2 : group1;
 
     const pollutionRatio = lowerPolluter.pollutantValue !== 0 ? higherPolluter.pollutantValue / lowerPolluter.pollutantValue : Infinity;
-    const heatRatio = higherPolluter.activityData !== 0 ? lowerPolluter.activityData / higherPolluter.activityData : Infinity;
+    const heatRatio = higherPolluter.actDataValue !== 0 ? lowerPolluter.actDataValue / higherPolluter.actDataValue : Infinity;
 
     const pollutantName = window.supabaseModule.getPollutantName(selectedPollutantId);
 

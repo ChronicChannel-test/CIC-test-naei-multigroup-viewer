@@ -332,6 +332,12 @@
       let groupInfoState = null;
       const highlightMatchesEnabled = true;
       let filterInputActive = true;
+      const actDataStatus = {
+        ready: false,
+        hasActDataByGroupName: new Map(),
+        hasActDataByGroupId: new Map(),
+        groupsWithoutActData: []
+      };
 
       function setFilterInputState(isActive) {
         if (!filterInput) {
@@ -404,6 +410,125 @@
         } catch (error) {
           console.warn('Shared data loader unavailable when preparing group info page:', error);
         }
+      }
+
+      async function ensureActDataStatus() {
+        if (actDataStatus.ready) {
+          return actDataStatus;
+        }
+
+        let dataset = null;
+
+        try {
+          if (window.SharedDataLoader) {
+            if (!window.SharedDataLoader.isDataLoaded()) {
+              await window.SharedDataLoader.loadSharedData();
+            }
+            dataset = window.SharedDataLoader.getCachedData();
+          }
+        } catch (error) {
+          console.warn('Unable to access shared ActData dataset from cache:', error);
+        }
+
+        if (!dataset) {
+          const client = window.SupabaseConfig ? window.SupabaseConfig.initSupabaseClient() : null;
+          if (client) {
+            try {
+              const [pollutantsResp, groupsResp, timeseriesResp] = await Promise.all([
+                client.from('NAEI_global_Pollutants').select('id,pollutant'),
+                client.from('NAEI_global_t_Group').select('id,group_title'),
+                client.from('NAEI_2023ds_t_Group_Data').select('*')
+              ]);
+
+              if (!pollutantsResp?.error && !groupsResp?.error && !timeseriesResp?.error) {
+                dataset = {
+                  pollutants: pollutantsResp.data || [],
+                  groups: groupsResp.data || [],
+                  timeseries: timeseriesResp.data || []
+                };
+              } else {
+                console.warn('Failed to load fallback ActData dataset:', pollutantsResp?.error || groupsResp?.error || timeseriesResp?.error);
+              }
+            } catch (error) {
+              console.warn('Error while fetching fallback ActData dataset:', error);
+            }
+          }
+        }
+
+        if (!dataset) {
+          actDataStatus.ready = true;
+          return actDataStatus;
+        }
+
+        const { pollutants = [], groups = [], timeseries = [] } = dataset;
+        const actDataPollutant = pollutants.find(entry => typeof entry?.pollutant === 'string' && entry.pollutant.toLowerCase() === 'activity data');
+
+        if (!actDataPollutant) {
+          console.warn('Activity Data pollutant missing; cannot compute ActData availability.');
+          actDataStatus.ready = true;
+          return actDataStatus;
+        }
+
+        const sampleRow = timeseries.find(row => row?.pollutant_id === actDataPollutant.id) || timeseries[0];
+        const yearColumns = sampleRow
+          ? Object.keys(sampleRow).filter(key => /^f\d{4}$/.test(key)).sort((a, b) => a.localeCompare(b))
+          : [];
+
+        const actDataRowsByGroup = new Map();
+        timeseries.forEach(row => {
+          if (row?.pollutant_id === actDataPollutant.id) {
+            actDataRowsByGroup.set(row.group_id, row);
+          }
+        });
+
+        const hasActDataByGroupName = new Map();
+        const hasActDataByGroupId = new Map();
+        const missingNamesSet = new Set();
+
+        groups.forEach(group => {
+          const rawName = normalizeValue(group?.group_title);
+          if (!rawName) {
+            return;
+          }
+          const key = rawName.toLowerCase();
+          let hasActData = false;
+          const actRow = actDataRowsByGroup.get(group.id);
+
+          if (actRow && yearColumns.length) {
+            hasActData = yearColumns.some(column => {
+              const value = actRow[column];
+              if (value === null || value === undefined) {
+                return false;
+              }
+              const numeric = Number(value);
+              return Number.isFinite(numeric) && numeric !== 0;
+            });
+          }
+
+          if (key === 'all') {
+            hasActData = false;
+          }
+
+          hasActDataByGroupName.set(key, hasActData);
+          hasActDataByGroupId.set(group.id, hasActData);
+          if (!hasActData) {
+            missingNamesSet.add(rawName);
+          }
+        });
+
+        actDataStatus.ready = true;
+        actDataStatus.hasActDataByGroupName = hasActDataByGroupName;
+        actDataStatus.hasActDataByGroupId = hasActDataByGroupId;
+        actDataStatus.groupsWithoutActData = Array.from(missingNamesSet).sort((a, b) => a.localeCompare(b));
+
+        if (actDataStatus.groupsWithoutActData.length) {
+          window.groupsWithoutActData = actDataStatus.groupsWithoutActData.slice();
+        }
+        window.inactiveActDataGroupIds = groups
+          .filter(group => hasActDataByGroupId.get(group.id) === false)
+          .map(group => group.id);
+
+        return actDataStatus;
       }
 
       function isNullToken(value) {
@@ -663,15 +788,26 @@
         return highlightText('All Fuel Types', highlightRegex);
       }
 
-      function hasActivityData(group) {
-        if (!group || !Array.isArray(group.activities)) {
+      function hasActDataForGroup(group) {
+        if (!group) {
           return false;
         }
-        return group.activities.some(item => !isNullToken(item));
+        const normalizedName = normalizeValue(group.name);
+        if (!normalizedName) {
+          return false;
+        }
+        const key = normalizedName.toLowerCase();
+        if (actDataStatus.hasActDataByGroupName && actDataStatus.hasActDataByGroupName.has(key)) {
+          return actDataStatus.hasActDataByGroupName.get(key);
+        }
+        if (Array.isArray(group.activities)) {
+          return group.activities.some(item => !isNullToken(item));
+        }
+        return false;
       }
 
       function getActivityIndicatorInfo(group) {
-        const hasData = hasActivityData(group);
+        const hasData = hasActDataForGroup(group);
         const message = hasData ? 'Yes' : 'No';
         const description = hasData ? 'Activity data available' : 'Activity data unavailable';
         const iconSrc = hasData
@@ -973,6 +1109,7 @@
         contentEl.textContent = 'Loading group information…';
 
         await ensureSharedDataLoaded();
+        await ensureActDataStatus();
 
         let groupRows = [];
         let nfrRows = [];

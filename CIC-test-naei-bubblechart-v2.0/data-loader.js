@@ -38,7 +38,10 @@ window.DataLoader = {
     return window.supabaseModule.allGroups; 
   },
   
-  get activityDataId() { 
-    return window.supabaseModule.activityDataId; 
+  get actDataPollutantId() {
+    return window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
+  },
+  get activityDataId() {
+    return window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
   }
 };

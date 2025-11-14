@@ -40,12 +40,12 @@ let groupedData = {};
 let allGroupsList = [];
 let allPollutants = [];
 let allGroups = [];
-let activeGroups = [];
-let activeGroupIds = [];
-let inactiveActivityGroupIds = [];
+  let activeActDataGroups = [];
+  let activeActDataGroupIds = [];
+  let inactiveActDataGroupIds = [];
 let pollutantsData = []; // Store raw pollutant data for ID lookups
 let groupsData = []; // Store raw group data for ID lookups
-let activityDataId = null;
+  let actDataPollutantId = null;
 
 /**
  * Track analytics events to Supabase (wrapper for shared Analytics module)
@@ -133,13 +133,13 @@ async function loadData() {
     });
 
     // Find Activity Data pollutant ID
-    const activityDataPollutant = pollutants.find(p => 
+    const actDataPollutant = pollutants.find(p => 
       p.pollutant && p.pollutant.toLowerCase() === 'activity data'
     );
     
-    if (activityDataPollutant) {
-      activityDataId = activityDataPollutant.id;
-      console.log("Activity Data pollutant ID:", activityDataId);
+    if (actDataPollutant) {
+      actDataPollutantId = actDataPollutant.id;
+      console.log("Activity Data pollutant ID:", actDataPollutantId);
     } else {
       console.warn("Activity Data not found in pollutants list");
     }
@@ -161,69 +161,69 @@ async function loadData() {
       window.globalYearKeys = headers;
     }
 
-    // Determine which groups have any non-zero activity data across available years
-    activeGroups = [];
-    activeGroupIds = [];
-    inactiveActivityGroupIds = [];
+    // Determine which groups have any non-zero Activity Data across available years
+    activeActDataGroups = [];
+    activeActDataGroupIds = [];
+    inactiveActDataGroupIds = [];
 
-    if (activityDataId && globalHeaders.length > 0) {
-      const activityRowsByGroup = new Map();
+    if (actDataPollutantId && globalHeaders.length > 0) {
+      const actDataRowsByGroup = new Map();
       globalRows.forEach(row => {
-        if (row.pollutant_id === activityDataId) {
-          activityRowsByGroup.set(row.group_id, row);
+        if (row.pollutant_id === actDataPollutantId) {
+          actDataRowsByGroup.set(row.group_id, row);
         }
       });
 
       groups.forEach(group => {
-        const activityRow = activityRowsByGroup.get(group.id);
+        const actDataRow = actDataRowsByGroup.get(group.id);
 
-        if (!activityRow) {
-          inactiveActivityGroupIds.push(group.id);
+        if (!actDataRow) {
+          inactiveActDataGroupIds.push(group.id);
           return;
         }
 
-        const hasActivity = globalHeaders.some(header => {
-          const value = activityRow[header];
+        const hasActData = globalHeaders.some(header => {
+          const value = actDataRow[header];
           if (value === null || value === undefined) return false;
           const numeric = Number(value);
           if (!Number.isFinite(numeric)) return false;
           return numeric !== 0;
         });
 
-        if (hasActivity) {
-          activeGroups.push(group);
-          activeGroupIds.push(group.id);
+        if (hasActData) {
+          activeActDataGroups.push(group);
+          activeActDataGroupIds.push(group.id);
         } else {
-          inactiveActivityGroupIds.push(group.id);
+          inactiveActDataGroupIds.push(group.id);
         }
       });
 
-      if (activeGroups.length === 0 && groups.length > 0) {
-        console.warn('No groups reported activity data; reverting to full group list.');
-        activeGroups = [...groups];
-        activeGroupIds = activeGroups.map(g => g.id);
-        inactiveActivityGroupIds = [];
+      if (activeActDataGroups.length === 0 && groups.length > 0) {
+        console.warn('No groups reported Activity Data; reverting to full group list.');
+        activeActDataGroups = [...groups];
+        activeActDataGroupIds = activeActDataGroups.map(g => g.id);
+        inactiveActDataGroupIds = [];
       }
     } else {
-      // Fallback: if we cannot determine activity data, treat all groups as active
-      activeGroups = [...groups];
-      activeGroupIds = activeGroups.map(g => g.id);
-      inactiveActivityGroupIds = [];
+      // Fallback: if we cannot determine Activity Data, treat all groups as active
+      activeActDataGroups = [...groups];
+      activeActDataGroupIds = activeActDataGroups.map(g => g.id);
+      inactiveActDataGroupIds = [];
     }
 
     // Always exclude the aggregate "All" group from bubble chart selectors
     const allGroupEntry = groups.find(g => typeof g.group_title === 'string' && g.group_title.trim().toLowerCase() === 'all');
     if (allGroupEntry) {
       const allGroupId = allGroupEntry.id;
-      activeGroups = activeGroups.filter(g => g.id !== allGroupId);
-      activeGroupIds = activeGroupIds.filter(id => id !== allGroupId);
-      if (!inactiveActivityGroupIds.includes(allGroupId)) {
-        inactiveActivityGroupIds.push(allGroupId);
+      activeActDataGroups = activeActDataGroups.filter(g => g.id !== allGroupId);
+      activeActDataGroupIds = activeActDataGroupIds.filter(id => id !== allGroupId);
+      if (!inactiveActDataGroupIds.includes(allGroupId)) {
+        inactiveActDataGroupIds.push(allGroupId);
       }
     }
 
     // Build groups list for dropdowns using only active groups (fallback to all if none identified)
-    const baseGroupsForDropdown = activeGroups.length > 0 ? activeGroups : groups;
+    const baseGroupsForDropdown = activeActDataGroups.length > 0 ? activeActDataGroups : groups;
     const groupsForDropdown = baseGroupsForDropdown.filter(g => {
       if (typeof g.group_title !== 'string') return true;
       return g.group_title.trim().toLowerCase() !== 'all';
@@ -233,14 +233,16 @@ async function loadData() {
       name: g.group_title || `Group ${g.id}`
     })).sort((a, b) => a.name.localeCompare(b.name));
 
-    if (inactiveActivityGroupIds.length > 0) {
-      const inactiveNames = inactiveActivityGroupIds
+    if (inactiveActDataGroupIds.length > 0) {
+      const inactiveNames = inactiveActDataGroupIds
         .map(id => groups.find(g => g.id === id)?.group_title || `Group ${id}`)
         .filter(Boolean)
         .sort();
-      window.groupsWithoutActivityData = inactiveNames;
-      console.log('Groups without activity data (excluded from bubble chart dropdown):', inactiveNames);
+      window.groupsWithoutActData = inactiveNames;
+      window.groupsWithoutActivityData = inactiveNames; // legacy alias for any embeds not yet renamed
+      console.log('Groups without Activity Data (excluded from bubble chart dropdown):', inactiveNames);
     } else {
+      window.groupsWithoutActData = [];
       window.groupsWithoutActivityData = [];
     }
 
@@ -288,16 +290,16 @@ function getAvailableYears() {
  * @param {number} year - Year to get data for
  * @param {number} pollutantId - Pollutant ID
  * @param {Array} groupIds - Array of group IDs
- * @returns {Array} Array of data points {group, activityData, pollutantValue}
+ * @returns {Array} Array of data points {group, actDataValue, pollutantValue}
  */
 function getScatterData(year, pollutantId, groupIds) {
   const yearColumn = `f${year}`;
   const dataPoints = [];
 
   groupIds.forEach(groupId => {
-    // Get activity data for this group
-    const activityRow = globalRows.find(row => 
-      row.pollutant_id === activityDataId && row.group_id === groupId
+    // Get Activity Data for this group
+    const actDataRow = globalRows.find(row => 
+      row.pollutant_id === actDataPollutantId && row.group_id === groupId
     );
     
     // Get pollutant data for this group
@@ -305,19 +307,19 @@ function getScatterData(year, pollutantId, groupIds) {
       row.pollutant_id === pollutantId && row.group_id === groupId
     );
 
-    if (activityRow && pollutantRow) {
-      const activityValue = activityRow[yearColumn];
+    if (actDataRow && pollutantRow) {
+      const actDataValue = actDataRow[yearColumn];
       const pollutantValue = pollutantRow[yearColumn];
       
       // Only include if both values are valid numbers
-      if (activityValue != null && pollutantValue != null && 
-          !isNaN(activityValue) && !isNaN(pollutantValue)) {
+      if (actDataValue != null && pollutantValue != null && 
+          !isNaN(actDataValue) && !isNaN(pollutantValue)) {
         
         const group = allGroups.find(g => g.id === groupId);
         dataPoints.push({
           groupId: groupId,
           groupName: group ? group.group_title : `Group ${groupId}`,
-          activityData: parseFloat(activityValue),
+          actDataValue: parseFloat(actDataValue),
           pollutantValue: parseFloat(pollutantValue)
         });
       }
@@ -428,10 +430,15 @@ try {
     get allPollutants() { return allPollutants; },
     get allGroups() { return allGroups; },
     get allGroupsList() { return allGroupsList; },
-    get activityDataId() { return activityDataId; },
-    get activeGroups() { return activeGroups; },
-    get activeGroupIds() { return activeGroupIds; },
-    get inactiveActivityGroupIds() { return inactiveActivityGroupIds; }
+    get actDataPollutantId() { return actDataPollutantId; },
+    get activeActDataGroups() { return activeActDataGroups; },
+    get activeActDataGroupIds() { return activeActDataGroupIds; },
+    get inactiveActDataGroupIds() { return inactiveActDataGroupIds; },
+    // Legacy getters maintained temporarily for backwards compatibility
+    get activityDataId() { return actDataPollutantId; },
+    get activeGroups() { return activeActDataGroups; },
+    get activeGroupIds() { return activeActDataGroupIds; },
+    get inactiveActivityGroupIds() { return inactiveActDataGroupIds; }
   };
   console.log('supabaseModule for scatter chart initialized successfully');
 } catch (error) {

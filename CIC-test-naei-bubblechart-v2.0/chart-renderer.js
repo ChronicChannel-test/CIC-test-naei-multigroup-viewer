@@ -225,7 +225,7 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   }
   
   // Calculate all EF values first to determine dynamic scale factor (use visible points only)
-  const allEFs = visibleDataPoints.map(p => p.EF !== undefined ? p.EF : (p.activityData !== 0 ? (p.pollutantValue / p.activityData) * conversionFactor : 0));
+  const allEFs = visibleDataPoints.map(p => p.EF !== undefined ? p.EF : (p.actDataValue !== 0 ? (p.pollutantValue / p.actDataValue) * conversionFactor : 0));
   const maxEF = Math.max(...allEFs);
   const minEF = Math.min(...allEFs.filter(ef => ef > 0)); // Exclude zeros
   
@@ -268,7 +268,7 @@ function drawBubbleChart(year, pollutantId, groupIds) {
 
     // Use Emission Factor (EF) directly for bubble size
     // If EF is already provided in point, use it; otherwise, calculate
-    const emissionFactor = point.EF !== undefined ? point.EF : (point.activityData !== 0 ? (point.pollutantValue / point.activityData) * conversionFactor : 0);
+    const emissionFactor = point.EF !== undefined ? point.EF : (point.actDataValue !== 0 ? (point.pollutantValue / point.actDataValue) * conversionFactor : 0);
 
     // Calculate bubble size using logarithmic or linear scaling
     let radius;
@@ -300,10 +300,10 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     // All EF values are converted to g/GJ
     // Use more decimal places for very small values
     const efDisplay = emissionFactor < 0.01 ? emissionFactor.toFixed(8) : emissionFactor.toFixed(2);
-    const tooltip = `${point.groupName}\nActivity: ${point.activityData.toLocaleString()} TJ\nEmissions: ${point.pollutantValue.toLocaleString()} ${pollutantUnit}\nEmission Factor: ${efDisplay} g/GJ`;
+    const tooltip = `${point.groupName}\nActivity: ${point.actDataValue.toLocaleString()} TJ\nEmissions: ${point.pollutantValue.toLocaleString()} ${pollutantUnit}\nEmission Factor: ${efDisplay} g/GJ`;
 
     data.addRow([
-      point.activityData, // X-axis
+      point.actDataValue, // X-axis
       point.pollutantValue, // Y-axis
       tooltip,
       `point {fill-color: ${color}; size: ${Math.round(normalizedRadius)};}`
@@ -315,7 +315,8 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   // Chart options
   const pollutantName = window.supabaseModule.getPollutantName(pollutantId);
   // pollutantUnit already declared above
-  const activityUnit = window.supabaseModule.getPollutantUnit(window.supabaseModule.activityDataId);
+  const actDataId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
+  const activityUnit = window.supabaseModule.getPollutantUnit(actDataId);
   
   console.log('Chart renderer - Pollutant Name:', pollutantName);
   console.log('Chart renderer - Pollutant Unit:', pollutantUnit);
@@ -367,7 +368,7 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   });
 
   // Calculate axis ranges with padding for bubbles (use visible data points only)
-  const activityValues = visibleDataPoints.map(p => p.activityData);
+  const activityValues = visibleDataPoints.map(p => p.actDataValue);
   const pollutantValues = visibleDataPoints.map(p => p.pollutantValue);
   
   const maxActivity = Math.max(...activityValues);

@@ -234,7 +234,7 @@ async function generateChartImage() {
 
           // Calculate all EF values for scaling
           const allEFs = visibleDataPoints.map(p => 
-            p.EF !== undefined ? p.EF : (p.activityData !== 0 ? (p.pollutantValue / p.activityData) * conversionFactor : 0)
+            p.EF !== undefined ? p.EF : (p.actDataValue !== 0 ? (p.pollutantValue / p.actDataValue) * conversionFactor : 0)
           );
           const maxEF = Math.max(...allEFs);
           const minEF = Math.min(...allEFs.filter(ef => ef > 0));
@@ -319,15 +319,15 @@ async function generateChartImage() {
           visibleDataPoints.forEach(point => {
             // Calculate emission factor using correct conversion factor
             const emissionFactor = point.EF !== undefined ? point.EF : 
-              (point.activityData !== 0 ? (point.pollutantValue / point.activityData) * conversionFactor : 0);
+              (point.actDataValue !== 0 ? (point.pollutantValue / point.actDataValue) * conversionFactor : 0);
             
             // Skip if no valid data
-            if (!point || typeof point.activityData !== 'number' || typeof point.pollutantValue !== 'number') {
+            if (!point || typeof point.actDataValue !== 'number' || typeof point.pollutantValue !== 'number') {
               return;
             }
             
             // Calculate bubble position in pixels
-            const xRatio = point.activityData / xMax;
+            const xRatio = point.actDataValue / xMax;
             const yRatio = 1 - (point.pollutantValue / yMax); // Invert Y axis
             const bubbleX = padding + (150 * exportScale) + (xRatio * plotWidth);
             const bubbleY = chartY + chartAreaTop + (yRatio * plotHeight);
@@ -795,7 +795,8 @@ function exportData(format = 'csv') {
 
   const pollutantName = chartData.pollutantName;
   const pollutantUnit = window.supabaseModule.getPollutantUnit(chartData.pollutantId);
-  const activityUnit = window.supabaseModule.getPollutantUnit(window.supabaseModule.activityDataId);
+  const actDataId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
+  const activityUnit = window.supabaseModule.getPollutantUnit(actDataId);
   const year = chartData.year;
   const dataPoints = chartData.dataPoints;
 
@@ -823,11 +824,11 @@ function exportData(format = 'csv') {
   // Data rows
   dataPoints.forEach(point => {
     const emissionFactor = point.EF !== undefined ? point.EF : 
-      (point.activityData !== 0 ? (point.pollutantValue / point.activityData) * 1000000 : 0);
+      (point.actDataValue !== 0 ? (point.pollutantValue / point.actDataValue) * 1000000 : 0);
     
     rows.push([
       point.groupName,
-      point.activityData.toFixed(2),
+      point.actDataValue.toFixed(2),
       point.pollutantValue.toFixed(6),
       emissionFactor.toFixed(2)
     ]);
