@@ -405,8 +405,8 @@
       <div class="flex items-center justify-between h-16">
         <div class="flex items-center">
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">NAEI Multi-Group Pollutant Viewer</h1>
-            <p class="text-sm text-gray-500">Interactive charts for UK emissions data</p>
+            <h1 class="text-3xl font-bold text-gray-900">UK Air Pollution and Emissions Data Explorer</h1>
+            <p class="text-sm text-gray-500">Interactive Charts using UK Government Data</p>
           </div>
         </div>
       </div>
@@ -448,10 +448,11 @@
   <div id="chart-1" class="chart-container" role="tabpanel" aria-labelledby="tab-1" aria-hidden="false">
       <iframe
         id="bubblechart-iframe"
+        class="chart-iframe"
         src="CIC-test-naei-bubblechart-v2.0/index.html"
         frameborder="0"
         scrolling="no"
-  style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden;"
+        style="height: 600px;"
         title="NAEI Activity Data Bubble Chart"></iframe>
     </div>
 
@@ -459,10 +460,11 @@
   <div id="chart-2" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-2" aria-hidden="true">
       <iframe
         id="linechart-iframe"
+        class="chart-iframe"
         src="CIC-test-naei-linechart-v2.4/index.html"
         frameborder="0"
         scrolling="no"
-  style="width: 100%; height: 600px; border: none; background: white; display: block; overflow: hidden;"
+        style="height: 600px;"
         title="NAEI Activity Data Line Chart"></iframe>
     </div>
 
@@ -470,10 +472,11 @@
   <div id="chart-group-info" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-group-info" aria-hidden="true">
       <iframe
         id="groupinfo-iframe"
+        class="chart-iframe"
         src="group-info-embed.html"
         frameborder="0"
         scrolling="no"
-        style="width: 100%; height: 900px; border: none; background: white; display: block; overflow: hidden;"
+        style="height: 900px;"
         title="NAEI Group Information"></iframe>
     </div>
 
@@ -481,10 +484,11 @@
   <div id="chart-user-guide" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-user-guide" aria-hidden="true">
       <iframe
         id="userguide-iframe"
+        class="chart-iframe"
         src="user-guide-embed.html"
         frameborder="0"
         scrolling="no"
-        style="width: 100%; height: 900px; border: none; background: white; display: block; overflow: hidden;"
+        style="height: 900px;"
         title="NAEI User Guide"></iframe>
     </div>
 
@@ -492,10 +496,11 @@
   <div id="chart-resources" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-resources" aria-hidden="true">
       <iframe
         id="resources-iframe"
+        class="chart-iframe"
         src="resources-embed.html"
         frameborder="0"
         scrolling="no"
-        style="width: 100%; height: 900px; border: none; background: white; display: block; overflow: hidden;"
+        style="height: 900px;"
         title="NAEI Resources"></iframe>
     </div>
 
@@ -514,6 +519,15 @@
   </div> <!-- End chart-interface -->
 
   <style>
+    .chart-iframe {
+      width: 100%;
+      max-width: 100%;
+      border: none;
+      background: white;
+      display: block;
+      overflow: hidden;
+    }
+
     .footer-copyright,
     .footer-license {
       white-space: nowrap;

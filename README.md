@@ -20,6 +20,28 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 - Configure credentials in `SharedResources/supabase-config.js`; the helper exports `initSupabaseClient()` used everywhere.
 - Supabase functions live under `supabase/functions/` and can be deployed via the Supabase CLI when backend updates are needed.
 
+## Deep-Link Tabs & Embeds
+- The shell router inside `index.html` (mirrored in `404.html`) makes `/group-info`, `/user-guide`, and `/resources` deep links fall back to the SPA before the iframe content loads.
+- Each tab’s copy is stored in a dedicated `*-embed.html` file (`group-info-embed.html`, `user-guide-embed.html`, `resources-embed.html`) so the iframe URL never conflicts with the SPA route.
+- The parent iframe wrapper is responsible for sizing; the embed documents only emit height messages, so keep any structural changes self-contained inside the embed file.
+
+### Adding Another Static Tab
+1. Create `your-tab-embed.html` next to the existing embed files (reuse their boilerplate for messaging and styles).
+2. Point the new tab’s iframe `src` in `index.html` to the `*-embed.html` file.
+3. Copy `index.html` to `404.html` so GitHub Pages continues to serve the SPA shell for direct requests to `/your-tab`.
+4. Test the new path on GitHub Pages (or a local SPA preview) by loading `/your-tab` directly to be sure the shell + iframe render together.
+
+## Local SPA Preview
+GitHub Pages hosts the project at `/CIC-test-naei-multigroup-viewer/`, so run a SPA-aware server from the parent directory to reproduce the same URL prefix locally:
+
+```bash
+cd /Users/mikehinford/Dropbox/Projects/NAEI\ Multigroup\ Viewer
+npx http-server-spa ./CIC-test-naei-multigroup-viewer index.html 4173 -c-1
+```
+
+- Visit `http://localhost:4173/CIC-test-naei-multigroup-viewer/` for the default view, or append `/group-info`, `/user-guide`, or `/resources` to confirm deep links mount the SPA shell before loading the iframe content.
+- Any SPA-aware server (`vite preview`, `serve-spa`, etc.) works as long as it rewrites unknown routes to `index.html` and preserves the `/CIC-test-naei-multigroup-viewer/` prefix.
+
 ## Tailwind Build
 - Run `npm install` once to pull in the Tailwind/PostCSS toolchain.
 - Execute `npm run build:css` to regenerate `dist/tailwind.css` for production (GitHub Pages, Netlify, etc.).

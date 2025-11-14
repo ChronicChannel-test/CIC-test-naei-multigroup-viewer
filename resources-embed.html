@@ -5,6 +5,7 @@
   <title>NAEI Viewer Resources</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="dist/tailwind.css">
+  <link rel="stylesheet" href="SharedResources/common-styles.css">
   <style>
     body {
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -14,23 +15,29 @@
     }
 
     .resources-shell {
-      max-width: 960px;
-      margin: 0 auto;
-      padding: 2.5rem 1.5rem 3rem;
+      padding: 20px;
+      margin: 0;
+      background: #ffffff;
+    }
+
+    .resources-frame {
+      width: calc(100% - 140px);
+      margin: 0 auto 0 0;
+      padding: 0 32px 32px 0;
+      background: #ffffff;
+      border-radius: 6px;
+      box-sizing: border-box;
     }
 
     .resources-header {
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
-      margin-bottom: 2.5rem;
+      margin-bottom: 2rem;
     }
 
-    .resources-header h1 {
-      font-size: clamp(2rem, 4vw, 2.75rem);
-      font-weight: 600;
-      line-height: 1.1;
-      color: #0f172a;
+    .resources-header .main-title {
+      padding-right: 0;
       margin: 0;
     }
 
@@ -39,12 +46,6 @@
       font-size: 1rem;
       max-width: 48ch;
       margin: 0;
-    }
-
-    .resources-icon {
-      width: 56px;
-      height: 56px;
-      object-fit: contain;
     }
 
     .placeholder-panel {
@@ -61,17 +62,16 @@
 </head>
 <body>
   <main class="resources-shell">
-    <header class="resources-header">
-      <img src="SharedResources/images/chain-link-icon-CIC.png" alt="Resources icon" class="resources-icon">
-      <div>
-        <h1>Resources &amp; Links</h1>
+    <div class="resources-frame">
+      <header class="resources-header">
+        <h1 class="main-title">Resources</h1>
         <p>A curated hub for supplementary documentation, downloads, partner content, and training materials. Coming soon.</p>
-      </div>
-    </header>
+      </header>
 
-    <section class="placeholder-panel" aria-live="polite">
-      Resource directory in progress. Check back shortly.
-    </section>
+      <section class="placeholder-panel" aria-live="polite">
+        Resource directory in progress. Check back shortly.
+      </section>
+    </div>
   </main>
 
   <script>

@@ -5,6 +5,7 @@
   <title>NAEI Data Viewer – User Guide</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="dist/tailwind.css">
+  <link rel="stylesheet" href="SharedResources/common-styles.css">
   <style>
     body {
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -14,22 +15,239 @@
     }
 
     .guide-shell {
-      max-width: 1000px;
-      margin: 0 auto;
-      padding: 2.5rem 1.25rem 3rem;
+      padding: 0 20px 32px 20px;
+      margin: 0;
+      background: #ffffff;
+    }
+
+    .guide-frame {
+      width: calc(100% - 140px);
+      margin: 0 auto 0 0;
+      padding: 0 32px 32px 0;
+      background: #ffffff;
+      border-radius: 6px;
+      box-sizing: border-box;
     }
 
     .guide-header {
       display: flex;
       flex-direction: column;
       gap: 0.75rem;
-      margin-bottom: 2rem;
+      margin-bottom: 1.5rem;
     }
 
-    .guide-header h1 {
-      font-size: clamp(2rem, 4vw, 2.75rem);
+    .guide-header .main-title {
+      margin: 0;
+      padding-right: 0;
+      color: #0f172a;
+    }
+
+    .guide-header p {
+      color: #475569;
+      font-size: 1rem;
+      max-width: 52ch;
+      margin: 0;
+    }
+
+    .guide-wrapper {
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      background: transparent;
+      padding: 0;
+    }
+
+    .guide-loading {
+      padding: 1.5rem 0;
+      text-align: center;
+      font-size: 1rem;
+      color: #6b7280;
+    }
+
+    .guide-error {
+      padding: 1.5rem 0;
+      text-align: center;
+      font-size: 1rem;
       font-weight: 600;
-      line-height: 1.1;
+      color: #b91c1c;
+    }
+
+    @media (max-width: 1100px) {
+      .guide-frame {
+        width: 100%;
+        padding: 0 24px 32px 0;
+      }
+
+      .guide-shell {
+        padding: 0 16px 24px 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="guide-shell">
+    <section class="guide-frame" aria-labelledby="user-guide-heading">
+      <header class="guide-header">
+        <h1 class="main-title" id="user-guide-heading">User Guide</h1>
+        <p>Step-by-step guidance, feature summaries, and troubleshooting tips for both the line and bubble chart experiences.</p>
+      </header>
+
+      <section class="guide-wrapper" aria-labelledby="user-guide-content">
+        <div id="user-guide-content" class="guide-loading">Loading latest user guide…</div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    (function() {
+      const contentEl = document.getElementById('user-guide-content');
+      const loadedStyles = new Set();
+
+      function measureHeight() {
+        const body = document.body;
+        const docEl = document.documentElement;
+        let height = Math.max(
+          body ? body.scrollHeight : 0,
+          body ? body.offsetHeight : 0,
+          docEl ? docEl.scrollHeight : 0,
+          docEl ? docEl.offsetHeight : 0,
+          700
+        );
+        if (!Number.isFinite(height) || height <= 0) {
+          height = 900;
+        }
+        return height;
+      }
+
+      function sendHeightToParent() {
+        try {
+          const height = measureHeight();
+          window.parent.postMessage({
+            type: 'contentHeight',
+            chart: 'user-guide',
+            height
+          }, '*');
+        } catch (error) {
+          console.warn('Unable to send user guide height to parent:', error);
+        }
+      }
+
+      function scheduleHeightUpdate(delay = 50) {
+        setTimeout(() => {
+          requestAnimationFrame(sendHeightToParent);
+        }, delay);
+      }
+
+      function injectStyles(styleNodes) {
+        if (!styleNodes || !styleNodes.length) return;
+        styleNodes.forEach(node => {
+          const css = node.textContent || '';
+          if (!css.trim() || loadedStyles.has(css)) {
+            return;
+          }
+          const styleEl = document.createElement('style');
+          styleEl.textContent = css;
+          document.head.appendChild(styleEl);
+          loadedStyles.add(css);
+        });
+      }
+
+      function sanitiseContent(wrapper) {
+        if (!wrapper) return;
+        wrapper.querySelectorAll('script').forEach(script => script.remove());
+        wrapper.querySelectorAll('link[rel="stylesheet"]').forEach(link => link.remove());
+      }
+
+      async function loadUserGuide() {
+        try {
+          const response = await fetch('CIC-test-naei-linechart-v2.4/help.html');
+          if (!response.ok) {
+            throw new Error(`Help page responded with status ${response.status}`);
+          }
+
+          const rawHtml = await response.text();
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(rawHtml, 'text/html');
+
+          const styleNodes = Array.from(doc.querySelectorAll('style'));
+          injectStyles(styleNodes);
+
+          const wrapper = document.createElement('div');
+          wrapper.className = 'prose max-w-none px-6 py-8 lg:px-10 lg:py-10';
+          wrapper.innerHTML = doc.body ? doc.body.innerHTML : rawHtml;
+          sanitiseContent(wrapper);
+
+          contentEl.innerHTML = '';
+          contentEl.className = '';
+          contentEl.appendChild(wrapper);
+
+          scheduleHeightUpdate(80);
+        } catch (error) {
+          console.error('Failed to load user guide content:', error);
+          contentEl.className = 'guide-error';
+          contentEl.textContent = '⚠️ Unable to load the user guide right now. Please try again later.';
+          scheduleHeightUpdate();
+        }
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        loadUserGuide();
+      });
+
+      window.addEventListener('message', event => {
+        if (event?.data?.type === 'requestHeight') {
+          scheduleHeightUpdate(10);
+        }
+      });
+
+      window.addEventListener('load', () => {
+        scheduleHeightUpdate(40);
+      });
+    })();
+  </script>
+</body>
+</html><!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>NAEI Data Viewer – User Guide</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="dist/tailwind.css">
+  <link rel="stylesheet" href="dist/tailwind.css">
+  <link rel="stylesheet" href="SharedResources/common-styles.css">
+  <style>
+    body {
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #ffffff;
+      color: #111827;
+      margin: 0;
+    }
+
+    .guide-shell {
+      padding: 0 20px 32px 20px;
+      margin: 0;
+      background: #ffffff;
+    }
+
+    .guide-frame {
+      width: calc(100% - 140px);
+      margin: 0 auto 0 0;
+      padding: 0 32px 32px 0;
+      background: #ffffff;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+
+    .guide-header {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .guide-header .main-title {
+      margin: 0;
+      padding-right: 0;
       color: #0f172a;
     }
 
@@ -40,47 +258,63 @@
     }
 
     .guide-wrapper {
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 16px;
-      box-shadow: 0 20px 35px -22px rgba(15, 23, 42, 0.35);
-      overflow: hidden;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      background: transparent;
+      padding: 0;
     }
 
     .guide-loading {
-      padding: 2.5rem;
+      padding: 1.5rem 0;
       text-align: center;
       font-size: 1rem;
       color: #6b7280;
     }
 
     .guide-error {
-      padding: 2.5rem;
+      padding: 1.5rem 0;
       text-align: center;
       font-size: 1rem;
       font-weight: 600;
       color: #b91c1c;
     }
 
-    .guide-icon {
-      width: 56px;
-      height: 56px;
-      object-fit: contain;
-    }
-  </style>
-</head>
-<body>
-  <main class="guide-shell">
-    <div class="guide-header">
-  <img src="SharedResources/images/instructions-alpha-v4.png" alt="User guide icon" class="guide-icon">
-      <div>
-        <h1>NAEI Multi-Group Viewer – User Guide</h1>
-        <p>Step-by-step guidance, feature summaries, and troubleshooting tips for both the line and bubble chart experiences.</p>
-      </div>
-    </div>
+    @media (max-width: 1100px) {
+      .guide-frame {
+        width: 100%;
+        padding: 0 24px 32px 0;
+      }
 
-    <section class="guide-wrapper" aria-labelledby="user-guide-content">
-      <div id="user-guide-content" class="guide-loading">Loading latest user guide…</div>
+      .guide-shell {
+        padding: 0 16px 24px 16px;
+      }
+    }
+      color: #b91c1c;
+    }
+
+  <main class="guide-shell">
+    <section class="guide-frame" aria-labelledby="user-guide-heading">
+      <header class="guide-header">
+        <h1 class="main-title" id="user-guide-heading">User Guide</h1>
+        <p>Step-by-step guidance, feature summaries, and troubleshooting tips for both the line and bubble chart experiences.</p>
+      </header>
+
+      <section class="guide-wrapper" aria-labelledby="user-guide-content">
+        <div id="user-guide-content" class="guide-loading">Loading latest user guide…</div>
+      </section>
+    </section>
+  </main>
+  <main class="guide-shell">
+    <section class="guide-frame" aria-labelledby="user-guide-heading">
+      <header class="guide-header">
+        <h1 class="main-title" id="user-guide-heading">User Guide</h1>
+        <p>Step-by-step guidance, feature summaries, and troubleshooting tips for both the line and bubble chart experiences.</p>
+      </header>
+
+      <section class="guide-wrapper" aria-labelledby="user-guide-content">
+        <div id="user-guide-content" class="guide-loading">Loading latest user guide…</div>
+      </section>
     </section>
   </main>
 

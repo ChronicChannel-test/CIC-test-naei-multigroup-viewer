@@ -5,6 +5,7 @@
   <title>NAEI Group Information</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="stylesheet" href="dist/tailwind.css">
+  <link rel="stylesheet" href="SharedResources/common-styles.css">
   <style>
     body {
       font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -168,10 +169,10 @@
     }
 
     .group-info-title-main {
-      font-size: 28px;
-      font-weight: 700;
-      line-height: 1.1;
+      line-height: 1.25;
       color: #0f172a;
+      padding-right: 0;
+      margin: 0 0 6px 0;
     }
 
     .group-info-filter-block {
@@ -179,7 +180,7 @@
       flex-wrap: wrap;
       align-items: center;
       gap: 12px;
-      margin: 28px 0 16px;
+      margin: 12px 0 16px;
       max-width: 100%;
     }
 
@@ -280,7 +281,7 @@
   <main class="group-info-shell">
     <section class="group-info-frame" aria-labelledby="group-info-heading">
       <header class="group-info-header">
-        <div class="group-info-title-main" id="group-info-heading">Group Information</div>
+        <h1 class="main-title group-info-title-main" id="group-info-heading">Group Information</h1>
       </header>
 
       <div class="group-info-filter-block">
