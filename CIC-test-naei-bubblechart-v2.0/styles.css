@@ -308,7 +308,7 @@ select,
 }
 
 .bubble-tutorial-header {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 
 .bubble-tutorial-header h3 {
