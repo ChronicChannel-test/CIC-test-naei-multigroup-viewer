@@ -223,7 +223,10 @@ function showShareDialog(shareUrl) {
       ❌ Close
     </button>
     
-    <h3 style="margin: 0 0 16px 0; color: #333;">🔗 Share Chart</h3>
+    <h3 style="margin: 0 0 16px 0; color: #333; display: flex; align-items: center; gap: 8px;">
+      <span class="share-icon" style="width: 20px; height: 20px;"></span>
+      <span>Share Chart</span>
+    </h3>
     <p style="margin: 0 0 16px 0; color: #666;">Share this specific chart configuration:</p>
     <p style="margin: 0 0 16px 0; font-weight: 600; color: #000;">${title}</p>
     
