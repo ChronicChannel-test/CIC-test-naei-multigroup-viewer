@@ -1,4 +1,4 @@
-/**
+/*
  * Scatter Chart Specific Styles
  * Application-specific styling for the NAEI Activity Data Scatter Chart viewer
  */
@@ -40,20 +40,20 @@
   text-align: center;
 }
 
-/* Chart div - fixed height like line chart */
+/* Chart div - fills wrapper height */
 #chart_div { 
   width: 100%; 
-  height: 600px; 
   margin-top: 0; 
   opacity: 0; 
   transition: opacity .35s ease; 
-  min-height: 400px; 
+  min-height: 420px; 
   border: none;
   border-radius: 0; 
   padding: 0; 
   box-sizing: border-box;
   position: relative; /* For absolute positioned elements inside */
   overflow: visible; /* Allow content to show beyond bounds */
+  flex: 1 1 auto;
 }
 
 #chart_div.visible { 
@@ -213,7 +213,7 @@ select,
 /* Chart wrapper opacity control (matching linechart v2.3) */
 .chart-wrapper {
   width: calc(100% - 140px);
-  padding: 4px 4px 0 4px; /* Match line chart - 0 bottom padding */
+  padding: 4px 4px 2px 4px; /* Slightly smaller bottom inset so the footer can sit closer */
   margin: 0 auto 0 0;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -222,10 +222,228 @@ select,
   overflow: visible;
   opacity: 0;
   transition: opacity 0.3s ease-in-out 0.1s;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 .chart-wrapper.visible {
   opacity: 1;
+}
+
+.tutorial-launch-btn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 5;
+  background: #ff8c1a;
+  color: #fff;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1.05;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.tutorial-launch-icon {
+  width: 25px;
+  height: 25px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.2));
+}
+
+.tutorial-launch-btn:hover,
+.tutorial-launch-btn:focus-visible {
+  background: #ff7300;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  outline: none;
+}
+
+.tutorial-launch-btn:focus-visible {
+  box-shadow: 0 0 0 3px rgba(255,140,26,0.4);
+}
+
+
+.bubble-tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  padding: 16px;
+  background: rgba(0,0,0,0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+  z-index: 10020;
+}
+
+.bubble-tutorial-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.bubble-tutorial-dialog {
+  position: relative;
+  width: min(1080px, calc(100% - 48px));
+  height: min(700px, calc(100% - 48px));
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.35);
+  overflow: hidden;
+  padding: 32px 32px 28px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bubble-tutorial-header {
+  margin-bottom: 16px;
+}
+
+.bubble-tutorial-header h3 {
+  margin: 0 0 4px;
+  font-size: 1.4rem;
+  color: #222;
+}
+
+.bubble-tutorial-header p {
+  margin: 0;
+  color: #4a4a4a;
+  font-size: 0.95rem;
+}
+
+.bubble-tutorial-stage {
+  position: relative;
+  width: 100%;
+  flex: 1;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.tutorial-layer-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.tutorial-layer-image.visible {
+  opacity: 1;
+}
+
+.bubble-tutorial-nav-wrap {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+}
+
+.bubble-tutorial-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  border: none;
+  width: 52px;
+  height: 82px;
+  font-size: 2.2rem;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s ease;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bubble-tutorial-nav:hover,
+.bubble-tutorial-nav:focus-visible {
+  background: rgba(0, 0, 0, 0.65);
+  outline: none;
+}
+
+.bubble-tutorial-nav.prev {
+  left: 12px;
+}
+
+.bubble-tutorial-nav.next {
+  right: 12px;
+}
+
+.bubble-tutorial-close {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  border: none;
+  border-radius: 8px;
+  background: #666;
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  z-index: 40;
+  transition: background 0.2s ease, transform 0.2s ease;
+  padding: 8px 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.25);
+}
+
+.bubble-tutorial-close:hover,
+.bubble-tutorial-close:focus-visible {
+  background: #4b4b4b;
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.bubble-tutorial-close-text {
+  font-size: 0.9rem;
+}
+
+body.tutorial-open {
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  .tutorial-launch-btn {
+    font-size: 0.9rem;
+    padding: 8px 14px;
+    gap: 8px;
+  }
+
+  .tutorial-launch-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .bubble-tutorial-dialog {
+    width: calc(100% - 24px);
+    height: calc(100% - 24px);
+    border-radius: 12px;
+    padding: 24px 16px 20px;
+  }
+
+  .bubble-tutorial-nav {
+    width: 40px;
+    height: 64px;
+    font-size: 1.5rem;
+  }
 }
 
 /* Custom spinner to match linechart */

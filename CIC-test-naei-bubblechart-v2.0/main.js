@@ -46,9 +46,165 @@ let chartReadyNotified = false;
 
 // Track parent height coordination so we avoid chatty postMessage loops.
 const MIN_HEIGHT_DELTA = 8; // px difference required before re-sending height
+const MIN_CHART_WRAPPER_HEIGHT = 480;
+const MIN_CHART_CANVAS_HEIGHT = 420;
+const CHART_HEADER_BUFFER = 10; // spacing between title/legend and chart
+const FOOTER_GAP = 6; // breathing room between chart bottom and footer
+const DEFAULT_PARENT_FOOTER = 140;
+const DEFAULT_PARENT_VIEWPORT = 900;
+const TUTORIAL_SLIDE_MATRIX = [
+  ['002', '003', '004', '005'],
+  ['002', '003', '004', '007'],
+  ['002', '003', '004', '009'],
+  ['002', '003', '004', '011', '012'],
+  ['002', '003', '004', '011', '014'],
+  ['002', '003', '016'],
+  ['002', '017'],
+  ['002', '018'],
+  ['002', '019'],
+  ['002', '020']
+];
+const IS_EMBEDDED = window.parent && window.parent !== window;
 
 let lastSentHeight = 0;
 let lastKnownViewportWidth = 0;
+let parentFooterHeight = DEFAULT_PARENT_FOOTER;
+let parentViewportHeight = DEFAULT_PARENT_VIEWPORT;
+
+function logViewportHeight(contextLabel = 'resize') {
+  const innerHeight = window.innerHeight || 0;
+  const outerHeight = window.outerHeight || 0;
+  const clientHeight = document.documentElement?.clientHeight || 0;
+  const visualViewportHeight = window.visualViewport?.height || null;
+  const bodyScrollHeight = document.body?.scrollHeight || 0;
+  const bodyOffsetHeight = document.body?.offsetHeight || 0;
+  const chartWrapper = document.querySelector('.chart-wrapper');
+  const chartDiv = document.getElementById('chart_div');
+  const wrapperHeight = chartWrapper ? Math.round(chartWrapper.getBoundingClientRect().height) : 'n/a';
+  const chartDivHeight = chartDiv ? Math.round(chartDiv.getBoundingClientRect().height) : 'n/a';
+
+  console.warn(
+    `📏 Viewport (${contextLabel}): innerHeight=${innerHeight}px, clientHeight=${clientHeight}px, outerHeight=${outerHeight}px${visualViewportHeight ? `, visualViewport=${Math.round(visualViewportHeight)}px` : ''}, parentFooter=${parentFooterHeight}px, parentViewport=${parentViewportHeight}px`
+  );
+  console.warn(
+    `📦 Layout (${contextLabel}): wrapper=${wrapperHeight}px, chartDiv=${chartDivHeight}px, bodyScroll=${bodyScrollHeight}px, bodyOffset=${bodyOffsetHeight}px`
+  );
+}
+
+function getElementHeight(el) {
+  if (!el) {
+    return 0;
+  }
+  const rect = el.getBoundingClientRect();
+  return Math.round(rect.height || 0);
+}
+
+function getStandaloneFooterHeight() {
+  const footer = document.querySelector('footer');
+  if (!footer) {
+    return DEFAULT_PARENT_FOOTER;
+  }
+
+  const rect = footer.getBoundingClientRect();
+  const styles = window.getComputedStyle(footer);
+  const margins = (parseFloat(styles.marginTop) || 0) + (parseFloat(styles.marginBottom) || 0);
+  return Math.round((rect.height || 0) + margins);
+}
+
+window.addEventListener('message', (event) => {
+  if (!event?.data) {
+    return;
+  }
+
+  if (event.data.type === 'parentViewportMetrics') {
+    const footerCandidate = Number(event.data.footerHeight);
+    const viewportCandidate = Number(event.data.viewportHeight);
+
+    if (Number.isFinite(footerCandidate) && footerCandidate >= 0) {
+      parentFooterHeight = Math.max(footerCandidate, FOOTER_GAP);
+    }
+
+    if (Number.isFinite(viewportCandidate) && viewportCandidate > 0) {
+      parentViewportHeight = viewportCandidate;
+    }
+
+    updateChartWrapperHeight('parent-viewport');
+  }
+});
+
+function updateChartWrapperHeight(contextLabel = 'init') {
+  const chartWrapper = document.querySelector('.chart-wrapper');
+  const chartDiv = document.getElementById('chart_div');
+  const chartTitle = document.getElementById('chartTitle');
+  const chartLegend = document.getElementById('customLegend');
+
+  if (!chartWrapper || !chartDiv) {
+    bubbleDebugWarn('Cannot update chart wrapper height - element missing');
+    return;
+  }
+
+  const viewportHeight = Math.round(
+    IS_EMBEDDED
+      ? parentViewportHeight
+      : (
+        window.visualViewport?.height
+        || window.innerHeight
+        || document.documentElement?.clientHeight
+        || 0
+      )
+  );
+
+  if (!viewportHeight) {
+    bubbleDebugWarn('Viewport height unavailable while updating chart wrapper height');
+    return;
+  }
+
+  const footerReserve = IS_EMBEDDED
+    ? parentFooterHeight + FOOTER_GAP
+    : getStandaloneFooterHeight() + FOOTER_GAP;
+  const wrapperTop = Math.max(0, Math.round(chartWrapper.getBoundingClientRect().top));
+  const wrapperStyles = window.getComputedStyle(chartWrapper);
+  const wrapperPadding = (parseFloat(wrapperStyles.paddingTop) || 0) + (parseFloat(wrapperStyles.paddingBottom) || 0);
+  const titleHeight = getElementHeight(chartTitle);
+  const legendHeight = getElementHeight(chartLegend);
+  const chromeReserve = wrapperPadding + titleHeight + legendHeight + CHART_HEADER_BUFFER;
+
+  let wrapperHeight;
+  let chartRegionHeight;
+
+  if (IS_EMBEDDED) {
+    const maxWrapperHeight = Math.max(0, viewportHeight - footerReserve);
+    wrapperHeight = Math.max(0, maxWrapperHeight);
+    chartRegionHeight = Math.max(MIN_CHART_CANVAS_HEIGHT, wrapperHeight - chromeReserve);
+    if (chartRegionHeight + chromeReserve > wrapperHeight) {
+      chartRegionHeight = Math.max(0, wrapperHeight - chromeReserve);
+    }
+  } else {
+    const availableHeight = Math.max(0, viewportHeight - footerReserve - wrapperTop);
+    wrapperHeight = Math.max(MIN_CHART_WRAPPER_HEIGHT, availableHeight);
+    chartRegionHeight = Math.max(0, wrapperHeight - chromeReserve);
+    if (chartRegionHeight < MIN_CHART_CANVAS_HEIGHT && wrapperHeight >= MIN_CHART_CANVAS_HEIGHT + chromeReserve) {
+      chartRegionHeight = MIN_CHART_CANVAS_HEIGHT;
+    }
+    if (chartRegionHeight + chromeReserve > wrapperHeight) {
+      chartRegionHeight = Math.max(0, wrapperHeight - chromeReserve);
+    }
+  }
+
+  chartWrapper.style.height = `${wrapperHeight}px`;
+  chartWrapper.style.maxHeight = `${wrapperHeight}px`;
+  chartWrapper.style.minHeight = `${wrapperHeight}px`;
+
+  chartDiv.style.height = `${chartRegionHeight}px`;
+  chartDiv.style.minHeight = `${chartRegionHeight}px`;
+  chartDiv.style.maxHeight = `${chartRegionHeight}px`;
+  chartDiv.style.flex = '0 0 auto';
+  window.__NAEI_LAST_CHART_HEIGHT = chartRegionHeight;
+
+  console.warn(`📐 Wrapper sizing (${contextLabel}): viewport=${viewportHeight}px, wrapperTop=${wrapperTop}px, footerReserve=${footerReserve}px, chartRegion=${chartRegionHeight}px, wrapper=${wrapperHeight}px (title=${titleHeight}px, legend=${legendHeight}px)`);
+}
+
+window.updateChartWrapperHeight = updateChartWrapperHeight;
 
 /**
  * Initialize the application
@@ -60,6 +216,7 @@ async function init() {
   // Ensure loading class is set
   document.body.classList.add('loading');
   console.log('Loading class added, body classes now:', document.body.className);
+  updateChartWrapperHeight('init');
   
   try {
     // Loading overlay removed - data pre-loaded via shared loader
@@ -117,6 +274,8 @@ async function init() {
     setupPollutantSelector();
     setupGroupSelector();
     setupEventListeners();
+    setupTutorialOverlay();
+    updateChartWrapperHeight('post-setup');
 
     // Render initial view based on URL parameters or defaults
     await renderInitialView();
@@ -182,6 +341,360 @@ function showContentDirectly() {
   }
 }
 
+function setupTutorialOverlay() {
+  const overlay = document.getElementById('bubbleTutorialOverlay');
+  const openBtn = document.getElementById('tutorialBtn');
+  if (!overlay || !openBtn) {
+    bubbleDebugWarn('Tutorial overlay markup missing; skipping tutorial setup');
+    return;
+  }
+  openBtn.setAttribute('aria-expanded', 'false');
+
+  const dialog = overlay.querySelector('.bubble-tutorial-dialog');
+  const stage = overlay.querySelector('.bubble-tutorial-stage');
+  const closeBtn = overlay.querySelector('.bubble-tutorial-close');
+  const prevBtn = overlay.querySelector('.bubble-tutorial-nav.prev');
+  const nextBtn = overlay.querySelector('.bubble-tutorial-nav.next');
+  const layerImages = Array.from(overlay.querySelectorAll('.tutorial-layer-image'));
+  const layerBySuffix = new Map(layerImages.map(img => [img.dataset.suffix, img]));
+  const fadeDurationMs = 300;
+  const gapMs = 100;
+  const swipeThresholdPx = 45;
+
+  let currentSlide = 0;
+  let currentVisibleLayers = new Set();
+  let isTransitioning = false;
+  let overlayActive = false;
+  let lastFocusedElement = null;
+  let touchStartX = null;
+
+  const lastSlideIndex = TUTORIAL_SLIDE_MATRIX.length - 1;
+
+  function getFocusableElements() {
+    return Array.from(dialog.querySelectorAll('button:not([disabled])'));
+  }
+
+  function updateNavButtons() {
+    if (prevBtn) {
+      const isDisabled = currentSlide === 0;
+      prevBtn.disabled = isDisabled;
+      prevBtn.setAttribute('aria-disabled', String(isDisabled));
+      prevBtn.style.display = isDisabled ? 'none' : 'flex';
+    }
+    if (nextBtn) {
+      const isDisabled = currentSlide === lastSlideIndex;
+      nextBtn.disabled = isDisabled;
+      nextBtn.setAttribute('aria-disabled', String(isDisabled));
+      nextBtn.style.display = isDisabled ? 'none' : 'flex';
+    }
+  }
+
+  function applyLayerVisibility(targetLayers) {
+    currentVisibleLayers.forEach(suffix => {
+      if (!targetLayers.has(suffix)) {
+        const img = layerBySuffix.get(suffix);
+        if (img) {
+          img.classList.remove('visible');
+        }
+      }
+    });
+
+    targetLayers.forEach(suffix => {
+      if (!currentVisibleLayers.has(suffix)) {
+        const img = layerBySuffix.get(suffix);
+        if (img) {
+          img.classList.add('visible');
+        }
+      }
+    });
+  }
+
+  function showSlide(index, immediate = false) {
+    const targetIndex = Math.max(0, Math.min(index, lastSlideIndex));
+    const targetLayers = new Set(TUTORIAL_SLIDE_MATRIX[targetIndex] || []);
+
+    if (immediate) {
+      applyLayerVisibility(targetLayers);
+      currentVisibleLayers = targetLayers;
+      currentSlide = targetIndex;
+      updateNavButtons();
+      return;
+    }
+
+    if (isTransitioning || (!overlayActive && currentVisibleLayers.size === 0 && targetIndex === currentSlide)) {
+      return;
+    }
+
+    const toHide = [...currentVisibleLayers].filter(layer => !targetLayers.has(layer));
+    const toShow = [...targetLayers].filter(layer => !currentVisibleLayers.has(layer));
+    const hasExistingLayers = currentVisibleLayers.size > 0;
+
+    const finalize = () => {
+      currentVisibleLayers = targetLayers;
+      currentSlide = targetIndex;
+      updateNavButtons();
+      isTransitioning = false;
+    };
+
+    if (!hasExistingLayers) {
+      applyLayerVisibility(targetLayers);
+      setTimeout(finalize, fadeDurationMs);
+      return;
+    }
+
+    isTransitioning = true;
+    toHide.forEach(suffix => {
+      const img = layerBySuffix.get(suffix);
+      if (img) {
+        img.classList.remove('visible');
+      }
+    });
+
+    setTimeout(() => {
+      toShow.forEach(suffix => {
+        const img = layerBySuffix.get(suffix);
+        if (img) {
+          img.classList.add('visible');
+        }
+      });
+    }, fadeDurationMs + gapMs);
+
+    setTimeout(finalize, fadeDurationMs + gapMs + fadeDurationMs);
+  }
+
+  function showNextSlide() {
+    if (currentSlide < lastSlideIndex) {
+      showSlide(currentSlide + 1);
+    }
+  }
+
+  function showPrevSlide() {
+    if (currentSlide > 0) {
+      showSlide(currentSlide - 1);
+    }
+  }
+
+  function handleOverlayKeydown(event) {
+    if (!overlayActive) {
+      return;
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      hideOverlay();
+      return;
+    }
+    if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'Spacebar') {
+      event.preventDefault();
+      showNextSlide();
+      return;
+    }
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      showPrevSlide();
+      return;
+    }
+    if (event.key === 'Tab') {
+      const focusable = getFocusableElements();
+      if (!focusable.length) {
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+  }
+
+  function handleTouchStart(event) {
+    if (!overlayActive || !event?.changedTouches?.length) {
+      return;
+    }
+    touchStartX = event.changedTouches[0].clientX;
+  }
+
+  function handleTouchEnd(event) {
+    if (!overlayActive || touchStartX === null || !event?.changedTouches?.length) {
+      touchStartX = null;
+      return;
+    }
+    const deltaX = event.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(deltaX) >= swipeThresholdPx) {
+      if (deltaX < 0) {
+        showNextSlide();
+      } else {
+        showPrevSlide();
+      }
+    }
+    touchStartX = null;
+  }
+
+  function scrollTutorialIntoView() {
+    const isEmbedded = IS_EMBEDDED && window.parent && window.parent !== window;
+
+    const scrollSelf = () => new Promise(resolve => {
+      try {
+        const chartWrapper = document.querySelector('.chart-wrapper');
+        const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        if (!chartWrapper) {
+          window.scrollTo({ top: 0, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+          resolve();
+          return;
+        }
+
+        const rect = chartWrapper.getBoundingClientRect();
+        const pageOffset = window.pageYOffset || document.documentElement.scrollTop || 0;
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const wrapperHeight = rect.height || chartWrapper.offsetHeight || 0;
+        const offsetToCenter = Math.max(0, (viewportHeight - wrapperHeight) / 2);
+        const targetTop = Math.max(0, rect.top + pageOffset - offsetToCenter);
+        const behavior = prefersReducedMotion ? 'auto' : 'smooth';
+
+        window.scrollTo({ top: targetTop, behavior });
+        resolve();
+      } catch (error) {
+        bubbleDebugWarn('Unable to center tutorial overlay:', error);
+        resolve();
+      }
+    });
+
+    if (!isEmbedded) {
+      return scrollSelf();
+    }
+
+    const tryFrameElementScroll = () => new Promise(resolve => {
+      try {
+        const frameEl = window.frameElement;
+        if (!frameEl || typeof frameEl.scrollIntoView !== 'function') {
+          resolve(false);
+          return;
+        }
+        const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        frameEl.scrollIntoView({ block: 'center', behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+        setTimeout(() => resolve(true), prefersReducedMotion ? 0 : 30);
+      } catch (error) {
+        bubbleDebugWarn('Unable to scroll parent via frameElement:', error);
+        resolve(false);
+      }
+    });
+
+    const parentScrollFallback = () => {
+      const requestId = `bubbleTutorial-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+      return new Promise(resolve => {
+        let resolved = false;
+
+        const handleAck = (event) => {
+          if (event?.data?.type === 'bubbleTutorialScrollComplete' && event.data.requestId === requestId) {
+            window.removeEventListener('message', handleAck);
+            resolved = true;
+            resolve();
+          }
+        };
+
+        window.addEventListener('message', handleAck);
+
+        try {
+          window.parent.postMessage({ type: 'scrollToBubbleTutorial', requestId }, '*');
+        } catch (error) {
+          bubbleDebugWarn('Unable to request parent scroll:', error);
+          window.removeEventListener('message', handleAck);
+          resolve();
+          return;
+        }
+
+        setTimeout(() => {
+          if (!resolved) {
+            window.removeEventListener('message', handleAck);
+            resolve();
+          }
+        }, 140);
+      });
+    };
+
+    return tryFrameElementScroll()
+      .then(success => success ? null : parentScrollFallback())
+      .then(scrollSelf);
+  }
+
+  async function showOverlay() {
+    if (overlayActive) {
+      return;
+    }
+    await scrollTutorialIntoView();
+    overlayActive = true;
+    lastFocusedElement = document.activeElement;
+    overlay.classList.add('visible');
+    overlay.setAttribute('aria-hidden', 'false');
+    openBtn.setAttribute('aria-expanded', 'true');
+    document.body.classList.add('tutorial-open');
+    currentVisibleLayers.forEach(suffix => {
+      const img = layerBySuffix.get(suffix);
+      if (img) {
+        img.classList.remove('visible');
+      }
+    });
+    currentVisibleLayers = new Set();
+    showSlide(0, true);
+    document.addEventListener('keydown', handleOverlayKeydown);
+    requestAnimationFrame(() => {
+      if (closeBtn) {
+        closeBtn.focus();
+      }
+    });
+  }
+
+  function hideOverlay() {
+    if (!overlayActive) {
+      return;
+    }
+    overlayActive = false;
+    overlay.classList.remove('visible');
+    overlay.setAttribute('aria-hidden', 'true');
+    openBtn.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('tutorial-open');
+    document.removeEventListener('keydown', handleOverlayKeydown);
+    touchStartX = null;
+    if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+      lastFocusedElement.focus();
+    } else {
+      openBtn.focus();
+    }
+  }
+
+  openBtn.addEventListener('click', showOverlay);
+  if (closeBtn) {
+    closeBtn.addEventListener('click', hideOverlay);
+  }
+  if (prevBtn) {
+    prevBtn.addEventListener('click', showPrevSlide);
+  }
+  if (nextBtn) {
+    nextBtn.addEventListener('click', showNextSlide);
+  }
+
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) {
+      hideOverlay();
+    }
+  });
+
+  if (stage) {
+    stage.addEventListener('touchstart', handleTouchStart, { passive: true });
+    stage.addEventListener('touchend', handleTouchEnd, { passive: true });
+    stage.addEventListener('touchcancel', () => {
+      touchStartX = null;
+    }, { passive: true });
+  }
+
+  showSlide(0, true);
+}
+
 function sendContentHeightToParent(force = false) {
   try {
     if (window.parent && window.parent !== window) {
@@ -219,6 +732,7 @@ function sendContentHeightToParent(force = false) {
     console.warn('Unable to send bubble chart height to parent:', error);
   }
 }
+
 
 function notifyParentChartReady() {
   if (chartReadyNotified) {
@@ -275,6 +789,7 @@ async function revealMainContent() {
     console.log('Drawing chart...');
     console.log('Pre-draw sanity:', { selectedYear, selectedPollutantId, groups: getSelectedGroups() });
     drawChart();
+    updateChartWrapperHeight('revealMainContent');
     
     // Wait for chart to render, then complete the loading process
     setTimeout(() => {
@@ -288,6 +803,7 @@ async function revealMainContent() {
       // Complete after transition
       setTimeout(() => {
         console.log('Bubble chart fully loaded');
+        updateChartWrapperHeight('post-load');
         notifyParentChartReady();
         resolve();
       }, 400);
@@ -961,6 +1477,8 @@ function setupEventListeners() {
   // Resize handler – only redraw when width changes to avoid loops with parent height updates
   lastKnownViewportWidth = window.innerWidth || lastKnownViewportWidth;
   window.addEventListener('resize', debounce(() => {
+    logViewportHeight('window-resize');
+    updateChartWrapperHeight('window-resize');
     const currentWidth = window.innerWidth || 0;
     if (currentWidth === lastKnownViewportWidth) {
       console.debug('📐 Height-only resize detected; skipping redraw to prevent postMessage loop');

@@ -11,6 +11,7 @@ let googleChartsLoadPromise = null;
 let seriesVisibility = []; // Track which series are visible
 let useLogScale = false; // Track whether logarithmic scaling is being used
 window.seriesVisibility = seriesVisibility; // Expose for export.js
+const CHART_RENDERER_MIN_CANVAS_HEIGHT = 420;
 
 // Provide a minimal fallback palette when shared Colors module fails to load
 if (!window.Colors) {
@@ -357,8 +358,20 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     showMessage('Chart container not found', 'error');
     return;
   }
-  
-  chartDiv.style.minHeight = '800px';
+
+  // Build legend before sizing so its height is accounted for
+  createCustomLegend(chart, data, groupIds, dataPoints);
+  const cachedHeight = window.__NAEI_LAST_CHART_HEIGHT;
+  const chartRect = chartDiv.getBoundingClientRect();
+  const appliedChartHeight = Math.max(
+    CHART_RENDERER_MIN_CANVAS_HEIGHT,
+    Number.isFinite(cachedHeight) && cachedHeight > 0
+      ? cachedHeight
+      : Math.round(chartRect.height || CHART_RENDERER_MIN_CANVAS_HEIGHT)
+  );
+  chartDiv.style.height = `${appliedChartHeight}px`;
+  chartDiv.style.minHeight = `${appliedChartHeight}px`;
+  chartDiv.style.maxHeight = `${appliedChartHeight}px`;
 
   // Prepare colors for each group (use visible data points only)
   const colors = [];
@@ -386,6 +399,10 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   const activityMinOffset = Math.max(0, minActivity - (maxActivity * 0.05));
   const pollutantMinOffset = Math.max(0, minPollutant - (maxPollutant * 0.05));
 
+  const chartAreaTop = 85;
+  const chartAreaBottom = 120;
+  const chartAreaHeight = Math.max(200, appliedChartHeight - (chartAreaTop + chartAreaBottom));
+
   currentOptions = {
     legend: { position: 'none' }, // Remove Google Chart legend
     title: '', // Invisible Google Chart title
@@ -393,11 +410,13 @@ function drawBubbleChart(year, pollutantId, groupIds) {
       fontSize: 0 // Minimize title space
     },
     width: '100%',
+    height: appliedChartHeight,
     chartArea: {
-      top: 85,  // Slightly increased to avoid gridline at edge
-      bottom: 120,
+      top: chartAreaTop,  // Slightly increased to avoid gridline at edge
+      bottom: chartAreaBottom,
       left: 150,
       right: 80,
+      height: chartAreaHeight,
       backgroundColor: 'transparent'
     },
     backgroundColor: 'transparent',
@@ -488,9 +507,6 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     console.log('chart.draw() completed without error');
 
   registerTooltipPositionHandlers(chart, data);
-
-    // Create custom legend after chart is drawn
-    createCustomLegend(chart, data, groupIds, dataPoints);
     
     // Add bubble size explanation text overlay at top of chart
     addBubbleExplanationOverlay();
@@ -520,6 +536,9 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   if (downloadXLSXBtnEl) downloadXLSXBtnEl.disabled = false;
 
   clearMessage();
+  if (window.updateChartWrapperHeight) {
+    window.updateChartWrapperHeight('drawChart');
+  }
 }
 
 /**

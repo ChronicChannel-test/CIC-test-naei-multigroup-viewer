@@ -535,7 +535,7 @@
     </div>
 
     <!-- Footer (inside chart-interface so it fades in with the chart) -->
-  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; opacity: 1;">
+  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" id="mainFooter" style="margin-top: 0; opacity: 1;">
       <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via
       <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
       <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
@@ -646,6 +646,51 @@
       'user-guide': document.getElementById('userguide-iframe'),
       resources: document.getElementById('resources-iframe')
     };
+
+    let cachedParentFooterHeight = 0;
+    let cachedViewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+
+    function getParentFooterHeight() {
+      const footerEl = document.getElementById('mainFooter');
+      if (!footerEl) {
+        cachedParentFooterHeight = 0;
+        return 0;
+      }
+      const rect = footerEl.getBoundingClientRect();
+      cachedParentFooterHeight = Math.round(rect.height || 0);
+      return cachedParentFooterHeight;
+    }
+
+    function broadcastViewportMetrics() {
+      const iframe = iframeElements.bubble;
+      if (!iframe || !iframe.contentWindow) {
+        return;
+      }
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      if (viewportHeight) {
+        cachedViewportHeight = viewportHeight;
+      }
+      iframe.contentWindow.postMessage({
+        type: 'parentViewportMetrics',
+        viewportHeight: cachedViewportHeight,
+        footerHeight: cachedParentFooterHeight
+      }, '*');
+    }
+
+    window.addEventListener('resize', () => {
+      getParentFooterHeight();
+      broadcastViewportMetrics();
+    });
+    window.addEventListener('resize', () => {
+      getParentFooterHeight();
+      const iframe = iframeElements.bubble;
+      if (iframe && iframe.contentWindow) {
+        iframe.contentWindow.postMessage({
+          type: 'parentFooterHeight',
+          value: cachedParentFooterHeight
+        }, '*');
+      }
+    });
 
     if (debugLoggingEnabled) {
       Object.values(iframeElements).forEach(iframe => {
@@ -1140,6 +1185,46 @@
     window.addEventListener('message', function(event) {
       console.log('🔥 Parent received message:', event.data);
 
+      if (event.data && event.data.type === 'scrollToBubbleTutorial') {
+        const requestId = event.data.requestId;
+        const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const bubbleContainer = document.getElementById('chart-1') || document.getElementById('bubblechart-iframe');
+        const headerOffset = 32;
+        const scrollTarget = bubbleContainer;
+
+        let scrolled = false;
+        if (scrollTarget) {
+          const rect = scrollTarget.getBoundingClientRect();
+          const pageOffset = window.pageYOffset || document.documentElement.scrollTop || 0;
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+          const containerHeight = rect.height || scrollTarget.offsetHeight || 0;
+          const centerOffset = Math.max(0, (viewportHeight - containerHeight) / 2);
+          const targetTop = Math.max(0, rect.top + pageOffset - centerOffset - headerOffset);
+          const currentTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+          if (Math.abs(currentTop - targetTop) > 4) {
+            window.scrollTo({ top: targetTop, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+            scrolled = true;
+          }
+        }
+
+        const acknowledge = () => {
+          try {
+            if (event.source && typeof event.source.postMessage === 'function') {
+              event.source.postMessage({ type: 'bubbleTutorialScrollComplete', requestId }, '*');
+            }
+          } catch (error) {
+            console.warn('Unable to acknowledge bubble tutorial scroll:', error);
+          }
+        };
+
+        if (prefersReducedMotion || !scrolled) {
+          acknowledge();
+        } else {
+          setTimeout(acknowledge, 200);
+        }
+        return;
+      }
+
       // Handle URL updates from iframes
       if (event.data && event.data.type === 'updateUrl') {
         console.log('🔗 Updating URL to:', event.data.url);
@@ -1217,6 +1302,10 @@
           }
 
           iframe.style.height = finalHeight + 'px';
+          if (chartKey === 'bubble') {
+            getParentFooterHeight();
+            broadcastViewportMetrics();
+          }
           
           heightsReceived[chartKey] = true;
           

@@ -1109,6 +1109,45 @@
     window.addEventListener('message', function(event) {
       console.log('🔥 Parent received message:', event.data);
 
+      if (event.data && event.data.type === 'scrollToBubbleTutorial') {
+        const requestId = event.data.requestId;
+        const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const bubbleContainer = document.getElementById('chart-1') || document.getElementById('bubblechart-iframe');
+        const headerOffset = 32;
+
+        let scrolled = false;
+        if (bubbleContainer) {
+          const rect = bubbleContainer.getBoundingClientRect();
+          const pageOffset = window.pageYOffset || document.documentElement.scrollTop || 0;
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+          const containerHeight = rect.height || bubbleContainer.offsetHeight || 0;
+          const centerOffset = Math.max(0, (viewportHeight - containerHeight) / 2);
+          const targetTop = Math.max(0, rect.top + pageOffset - centerOffset - headerOffset);
+          const currentTop = window.pageYOffset || document.documentElement.scrollTop || 0;
+          if (Math.abs(currentTop - targetTop) > 4) {
+            window.scrollTo({ top: targetTop, behavior: prefersReducedMotion ? 'auto' : 'smooth' });
+            scrolled = true;
+          }
+        }
+
+        const acknowledge = () => {
+          try {
+            if (event.source && typeof event.source.postMessage === 'function') {
+              event.source.postMessage({ type: 'bubbleTutorialScrollComplete', requestId }, '*');
+            }
+          } catch (error) {
+            console.warn('Unable to acknowledge bubble tutorial scroll (404):', error);
+          }
+        };
+
+        if (prefersReducedMotion || !scrolled) {
+          acknowledge();
+        } else {
+          setTimeout(acknowledge, 200);
+        }
+        return;
+      }
+
       // Handle URL updates from iframes
       if (event.data && event.data.type === 'updateUrl') {
         console.log('🔗 Updating URL to:', event.data.url);
