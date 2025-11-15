@@ -15,14 +15,14 @@
     }
 
     .resources-shell {
-      padding: 20px;
+      padding: 20px 20px 20px 0;
       margin: 0;
       background: #ffffff;
     }
 
     .resources-frame {
-      width: calc(100% - 140px);
-      margin: 0 auto 0 0;
+      width: calc(100% - 280px);
+      margin: 0 auto 0 140px;
       padding: 0 32px 32px 0;
       background: #ffffff;
       border-radius: 6px;
@@ -48,15 +48,85 @@
       margin: 0;
     }
 
-    .placeholder-panel {
-      border: 1px dashed #cbd5f5;
-      background: linear-gradient(135deg, rgba(219, 234, 254, 0.45), rgba(219, 234, 254, 0.15));
-      border-radius: 16px;
-      padding: 2.5rem;
-      text-align: center;
-      color: #1d4ed8;
-      font-size: 1rem;
-      font-weight: 500;
+    .resources-table-section {
+      background: #ffffff;
+      margin-top: 1rem;
+    }
+
+    .resources-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0 20px;
+      font-size: 0.98rem;
+      color: #0f172a;
+    }
+
+    .resources-table td {
+      border: none;
+      padding: 0;
+      vertical-align: top;
+    }
+
+    .resource-logo-cell {
+      width: 110px;
+      padding-right: 24px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .resource-logo {
+      display: block;
+      width: 100%;
+      max-width: 95px;
+      height: auto;
+    }
+
+    .resource-info-name {
+      display: inline-block;
+      margin: 0 0 6px 0;
+      font-weight: 700;
+      color: #ff8c1a;
+      text-decoration: underline;
+      font-size: 2rem;
+      line-height: 1.25;
+    }
+
+    .resource-info-name:focus-visible {
+      outline: 2px solid rgba(255, 140, 26, 0.45);
+      outline-offset: 3px;
+    }
+
+    .resource-info-desc {
+      margin: 0;
+      color: #374151;
+      line-height: 1.5;
+    }
+
+    .resource-logo--caw {
+      max-width: 80px;
+    }
+
+    @media (max-width: 640px) {
+      .resource-logo-cell {
+        width: 80px;
+        padding-right: 16px;
+      }
+
+      .resource-logo {
+        max-width: 80px;
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .resources-shell {
+        padding: 20px;
+      }
+
+      .resources-frame {
+        width: 100%;
+        margin-left: 0;
+        padding: 0 24px 32px 0;
+      }
     }
   </style>
 </head>
@@ -65,11 +135,32 @@
     <div class="resources-frame">
       <header class="resources-header">
         <h1 class="main-title">Resources</h1>
-        <p>A curated hub for supplementary documentation, downloads, partner content, and training materials. Coming soon.</p>
+        <p>A selection of organisations campaigning for clean air, including groups that focus specifically on pollution from domestic wood burning.</p>
       </header>
 
-      <section class="placeholder-panel" aria-live="polite">
-        Resource directory in progress. Check back shortly.
+      <section class="resources-table-section" aria-label="Organisations">
+        <table class="resources-table" role="presentation">
+          <tbody>
+            <tr>
+              <td class="resource-logo-cell">
+                <img src="SharedResources/images/CAW-logo-black-circle-alpha-200x200.svg" alt="Communities Against Woodsmoke logo" class="resource-logo resource-logo--caw">
+              </td>
+              <td>
+                <a class="resource-info-name" href="https://www.communitiesagainstwoodsmoke.com/" target="_blank" rel="noopener">Communities Against Woodsmoke</a>
+                <p class="resource-info-desc">A grassroots campaign group dedicated to raising public awareness about the serious health and environmental risks of air pollution from domestic wood-burning.</p>
+              </td>
+            </tr>
+            <tr>
+              <td class="resource-logo-cell">
+                <img src="SharedResources/images/DSAWSP-2018.svg" alt="Doctors and Scientists Against Wood Smoke Pollution logo" class="resource-logo">
+              </td>
+              <td>
+                <a class="resource-info-name" href="https://www.dsawsp.org/" target="_blank" rel="noopener">Doctors and Scientists Against Wood Smoke Pollution (DSAWSP)</a>
+                <p class="resource-info-desc">Formed in 2016, DSAWSP is an international coalition of doctors, scientists and others who are dedicated to reducing harm to human health and our climate by decreasing wood burning.</p>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </section>
     </div>
   </main>
@@ -112,6 +203,15 @@
       }
 
       document.addEventListener('DOMContentLoaded', () => {
+        const resourceImages = document.querySelectorAll('.resource-logo');
+        resourceImages.forEach(img => {
+          if (img.complete) {
+            scheduleHeightUpdate(40);
+          } else {
+            img.addEventListener('load', () => scheduleHeightUpdate(40), { once: true });
+            img.addEventListener('error', () => scheduleHeightUpdate(40), { once: true });
+          }
+        });
         scheduleHeightUpdate(30);
       });
 
