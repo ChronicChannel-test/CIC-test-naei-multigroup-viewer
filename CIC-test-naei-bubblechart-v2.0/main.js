@@ -65,6 +65,8 @@ function freezeWidthForOpera(selectors = [], opts = {}) {
         if (!el) {
           return;
         }
+        // Clear prior width locks so we re-measure the natural content width each pass
+        el.style.width = '';
         el.style.minWidth = '';
         el.style.maxWidth = '';
         const rectWidth = Math.ceil(el.getBoundingClientRect().width || 0);
@@ -906,6 +908,11 @@ async function revealMainContent() {
     console.log('Making mainContent visible...');
     mainContent.style.display = 'block';
     mainContent.removeAttribute('aria-hidden');
+    freezeWidthForOpera('#downloadBtn', {
+      extraPadding: 0,
+      attempts: 6,
+      attemptDelay: 160
+    });
     freezeWidthForOpera('#yearSelect', {
       fixedWidth: 100,
       attempts: 6,

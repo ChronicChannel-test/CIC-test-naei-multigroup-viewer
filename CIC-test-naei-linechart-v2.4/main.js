@@ -284,6 +284,8 @@ function freezeWidthForOpera(selectors = [], opts = {}) {
         if (!el) {
           return;
         }
+        // Clear prior width locks so each measurement reflects natural content width
+        el.style.width = '';
         el.style.minWidth = '';
         el.style.maxWidth = '';
         const rectWidth = Math.ceil(el.getBoundingClientRect().width || 0);
@@ -1318,6 +1320,11 @@ async function revealMainContent() {
     mainContent.removeAttribute('aria-hidden');
     mainContent.classList.add('loaded'); // Add loaded class immediately
     freezeSmoothingToggleWidth();
+    freezeWidthForOpera('#downloadBtn', {
+      extraPadding: 0,
+      attempts: 6,
+      attemptDelay: 160
+    });
     freezeWidthForOpera(['#startYear', '#endYear'], {
       fixedWidth: 100,
       attempts: 6,
