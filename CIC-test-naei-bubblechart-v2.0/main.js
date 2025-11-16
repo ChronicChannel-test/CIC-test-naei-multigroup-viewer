@@ -66,6 +66,13 @@ const TUTORIAL_SLIDE_MATRIX = [
 ];
 const IS_EMBEDDED = window.parent && window.parent !== window;
 
+const tutorialOverlayApi = {
+  open: null,
+  hide: null,
+  isActive: () => false
+};
+let pendingTutorialOpenReason = null;
+
 let lastSentHeight = 0;
 let lastKnownViewportWidth = 0;
 let parentFooterHeight = DEFAULT_PARENT_FOOTER;
@@ -129,6 +136,18 @@ window.addEventListener('message', (event) => {
     }
 
     updateChartWrapperHeight('parent-viewport');
+  }
+
+  if (event.data.type === 'openBubbleTutorial') {
+    const reason = event.data.reason || 'parent';
+    if (typeof tutorialOverlayApi.open === 'function') {
+      const isActive = typeof tutorialOverlayApi.isActive === 'function' && tutorialOverlayApi.isActive();
+      if (!isActive) {
+        tutorialOverlayApi.open(reason);
+      }
+    } else {
+      pendingTutorialOpenReason = reason;
+    }
   }
 });
 
@@ -370,6 +389,21 @@ function setupTutorialOverlay() {
 
   const lastSlideIndex = TUTORIAL_SLIDE_MATRIX.length - 1;
 
+  function notifyParentTutorialState(state, source = 'user') {
+    if (!IS_EMBEDDED || !window.parent) {
+      return;
+    }
+    try {
+      window.parent.postMessage({
+        type: 'bubbleTutorialState',
+        state,
+        source
+      }, '*');
+    } catch (error) {
+      bubbleDebugWarn('Unable to notify parent about bubble tutorial state:', error);
+    }
+  }
+
   function getFocusableElements() {
     return Array.from(dialog.querySelectorAll('button:not([disabled])'));
   }
@@ -480,7 +514,7 @@ function setupTutorialOverlay() {
     }
     if (event.key === 'Escape') {
       event.preventDefault();
-      hideOverlay();
+      hideOverlay('keyboard');
       return;
     }
     if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'Spacebar') {
@@ -622,7 +656,7 @@ function setupTutorialOverlay() {
       .then(scrollSelf);
   }
 
-  async function showOverlay() {
+  async function showOverlay(source = 'user') {
     if (overlayActive) {
       return;
     }
@@ -642,6 +676,7 @@ function setupTutorialOverlay() {
     currentVisibleLayers = new Set();
     showSlide(0, true);
     document.addEventListener('keydown', handleOverlayKeydown);
+    notifyParentTutorialState('opened', source);
     requestAnimationFrame(() => {
       if (closeBtn) {
         closeBtn.focus();
@@ -649,7 +684,7 @@ function setupTutorialOverlay() {
     });
   }
 
-  function hideOverlay() {
+  function hideOverlay(source = 'user') {
     if (!overlayActive) {
       return;
     }
@@ -665,11 +700,13 @@ function setupTutorialOverlay() {
     } else {
       openBtn.focus();
     }
+    lastFocusedElement = null;
+    notifyParentTutorialState('closed', source);
   }
 
-  openBtn.addEventListener('click', showOverlay);
+  openBtn.addEventListener('click', () => showOverlay('user'));
   if (closeBtn) {
-    closeBtn.addEventListener('click', hideOverlay);
+    closeBtn.addEventListener('click', () => hideOverlay('user'));
   }
   if (prevBtn) {
     prevBtn.addEventListener('click', showPrevSlide);
@@ -680,7 +717,7 @@ function setupTutorialOverlay() {
 
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) {
-      hideOverlay();
+      hideOverlay('user');
     }
   });
 
@@ -693,6 +730,15 @@ function setupTutorialOverlay() {
   }
 
   showSlide(0, true);
+
+  tutorialOverlayApi.open = showOverlay;
+  tutorialOverlayApi.hide = hideOverlay;
+  tutorialOverlayApi.isActive = () => overlayActive;
+
+  if (pendingTutorialOpenReason) {
+    showOverlay(pendingTutorialOpenReason);
+    pendingTutorialOpenReason = null;
+  }
 }
 
 function sendContentHeightToParent(force = false) {

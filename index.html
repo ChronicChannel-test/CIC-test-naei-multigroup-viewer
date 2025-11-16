@@ -617,6 +617,13 @@
       'user-guide': [],   // User guide view (static)
       'resources': []     // Resources view (static)
     };
+
+    const bubbleTutorialParamPresent = ['bubbletutorial', 'bubbleTutorial'].some(param => globalUrlParams.has(param));
+    const bubbleTutorialControl = {
+      requested: bubbleTutorialParamPresent,
+      active: bubbleTutorialParamPresent,
+      openRequestSent: false
+    };
     
     // Load shared resources
     window.addEventListener('DOMContentLoaded', function() {
@@ -646,6 +653,114 @@
       'user-guide': document.getElementById('userguide-iframe'),
       resources: document.getElementById('resources-iframe')
     };
+
+    function decomposeUrl(rawUrl) {
+      if (typeof rawUrl !== 'string' || !rawUrl.length) {
+        return { origin: '', base: '', query: '', hash: '' };
+      }
+
+      let working = rawUrl;
+      let origin = '';
+
+      const absoluteUrlPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
+      if (absoluteUrlPattern.test(rawUrl)) {
+        try {
+          const parsed = new URL(rawUrl);
+          origin = `${parsed.protocol}//${parsed.host}`;
+          working = parsed.pathname + parsed.search + parsed.hash;
+        } catch (error) {
+          debugWarn('Unable to parse absolute URL:', error);
+        }
+      }
+
+      const hashIndex = working.indexOf('#');
+      const hash = hashIndex >= 0 ? working.slice(hashIndex) : '';
+      const withoutHash = hashIndex >= 0 ? working.slice(0, hashIndex) : working;
+
+      const queryIndex = withoutHash.indexOf('?');
+      const base = queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
+      const query = queryIndex >= 0 ? withoutHash.slice(queryIndex + 1) : '';
+
+      return { origin, base, query, hash };
+    }
+
+    function rebuildUrl({ origin = '', base = '', query = '', hash = '' }) {
+      const queryPart = query ? `?${query}` : '';
+      return `${origin}${base}${queryPart}${hash}`;
+    }
+
+    function applyBubbleTutorialFlag(url) {
+      if (!bubbleTutorialControl.active || !url) {
+        return url;
+      }
+
+      const components = decomposeUrl(url);
+      const params = components.query
+        ? components.query.split('&').filter(Boolean)
+        : [];
+
+      const hasFlag = params.some(param => {
+        const [key] = param.split('=');
+        return key && key.toLowerCase() === 'bubbletutorial';
+      });
+
+      if (!hasFlag) {
+        params.push('bubbletutorial=1');
+      }
+
+      components.query = params.join('&');
+      return rebuildUrl(components);
+    }
+
+    function updateHistoryState(method, targetUrl) {
+      const finalUrl = applyBubbleTutorialFlag(targetUrl);
+      const stateData = { path: finalUrl };
+      try {
+        window.history[method](stateData, '', finalUrl);
+      } catch (error) {
+        debugWarn(`Unable to update history via ${method}:`, error);
+      }
+    }
+
+    function removeBubbleTutorialFlagFromUrl() {
+      try {
+        const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+        const components = decomposeUrl(currentUrl);
+        const params = components.query
+          ? components.query.split('&').filter(Boolean)
+          : [];
+        const filtered = params.filter(param => {
+          const [key] = param.split('=');
+          return key && key.toLowerCase() !== 'bubbletutorial';
+        });
+        components.query = filtered.join('&');
+        const cleanUrl = rebuildUrl(components);
+        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+      } catch (error) {
+        debugWarn('Unable to remove bubbletutorial flag from URL:', error);
+      }
+    }
+
+    function attemptBubbleTutorialAutoOpen() {
+      if (!bubbleTutorialControl.requested || bubbleTutorialControl.openRequestSent) {
+        return;
+      }
+
+      const iframe = iframeElements.bubble;
+      if (!iframe || !iframe.contentWindow) {
+        return;
+      }
+
+      try {
+        iframe.contentWindow.postMessage({
+          type: 'openBubbleTutorial',
+          reason: 'url-param'
+        }, '*');
+        bubbleTutorialControl.openRequestSent = true;
+      } catch (error) {
+        debugWarn('Unable to request bubble tutorial overlay:', error);
+      }
+    }
 
     let cachedParentFooterHeight = 0;
     let cachedViewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
@@ -830,7 +945,7 @@
 
       // Set default URL and load chart interface
       const defaultUrl = getDefaultUrl(chartId);
-      window.history.replaceState({}, '', defaultUrl);
+      updateHistoryState('replaceState', defaultUrl);
 
       setTimeout(async () => {
         await loadChartInterface(chartId);
@@ -983,7 +1098,7 @@
         const historyMethod = currentChart ? 'pushState' : 'replaceState';
 
         if (window.location.search.substring(1) !== newQuery || normalizeChartId(urlParams.get('chart')) !== chartId) {
-          window.history[historyMethod]({}, '', newUrl);
+          updateHistoryState(historyMethod, newUrl);
         }
       } else {
         console.log('No stored state for chart', chartId, '- using defaults');
@@ -1025,7 +1140,7 @@
         }
 
         if (newUrl) {
-          window.history[historyMethod]({}, '', newUrl);
+          updateHistoryState(historyMethod, newUrl);
         }
       }
 
@@ -1228,7 +1343,26 @@
       // Handle URL updates from iframes
       if (event.data && event.data.type === 'updateUrl') {
         console.log('🔗 Updating URL to:', event.data.url);
-        window.history.replaceState({ path: event.data.url }, '', event.data.url);
+        updateHistoryState('replaceState', event.data.url);
+      }
+
+      if (event.data && event.data.type === 'bubbleTutorialState') {
+        if (event.data.state === 'opened') {
+          bubbleTutorialControl.openRequestSent = true;
+
+          if (!bubbleTutorialControl.active) {
+            bubbleTutorialControl.active = true;
+            bubbleTutorialControl.requested = false;
+            const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+            updateHistoryState('replaceState', currentUrl);
+          }
+        } else if (event.data.state === 'closed' && bubbleTutorialControl.active) {
+          bubbleTutorialControl.active = false;
+          bubbleTutorialControl.requested = false;
+          bubbleTutorialControl.openRequestSent = false;
+          removeBubbleTutorialFlagFromUrl();
+        }
+        return;
       }
       
       if (event.data && event.data.type === 'chartReady' && !overlayHidden) {
@@ -1245,6 +1379,10 @@
           console.log(`✅ ${keyLabel} chart is ready`);
         } else {
           debugWarn('⚠️ Unknown chart reported ready:', chartKey);
+        }
+
+        if (chartKey === 'bubble') {
+          attemptBubbleTutorialAutoOpen();
         }
         
         if (areAllChartsReady()) {
@@ -1356,7 +1494,7 @@
         const newParams = ['chart=' + chartKey, ...paramsArray];
         const newUrl = `${basePath}?${newParams.join('&')}`;
 
-        window.history.replaceState({ path: newUrl }, '', newUrl);
+        updateHistoryState('replaceState', newUrl);
         console.log('🔗 URL updated:', newUrl);
       }
       
@@ -1407,6 +1545,10 @@
       const pathChart = resolveChartFromPath();
       const urlParams = new URLSearchParams(window.location.search);
       let chartParam = pathChart || urlParams.get('chart') || '1';
+
+      if (bubbleTutorialControl.requested) {
+        chartParam = '1';
+      }
 
       chartParam = normalizeChartId(chartParam) || '1';
       console.log('Initial chart selection:', chartParam);
