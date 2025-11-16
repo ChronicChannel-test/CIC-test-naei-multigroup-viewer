@@ -939,7 +939,7 @@ function updateChart(){
 
   const yearLabel = startYear === endYear ? String(startYear) : `${startYear} - ${endYear}`;
   const pollutantTitle = unit ? `${pollutant} - ${unit}` : pollutant;
-  const emissionAxisTitle = 'Emissions' + (unit ? ` - ${unit}` : '');
+  const yAxisTitle = pollutantTitle;
 
   const options = {
     title: '',
@@ -963,7 +963,7 @@ function updateChart(){
       baselineColor: '#666'
     },
     vAxis: {
-      title: emissionAxisTitle,
+      title: yAxisTitle,
       viewWindow: { 
         min: 0 
       },
