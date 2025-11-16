@@ -22,6 +22,85 @@ if (!bubbleDebugLoggingEnabled) {
 
 console.log('main.js loaded');
 
+const isOperaBrowser = (() => {
+  try {
+    const ua = navigator.userAgent || '';
+    return ua.includes('OPR/') || ua.includes('Opera');
+  } catch (error) {
+    console.warn('Unable to detect Opera browser:', error);
+    return false;
+  }
+})();
+
+function applyOperaFixedWidth(el, widthPx) {
+  if (!el || !widthPx) {
+    return;
+  }
+  el.classList.add('opera-wide-select');
+  const widthValue = `${Math.round(widthPx)}px`;
+  el.style.setProperty('width', widthValue, 'important');
+  el.style.setProperty('min-width', widthValue, 'important');
+  el.style.setProperty('max-width', widthValue, 'important');
+}
+
+function freezeWidthForOpera(selectors = [], opts = {}) {
+  if (!isOperaBrowser) {
+    return;
+  }
+
+  const config = typeof opts === 'number' ? { extraPadding: opts } : (opts || {});
+  const minWidth = Number.isFinite(config.minWidth) ? Number(config.minWidth) : null;
+  const fixedWidth = Number.isFinite(config.fixedWidth) ? Number(config.fixedWidth) : null;
+  const maxWidth = Number.isFinite(config.maxWidth) ? Number(config.maxWidth) : null;
+  const extraPadding = Number.isFinite(config.extraPadding) ? Number(config.extraPadding) : 12;
+  const attempts = Math.max(1, Number.isFinite(config.attempts) ? Number(config.attempts) : 4);
+  const attemptDelay = Math.max(16, Number.isFinite(config.attemptDelay) ? Number(config.attemptDelay) : 120);
+  const arrowAllowance = Number.isFinite(config.arrowAllowance) ? Number(config.arrowAllowance) : 0;
+  const elements = Array.isArray(selectors) ? selectors : [selectors];
+
+  const measureAndFreeze = () => {
+    requestAnimationFrame(() => {
+      elements.forEach(selector => {
+        const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+        if (!el) {
+          return;
+        }
+        el.style.minWidth = '';
+        el.style.maxWidth = '';
+        const rectWidth = Math.ceil(el.getBoundingClientRect().width || 0);
+        const scrollWidth = Math.ceil((el.scrollWidth || 0));
+        const baseWidth = Math.max(rectWidth, scrollWidth);
+        let targetWidth = fixedWidth || Math.max(minWidth || 0, baseWidth + extraPadding);
+        if (Number.isFinite(maxWidth)) {
+          targetWidth = Math.min(maxWidth, targetWidth);
+        }
+        const finalWidth = targetWidth + arrowAllowance;
+        if (finalWidth > 0) {
+          applyOperaFixedWidth(el, finalWidth);
+        }
+      });
+    });
+  };
+
+  let remaining = attempts;
+  const schedule = () => {
+    if (remaining <= 0) {
+      return;
+    }
+    remaining -= 1;
+    measureAndFreeze();
+    if (remaining > 0) {
+      setTimeout(schedule, attemptDelay);
+    }
+  };
+
+  schedule();
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(measureAndFreeze).catch(measureAndFreeze);
+  }
+}
+
 // Debounce function
 function debounce(func, wait) {
   let timeout;
@@ -41,15 +120,11 @@ let selectedPollutantId = null;
 let chartRenderCallback = null; // Callback for when chart finishes rendering
 let selectedGroupIds = [];
 let initialComparisonFlags = []; // Store comparison flags from URL for initial checkbox state
-const MAX_GROUPS = 10;
-let chartReadyNotified = false;
-
-// Track parent height coordination so we avoid chatty postMessage loops.
-const MIN_HEIGHT_DELTA = 8; // px difference required before re-sending height
 const MIN_CHART_WRAPPER_HEIGHT = 480;
 const MIN_CHART_CANVAS_HEIGHT = 420;
 const CHART_HEADER_BUFFER = 10; // spacing between title/legend and chart
 const FOOTER_GAP = 6; // breathing room between chart bottom and footer
+const MIN_HEIGHT_DELTA = 8; // px difference required before re-sending height
 const DEFAULT_PARENT_FOOTER = 140;
 const DEFAULT_PARENT_VIEWPORT = 900;
 const TUTORIAL_SLIDE_MATRIX = [
@@ -77,6 +152,7 @@ let lastSentHeight = 0;
 let lastKnownViewportWidth = 0;
 let parentFooterHeight = DEFAULT_PARENT_FOOTER;
 let parentViewportHeight = DEFAULT_PARENT_VIEWPORT;
+let chartReadyNotified = false;
 
 function logViewportHeight(contextLabel = 'resize') {
   const innerHeight = window.innerHeight || 0;
@@ -830,6 +906,11 @@ async function revealMainContent() {
     console.log('Making mainContent visible...');
     mainContent.style.display = 'block';
     mainContent.removeAttribute('aria-hidden');
+    freezeWidthForOpera('#yearSelect', {
+      fixedWidth: 100,
+      attempts: 6,
+      attemptDelay: 160
+    });
     
     // Render the chart
     console.log('Drawing chart...');

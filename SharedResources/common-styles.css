@@ -309,12 +309,18 @@ button {
   }
 }
 
-.year-pair select,
-#startYear,
-#endYear {
+.year-pair select:not(.opera-wide-select),
+#startYear:not(.opera-wide-select),
+#endYear:not(.opera-wide-select) {
   width: 76px !important;
   min-width: 76px !important;
   max-width: 76px !important;
+}
+
+.opera-wide-select {
+  width: unset !important;
+  min-width: unset !important;
+  max-width: unset !important;
 }
 
 /* Group management */

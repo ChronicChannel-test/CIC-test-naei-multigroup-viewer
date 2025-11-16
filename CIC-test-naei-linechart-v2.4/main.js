@@ -214,6 +214,112 @@ const EXPORT_MAX_PIXELS = 100_000_000;
 let smoothLines = true; // default to smooth (curved) lines
 window.smoothLines = smoothLines; // Expose for export.js
 
+const isOperaBrowser = (() => {
+  try {
+    const ua = navigator.userAgent || '';
+    return ua.includes('OPR/') || ua.includes('Opera');
+  } catch (error) {
+    console.warn('Unable to detect Opera browser:', error);
+    return false;
+  }
+})();
+
+const SMOOTHING_TOGGLE_LABELS = {
+  smoothingOn: '🚫 Disable Smoothing',
+  smoothingOff: '✅ Enable Smoothing'
+};
+
+function updateSmoothingToggleLabel(button, isSmooth) {
+  if (!button) {
+    return;
+  }
+  button.textContent = isSmooth ? SMOOTHING_TOGGLE_LABELS.smoothingOn : SMOOTHING_TOGGLE_LABELS.smoothingOff;
+}
+
+function freezeSmoothingToggleWidth() {
+  const button = document.getElementById('toggleSmoothBtn');
+  if (!button) {
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    const width = Math.ceil(button.getBoundingClientRect().width);
+    if (width > 0) {
+      button.style.minWidth = `${width}px`;
+      button.style.maxWidth = `${width}px`;
+    }
+  });
+}
+
+function applyOperaFixedWidth(el, widthPx) {
+  if (!el || !widthPx) {
+    return;
+  }
+  el.classList.add('opera-wide-select');
+  const widthValue = `${Math.round(widthPx)}px`;
+  el.style.setProperty('width', widthValue, 'important');
+  el.style.setProperty('min-width', widthValue, 'important');
+  el.style.setProperty('max-width', widthValue, 'important');
+}
+
+function freezeWidthForOpera(selectors = [], opts = {}) {
+  if (!isOperaBrowser) {
+    return;
+  }
+
+  const config = typeof opts === 'number' ? { extraPadding: opts } : (opts || {});
+  const minWidth = Number.isFinite(config.minWidth) ? Number(config.minWidth) : null;
+  const fixedWidth = Number.isFinite(config.fixedWidth) ? Number(config.fixedWidth) : null;
+  const maxWidth = Number.isFinite(config.maxWidth) ? Number(config.maxWidth) : null;
+  const extraPadding = Number.isFinite(config.extraPadding) ? Number(config.extraPadding) : 12;
+  const attempts = Math.max(1, Number.isFinite(config.attempts) ? Number(config.attempts) : 4);
+  const attemptDelay = Math.max(16, Number.isFinite(config.attemptDelay) ? Number(config.attemptDelay) : 120);
+  const arrowAllowance = Number.isFinite(config.arrowAllowance) ? Number(config.arrowAllowance) : 0;
+  const elements = Array.isArray(selectors) ? selectors : [selectors];
+
+  const measureAndFreeze = () => {
+    requestAnimationFrame(() => {
+      elements.forEach(selector => {
+        const el = typeof selector === 'string' ? document.querySelector(selector) : selector;
+        if (!el) {
+          return;
+        }
+        el.style.minWidth = '';
+        el.style.maxWidth = '';
+        const rectWidth = Math.ceil(el.getBoundingClientRect().width || 0);
+        const scrollWidth = Math.ceil(el.scrollWidth || 0);
+        const baseWidth = Math.max(rectWidth, scrollWidth);
+        let targetWidth = fixedWidth || Math.max(minWidth || 0, baseWidth + extraPadding);
+        if (Number.isFinite(maxWidth)) {
+          targetWidth = Math.min(maxWidth, targetWidth);
+        }
+        const finalWidth = targetWidth + arrowAllowance;
+        if (finalWidth > 0) {
+          applyOperaFixedWidth(el, finalWidth);
+        }
+      });
+    });
+  };
+
+  let remaining = attempts;
+  const schedule = () => {
+    if (remaining <= 0) {
+      return;
+    }
+    remaining -= 1;
+    measureAndFreeze();
+    if (remaining > 0) {
+      setTimeout(schedule, attemptDelay);
+    }
+  };
+
+  schedule();
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(measureAndFreeze).catch(measureAndFreeze);
+  }
+}
+
 // Listen for messages from parent
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'overlayHidden') {
@@ -1211,6 +1317,12 @@ async function revealMainContent() {
     mainContent.style.display = 'block';
     mainContent.removeAttribute('aria-hidden');
     mainContent.classList.add('loaded'); // Add loaded class immediately
+    freezeSmoothingToggleWidth();
+    freezeWidthForOpera(['#startYear', '#endYear'], {
+      fixedWidth: 100,
+      attempts: 6,
+      attemptDelay: 160
+    });
     
     // Since iframe has fixed height, we can render immediately
     // Now render the chart at the correct size
@@ -1383,10 +1495,11 @@ function setupEventListeners() {
   // Smoothing toggle button
   const toggleSmoothBtn = document.getElementById('toggleSmoothBtn');
   if (toggleSmoothBtn) {
+    updateSmoothingToggleLabel(toggleSmoothBtn, smoothLines);
     toggleSmoothBtn.addEventListener('click', () => {
       smoothLines = !smoothLines;
       window.smoothLines = smoothLines; // Keep window.smoothLines in sync
-      toggleSmoothBtn.textContent = smoothLines ? '🚫 Disable Smoothing' : '✅ Enable Smoothing';
+      updateSmoothingToggleLabel(toggleSmoothBtn, smoothLines);
       updateChart();
     });
   }

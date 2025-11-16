@@ -108,6 +108,13 @@ select, button {
   color: inherit !important;
 }
 
+#toggleSmoothBtn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
 #downloadBtn:hover, #toggleSmoothBtn:hover, #downloadCSVBtn:hover, #downloadXLSXBtn:hover, #downloadCleanBtn:hover, #shareBtn:hover {
   background: #E0E0E0 !important;
 }
