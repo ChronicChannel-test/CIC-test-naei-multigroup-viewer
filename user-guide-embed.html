@@ -6,6 +6,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Embedded user guide for the UK Air Pollution and Emissions Explorer">
   <style>
+    :root {
+      --sidebar-reserve: clamp(82px, 9vw, 160px);
+      --chart-padding: 4px;
+      --chart-border-radius: 6px;
+    }
+
     * {
       box-sizing: border-box;
     }
@@ -29,32 +35,41 @@
       display: flex;
       flex-direction: column;
       justify-content: flex-start;
-      align-items: center;
-      gap: 18px;
+      align-items: flex-start;
+      gap: 16px;
     }
 
     .pdf-panel {
-      width: min(100%, 1500px);
+      width: calc(100% - var(--sidebar-reserve));
+      max-width: 1800px;
       background: #ffffff;
       border: 1px solid #d7e3ff;
-      border-radius: 18px;
+      border-radius: var(--chart-border-radius);
       overflow: hidden;
-      box-shadow: 0 22px 55px rgba(15, 23, 42, 0.08);
+      box-shadow: 0 22px 45px rgba(15, 23, 42, 0.06);
+      margin-left: 0;
+      margin-right: var(--sidebar-reserve);
+      padding: var(--chart-padding);
+      box-sizing: border-box;
     }
 
     .pdf-panel iframe {
       display: block;
       width: 100%;
-      min-height: 1800px;
+      min-height: 1200px;
       border: 0;
       background: #fff;
+      border-radius: calc(var(--chart-border-radius) / 1.5);
     }
 
     .viewer-actions {
-      width: min(100%, 1500px);
+      width: calc(100% - var(--sidebar-reserve));
+      max-width: 1800px;
       text-align: right;
       font-size: 0.95rem;
       color: #334155;
+      margin-left: 0;
+      margin-right: var(--sidebar-reserve);
     }
 
     .viewer-actions a {
@@ -70,88 +85,109 @@
 
     @media (max-width: 1100px) {
       .pdf-panel iframe {
-        min-height: 1500px;
+        min-height: 1000px;
+      }
+    }
+
+    @media (max-width: 900px) {
+      :root {
+        --sidebar-reserve: 32px;
       }
     }
 
     @media (max-width: 820px) {
+      :root {
+        --sidebar-reserve: 16px;
+      }
+
       body {
         background: #ffffff;
       }
 
       .viewer-shell {
-        padding: 12px;
+        padding: 12px 12px 28px;
       }
 
       .pdf-panel {
         border-radius: 12px;
+        margin-right: 0;
+        width: 100%;
       }
 
       .pdf-panel iframe {
-        min-height: 1180px;
+        min-height: 840px;
       }
 
       .viewer-actions {
         text-align: center;
+        width: 100%;
+        margin-right: 0;
       }
     }
 
     @media (max-width: 520px) {
       .pdf-panel iframe {
-        min-height: 920px;
+        min-height: 720px;
       }
     }
   </style>
 </head>
 <body>
-  <main class="viewer-shell" aria-label="User guide PDF">
+  <!--
+    Google Docs Viewer embed retained for quick rollback.
+    <main class="viewer-shell">
+      ...
+    </main>
+  -->
+
+  <main class="viewer-shell" aria-label="User guide PDF via PDF.js">
     <section class="pdf-panel">
-      <iframe id="userGuidePdf" title="User Guide PDF" loading="lazy" referrerpolicy="same-origin"></iframe>
+      <iframe id="userGuidePdfFrame" title="User Guide PDF via PDF.js" loading="lazy"></iframe>
     </section>
     <p class="viewer-actions">
-      Trouble viewing? <a id="userGuideDownload" href="#" target="_blank" rel="noopener">Open the PDF in a new tab</a>
+      Trouble viewing? <a id="userGuideDownload" href="#" target="_blank" rel="noopener">Open the PDF directly</a>
     </p>
   </main>
 
   <script>
     (function() {
-      const basePdfPath = 'SharedResources/docs/Test-User-Guide-Pollution-Emissions-Data-Explorer.pdf';
-      const iframe = document.getElementById('userGuidePdf');
+      const basePdfPath = 'SharedResources/docs/Test2-User-Guide-Pollution-Emissions-Data-Explorer.pdf';
+      const pdfjsViewerPath = 'SharedResources/pdfjs/viewer.html';
+      const frame = document.getElementById('userGuidePdfFrame');
       const downloadLink = document.getElementById('userGuideDownload');
       const pdfPanel = document.querySelector('.pdf-panel');
       const actionsRow = document.querySelector('.viewer-actions');
-      let currentZoomToken = '';
 
-      function buildPdfConfig() {
-        const viewportWidth = Math.max(window.innerWidth || 0, document.documentElement?.clientWidth || 0, 1200);
-        let zoom = 95;
-
-        if (viewportWidth >= 1500) {
-          zoom = 70; // plenty of horizontal room to show two full pages
-        } else if (viewportWidth >= 1320) {
-          zoom = 80;
-        } else if (viewportWidth >= 1100) {
-          zoom = 90;
-        } else if (viewportWidth >= 900) {
-          zoom = 105;
-        } else {
-          zoom = 120;
+      function buildAbsoluteUrl(relativePath) {
+        try {
+          return new URL(relativePath, window.location.href).href;
+        } catch (error) {
+          console.warn('Unable to build absolute URL for user guide PDF', error);
+          return relativePath;
         }
-
-        return {
-          url: `${basePdfPath}#page=1&zoom=${zoom}`,
-          zoomToken: String(zoom)
-        };
       }
 
-      function applyPdfSource(force = false) {
-        const config = buildPdfConfig();
-        if (force || currentZoomToken !== config.zoomToken) {
-          iframe.src = config.url;
-          currentZoomToken = config.zoomToken;
+      function buildViewerUrl() {
+        const absolutePdfUrl = buildAbsoluteUrl(basePdfPath);
+        try {
+          const viewerUrl = new URL(pdfjsViewerPath, window.location.href);
+          viewerUrl.searchParams.set('disablePreferences', 'true');
+          viewerUrl.searchParams.set('file', absolutePdfUrl);
+          viewerUrl.hash = 'zoom=page-width';
+          return viewerUrl.href;
+        } catch (error) {
+          console.warn('Unable to construct viewer URL, falling back to relative path', error);
+          return `${pdfjsViewerPath}?disablePreferences=true&file=${encodeURIComponent(absolutePdfUrl)}#zoom=page-width`;
+        }
+      }
+
+      function applyViewerSource() {
+        const viewerUrl = buildViewerUrl();
+        if (frame && frame.src !== viewerUrl) {
+          frame.src = viewerUrl;
         }
         if (downloadLink) {
-          downloadLink.href = basePdfPath;
+          downloadLink.href = buildAbsoluteUrl(basePdfPath);
         }
       }
 
@@ -181,27 +217,24 @@
         window.setTimeout(() => requestAnimationFrame(sendHeightToParent), delay);
       }
 
-      function handleResize() {
-        applyPdfSource();
-        scheduleHeightUpdate(80);
-      }
-
       document.addEventListener('DOMContentLoaded', () => {
-        applyPdfSource(true);
-        scheduleHeightUpdate(100);
+        applyViewerSource();
+        scheduleHeightUpdate(120);
       });
 
-      iframe.addEventListener('load', () => {
-        scheduleHeightUpdate(120);
+      frame.addEventListener('load', () => {
+        scheduleHeightUpdate(150);
       });
 
       window.addEventListener('message', event => {
         if (event?.data?.type === 'requestHeight') {
-          scheduleHeightUpdate(30);
+          scheduleHeightUpdate(50);
         }
       });
 
-      window.addEventListener('resize', handleResize);
+      window.addEventListener('resize', () => {
+        scheduleHeightUpdate(90);
+      });
     })();
   </script>
 </body>
