@@ -399,7 +399,7 @@ async function generateChartImage() {
           // Draw Logo and Footer
           const logo = new Image();
           logo.crossOrigin = 'anonymous';
-          logo.src = '../SharedResources/images/CIC - Square - Border - Words - Alpha 360x360.png';
+          logo.src = '../SharedResources/images/CIC-Square-Border-Words-Alpha.svg';
 
           const finishGeneration = () => {
             ctx.font = '50px system-ui, sans-serif';

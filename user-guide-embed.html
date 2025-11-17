@@ -56,7 +56,8 @@
     .pdf-panel iframe {
       display: block;
       width: 100%;
-      min-height: 1200px;
+      height: 600px;
+      min-height: 600px;
       border: 0;
       background: #fff;
       border-radius: calc(var(--chart-border-radius) / 1.5);
@@ -85,7 +86,8 @@
 
     @media (max-width: 1100px) {
       .pdf-panel iframe {
-        min-height: 1000px;
+        height: 560px;
+        min-height: 560px;
       }
     }
 
@@ -115,7 +117,8 @@
       }
 
       .pdf-panel iframe {
-        min-height: 840px;
+        height: 520px;
+        min-height: 520px;
       }
 
       .viewer-actions {
@@ -127,7 +130,8 @@
 
     @media (max-width: 520px) {
       .pdf-panel iframe {
-        min-height: 720px;
+        height: 460px;
+        min-height: 460px;
       }
     }
   </style>
@@ -173,11 +177,11 @@
           const viewerUrl = new URL(pdfjsViewerPath, window.location.href);
           viewerUrl.searchParams.set('disablePreferences', 'true');
           viewerUrl.searchParams.set('file', absolutePdfUrl);
-          viewerUrl.hash = 'zoom=page-width';
+          viewerUrl.hash = 'page=1&zoom=page-width&spread=odd';
           return viewerUrl.href;
         } catch (error) {
           console.warn('Unable to construct viewer URL, falling back to relative path', error);
-          return `${pdfjsViewerPath}?disablePreferences=true&file=${encodeURIComponent(absolutePdfUrl)}#zoom=page-width`;
+          return `${pdfjsViewerPath}?disablePreferences=true&file=${encodeURIComponent(absolutePdfUrl)}#page=1&zoom=page-width&spread=odd`;
         }
       }
 

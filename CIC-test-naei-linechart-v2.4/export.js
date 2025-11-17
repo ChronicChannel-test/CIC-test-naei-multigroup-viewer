@@ -592,7 +592,7 @@ async function generateChartImage() {
           // --- 5. Draw Logo and Footer, then resolve ---
           const logo = new Image();
           logo.crossOrigin = 'anonymous';
-          logo.src = '/CIC-test-naei-multigroup-viewer/SharedResources/images/CIC - Square - Border - Words - Alpha 360x360.png';
+          logo.src = '../SharedResources/images/CIC-Square-Border-Words-Alpha.svg';
 
           const finishGeneration = () => {
             ctx.font = '52px system-ui, sans-serif';
