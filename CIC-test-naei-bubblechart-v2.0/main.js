@@ -129,6 +129,8 @@ const FOOTER_GAP = 6; // breathing room between chart bottom and footer
 const MIN_HEIGHT_DELTA = 8; // px difference required before re-sending height
 const DEFAULT_PARENT_FOOTER = 140;
 const DEFAULT_PARENT_VIEWPORT = 900;
+const CSS_EXPERIMENT_FOOTER_RESERVE = 160; // Mirrors --bubble-footer-height default in styles.css
+const CSS_VISUAL_PADDING = 32; // Extra breathing room so chart clears the footer visually
 const TUTORIAL_SLIDE_MATRIX = [
   ['002', '003', '004', '005'],
   ['002', '003', '004', '007'],
@@ -155,6 +157,40 @@ let lastKnownViewportWidth = 0;
 let parentFooterHeight = DEFAULT_PARENT_FOOTER;
 let parentViewportHeight = DEFAULT_PARENT_VIEWPORT;
 let chartReadyNotified = false;
+let lastKnownWrapperHeight = 0;
+let pendingHeightRedrawTimer = null;
+
+function applyCssFooterReserve(pixels) {
+  try {
+    const safePixels = Math.max(FOOTER_GAP, Math.round(Number(pixels) || 0));
+    const padded = safePixels + CSS_VISUAL_PADDING;
+    document.documentElement?.style?.setProperty('--bubble-footer-height', `${padded}px`);
+  } catch (error) {
+    bubbleDebugWarn('Unable to apply CSS footer reserve', error);
+  }
+}
+
+applyCssFooterReserve(CSS_EXPERIMENT_FOOTER_RESERVE);
+
+function applyCssViewportHeight(value) {
+  try {
+    if (typeof value === 'string') {
+      document.documentElement?.style?.setProperty('--bubble-viewport-height', value);
+      return;
+    }
+    const pixels = Math.round(Number(value) || 0);
+    if (pixels > 0) {
+      document.documentElement?.style?.setProperty('--bubble-viewport-height', `${pixels}px`);
+    }
+  } catch (error) {
+    bubbleDebugWarn('Unable to apply CSS viewport height', error);
+  }
+}
+
+applyCssViewportHeight('100vh');
+if (IS_EMBEDDED) {
+  applyCssViewportHeight(`${parentViewportHeight}px`);
+}
 
 function logViewportHeight(contextLabel = 'resize') {
   const innerHeight = window.innerHeight || 0;
@@ -207,10 +243,12 @@ window.addEventListener('message', (event) => {
 
     if (Number.isFinite(footerCandidate) && footerCandidate >= 0) {
       parentFooterHeight = Math.max(footerCandidate, FOOTER_GAP);
+      applyCssFooterReserve(parentFooterHeight + FOOTER_GAP);
     }
 
     if (Number.isFinite(viewportCandidate) && viewportCandidate > 0) {
       parentViewportHeight = viewportCandidate;
+      applyCssViewportHeight(`${parentViewportHeight}px`);
     }
 
     updateChartWrapperHeight('parent-viewport');
@@ -230,16 +268,6 @@ window.addEventListener('message', (event) => {
 });
 
 function updateChartWrapperHeight(contextLabel = 'init') {
-  const chartWrapper = document.querySelector('.chart-wrapper');
-  const chartDiv = document.getElementById('chart_div');
-  const chartTitle = document.getElementById('chartTitle');
-  const chartLegend = document.getElementById('customLegend');
-
-  if (!chartWrapper || !chartDiv) {
-    bubbleDebugWarn('Cannot update chart wrapper height - element missing');
-    return;
-  }
-
   const viewportHeight = Math.round(
     IS_EMBEDDED
       ? parentViewportHeight
@@ -251,14 +279,41 @@ function updateChartWrapperHeight(contextLabel = 'init') {
       )
   );
 
-  if (!viewportHeight) {
-    bubbleDebugWarn('Viewport height unavailable while updating chart wrapper height');
-    return;
+  if (!IS_EMBEDDED) {
+    applyCssViewportHeight(`${viewportHeight}px`);
   }
 
   const footerReserve = IS_EMBEDDED
     ? parentFooterHeight + FOOTER_GAP
     : getStandaloneFooterHeight() + FOOTER_GAP;
+
+  applyCssFooterReserve(footerReserve);
+
+  if (!viewportHeight) {
+    bubbleDebugWarn('Viewport height unavailable while updating chart wrapper height');
+    return;
+  }
+
+  const estimatedChartHeight = Math.max(
+    MIN_CHART_CANVAS_HEIGHT,
+    viewportHeight - footerReserve - CHART_HEADER_BUFFER
+  );
+
+  window.__NAEI_LAST_CHART_HEIGHT = estimatedChartHeight;
+  bubbleDebugWarn(`CSS height experiment active – JS sizing skipped (${contextLabel}). Estimated chart height: ${estimatedChartHeight}px (footerReserve=${footerReserve}px)`);
+  return;
+
+  /*
+  const chartWrapper = document.querySelector('.chart-wrapper');
+  const chartDiv = document.getElementById('chart_div');
+  const chartTitle = document.getElementById('chartTitle');
+  const chartLegend = document.getElementById('customLegend');
+
+  if (!chartWrapper || !chartDiv) {
+    bubbleDebugWarn('Cannot update chart wrapper height - element missing');
+    return;
+  }
+
   const wrapperTop = Math.max(0, Math.round(chartWrapper.getBoundingClientRect().top));
   const wrapperStyles = window.getComputedStyle(chartWrapper);
   const wrapperPadding = (parseFloat(wrapperStyles.paddingTop) || 0) + (parseFloat(wrapperStyles.paddingBottom) || 0);
@@ -299,6 +354,7 @@ function updateChartWrapperHeight(contextLabel = 'init') {
   window.__NAEI_LAST_CHART_HEIGHT = chartRegionHeight;
 
   console.warn(`📐 Wrapper sizing (${contextLabel}): viewport=${viewportHeight}px, wrapperTop=${wrapperTop}px, footerReserve=${footerReserve}px, chartRegion=${chartRegionHeight}px, wrapper=${wrapperHeight}px (title=${titleHeight}px, legend=${legendHeight}px)`);
+  */
 }
 
 window.updateChartWrapperHeight = updateChartWrapperHeight;
@@ -1635,6 +1691,49 @@ function setupEventListeners() {
       }
     }, 200);
   }, 250));
+
+  setupWrapperHeightObserver();
+}
+
+function setupWrapperHeightObserver() {
+  if (!window.ResizeObserver) {
+    return;
+  }
+  const wrapper = document.querySelector('.chart-wrapper');
+  if (!wrapper) {
+    return;
+  }
+
+  const observer = new ResizeObserver(entries => {
+    const entry = entries?.[0];
+    const measured = entry?.contentRect?.height;
+    const newHeight = Math.round(measured || wrapper.offsetHeight || 0);
+    if (!newHeight) {
+      return;
+    }
+    if (!lastKnownWrapperHeight) {
+      lastKnownWrapperHeight = newHeight;
+      return;
+    }
+    if (Math.abs(newHeight - lastKnownWrapperHeight) < MIN_HEIGHT_DELTA) {
+      return;
+    }
+    lastKnownWrapperHeight = newHeight;
+
+    if (pendingHeightRedrawTimer) {
+      clearTimeout(pendingHeightRedrawTimer);
+    }
+
+    pendingHeightRedrawTimer = setTimeout(() => {
+      pendingHeightRedrawTimer = null;
+      console.log('📐 Wrapper height changed - redrawing chart');
+      drawChart(true);
+      sendContentHeightToParent(true);
+    }, 250);
+  });
+
+  observer.observe(wrapper);
+  window.__bubbleWrapperResizeObserver = observer;
 }
 
 /**

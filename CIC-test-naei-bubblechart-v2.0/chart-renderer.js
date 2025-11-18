@@ -363,11 +363,25 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   createCustomLegend(chart, data, groupIds, dataPoints);
   const cachedHeight = window.__NAEI_LAST_CHART_HEIGHT;
   const chartRect = chartDiv.getBoundingClientRect();
+  let requestedChartHeight = Number.isFinite(cachedHeight) && cachedHeight > 0
+    ? cachedHeight
+    : Math.round(chartRect.height || CHART_RENDERER_MIN_CANVAS_HEIGHT);
+
+  const wrapper = chartDiv.closest('.chart-wrapper');
+  if (wrapper) {
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const wrapperStyles = window.getComputedStyle(wrapper);
+    const paddingBottom = parseFloat(wrapperStyles.paddingBottom) || 0;
+    const chartTopOffset = chartRect.top - wrapperRect.top;
+    const availableHeight = Math.max(0, wrapperRect.height - chartTopOffset - paddingBottom);
+    if (availableHeight > 0) {
+      requestedChartHeight = Math.min(requestedChartHeight, availableHeight);
+    }
+  }
+
   const appliedChartHeight = Math.max(
     CHART_RENDERER_MIN_CANVAS_HEIGHT,
-    Number.isFinite(cachedHeight) && cachedHeight > 0
-      ? cachedHeight
-      : Math.round(chartRect.height || CHART_RENDERER_MIN_CANVAS_HEIGHT)
+    Math.round(requestedChartHeight)
   );
   chartDiv.style.height = `${appliedChartHeight}px`;
   chartDiv.style.minHeight = `${appliedChartHeight}px`;

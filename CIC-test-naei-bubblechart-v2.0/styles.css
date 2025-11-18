@@ -3,6 +3,11 @@
  * Application-specific styling for the NAEI Activity Data Scatter Chart viewer
  */
 
+:root {
+  --bubble-footer-height: 160px; /* Default reserve for wrapper height calc */
+  --bubble-viewport-height: 100vh; /* Standalone fallback, overridden via JS for embeds */
+}
+
 /* Loading overlay */
 #loadingOverlay { 
   position: fixed; 
@@ -213,7 +218,7 @@ select,
 /* Chart wrapper opacity control (matching linechart v2.3) */
 .chart-wrapper {
   width: calc(100% - 140px);
-  padding: 4px 4px 2px 4px; /* Slightly smaller bottom inset so the footer can sit closer */
+  padding: 4px 4px 12px 4px; /* Give chart content breathing room above the border */
   margin: 0 auto 0 0;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -223,6 +228,8 @@ select,
   opacity: 0;
   transition: opacity 0.3s ease-in-out 0.1s;
   min-height: 480px;
+  height: calc(var(--bubble-viewport-height) - var(--bubble-footer-height));
+  max-height: calc(var(--bubble-viewport-height) - var(--bubble-footer-height));
   display: flex;
   flex-direction: column;
   position: relative;
