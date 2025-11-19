@@ -129,7 +129,7 @@ const FOOTER_GAP = 6; // breathing room between chart bottom and footer
 const MIN_HEIGHT_DELTA = 8; // px difference required before re-sending height
 const DEFAULT_PARENT_FOOTER = 140;
 const DEFAULT_PARENT_VIEWPORT = 900;
-const CSS_EXPERIMENT_FOOTER_RESERVE = 160; // Mirrors --bubble-footer-height default in styles.css
+const CSS_DEFAULT_FOOTER_RESERVE = 160; // Mirrors --bubble-footer-height default in styles.css
 const CSS_VISUAL_PADDING = 32; // Extra breathing room so chart clears the footer visually
 const TUTORIAL_SLIDE_MATRIX = [
   ['002', '003', '004', '005'],
@@ -145,6 +145,17 @@ const TUTORIAL_SLIDE_MATRIX = [
 ];
 const IS_EMBEDDED = window.parent && window.parent !== window;
 
+const layoutHeightManager = window.LayoutHeightManager?.create({
+  namespace: 'bubble',
+  wrapperSelector: '.chart-wrapper',
+  chartSelector: '#chart_div',
+  minChartHeight: MIN_CHART_CANVAS_HEIGHT,
+  footerGap: FOOTER_GAP,
+  visualPadding: CSS_VISUAL_PADDING,
+  minHeightDelta: MIN_HEIGHT_DELTA,
+  heightDebounce: 250
+});
+
 const tutorialOverlayApi = {
   open: null,
   hide: null,
@@ -157,10 +168,11 @@ let lastKnownViewportWidth = 0;
 let parentFooterHeight = DEFAULT_PARENT_FOOTER;
 let parentViewportHeight = DEFAULT_PARENT_VIEWPORT;
 let chartReadyNotified = false;
-let lastKnownWrapperHeight = 0;
-let pendingHeightRedrawTimer = null;
 
 function applyCssFooterReserve(pixels) {
+  if (layoutHeightManager) {
+    return layoutHeightManager.applyFooterReserve(pixels);
+  }
   try {
     const safePixels = Math.max(FOOTER_GAP, Math.round(Number(pixels) || 0));
     const padded = safePixels + CSS_VISUAL_PADDING;
@@ -170,9 +182,12 @@ function applyCssFooterReserve(pixels) {
   }
 }
 
-applyCssFooterReserve(CSS_EXPERIMENT_FOOTER_RESERVE);
+applyCssFooterReserve(CSS_DEFAULT_FOOTER_RESERVE);
 
 function applyCssViewportHeight(value) {
+  if (layoutHeightManager) {
+    return layoutHeightManager.applyViewportHeight(value);
+  }
   try {
     if (typeof value === 'string') {
       document.documentElement?.style?.setProperty('--bubble-viewport-height', value);
@@ -238,20 +253,33 @@ window.addEventListener('message', (event) => {
   }
 
   if (event.data.type === 'parentViewportMetrics') {
-    const footerCandidate = Number(event.data.footerHeight);
-    const viewportCandidate = Number(event.data.viewportHeight);
+    if (layoutHeightManager) {
+      const metrics = layoutHeightManager.handleParentMetrics(event.data) || {};
+      if (Number.isFinite(metrics.footerHeight)) {
+        parentFooterHeight = Math.max(metrics.footerHeight, FOOTER_GAP);
+      }
+      if (Number.isFinite(metrics.viewportHeight)) {
+        parentViewportHeight = metrics.viewportHeight;
+      }
+    } else {
+      const footerCandidate = Number(event.data.footerHeight);
+      const viewportCandidate = Number(event.data.viewportHeight);
 
-    if (Number.isFinite(footerCandidate) && footerCandidate >= 0) {
-      parentFooterHeight = Math.max(footerCandidate, FOOTER_GAP);
-      applyCssFooterReserve(parentFooterHeight + FOOTER_GAP);
-    }
+      if (Number.isFinite(footerCandidate) && footerCandidate >= 0) {
+        parentFooterHeight = Math.max(footerCandidate, FOOTER_GAP);
+        applyCssFooterReserve(parentFooterHeight + FOOTER_GAP);
+      }
 
-    if (Number.isFinite(viewportCandidate) && viewportCandidate > 0) {
-      parentViewportHeight = viewportCandidate;
-      applyCssViewportHeight(`${parentViewportHeight}px`);
+      if (Number.isFinite(viewportCandidate) && viewportCandidate > 0) {
+        parentViewportHeight = viewportCandidate;
+        applyCssViewportHeight(`${parentViewportHeight}px`);
+      }
     }
 
     updateChartWrapperHeight('parent-viewport');
+    if (bubbleDebugLoggingEnabled) {
+      logViewportHeight('parent-viewport');
+    }
   }
 
   if (event.data.type === 'openBubbleTutorial') {
@@ -294,13 +322,19 @@ function updateChartWrapperHeight(contextLabel = 'init') {
     return;
   }
 
-  const estimatedChartHeight = Math.max(
-    MIN_CHART_CANVAS_HEIGHT,
-    viewportHeight - footerReserve - CHART_HEADER_BUFFER
-  );
+  const estimatedChartHeight = layoutHeightManager
+    ? layoutHeightManager.estimateChartHeight({
+        viewportHeight,
+        footerReserve,
+        chromeBuffer: CHART_HEADER_BUFFER
+      })
+    : Math.max(
+        MIN_CHART_CANVAS_HEIGHT,
+        viewportHeight - footerReserve - CHART_HEADER_BUFFER
+      );
 
   window.__NAEI_LAST_CHART_HEIGHT = estimatedChartHeight;
-  bubbleDebugWarn(`CSS height experiment active – JS sizing skipped (${contextLabel}). Estimated chart height: ${estimatedChartHeight}px (footerReserve=${footerReserve}px)`);
+  bubbleDebugWarn(`CSS-managed height update (${contextLabel}): chart=${estimatedChartHeight}px (footerReserve=${footerReserve}px)`);
   return;
 
   /*
@@ -370,6 +404,9 @@ async function init() {
   document.body.classList.add('loading');
   console.log('Loading class added, body classes now:', document.body.className);
   updateChartWrapperHeight('init');
+  if (bubbleDebugLoggingEnabled) {
+    logViewportHeight('init');
+  }
   
   try {
     // Loading overlay removed - data pre-loaded via shared loader
@@ -1692,48 +1729,13 @@ function setupEventListeners() {
     }, 200);
   }, 250));
 
-  setupWrapperHeightObserver();
-}
-
-function setupWrapperHeightObserver() {
-  if (!window.ResizeObserver) {
-    return;
-  }
-  const wrapper = document.querySelector('.chart-wrapper');
-  if (!wrapper) {
-    return;
-  }
-
-  const observer = new ResizeObserver(entries => {
-    const entry = entries?.[0];
-    const measured = entry?.contentRect?.height;
-    const newHeight = Math.round(measured || wrapper.offsetHeight || 0);
-    if (!newHeight) {
-      return;
-    }
-    if (!lastKnownWrapperHeight) {
-      lastKnownWrapperHeight = newHeight;
-      return;
-    }
-    if (Math.abs(newHeight - lastKnownWrapperHeight) < MIN_HEIGHT_DELTA) {
-      return;
-    }
-    lastKnownWrapperHeight = newHeight;
-
-    if (pendingHeightRedrawTimer) {
-      clearTimeout(pendingHeightRedrawTimer);
-    }
-
-    pendingHeightRedrawTimer = setTimeout(() => {
-      pendingHeightRedrawTimer = null;
-      console.log('📐 Wrapper height changed - redrawing chart');
+  if (layoutHeightManager) {
+    layoutHeightManager.observeWrapper(() => {
+      console.log('📐 Wrapper height changed - redrawing chart (helper)');
       drawChart(true);
       sendContentHeightToParent(true);
-    }, 250);
-  });
-
-  observer.observe(wrapper);
-  window.__bubbleWrapperResizeObserver = observer;
+    });
+  }
 }
 
 /**

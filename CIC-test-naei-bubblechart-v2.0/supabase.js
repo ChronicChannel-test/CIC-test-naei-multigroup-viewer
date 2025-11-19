@@ -363,27 +363,6 @@ function getGroupName(groupId) {
   return group ? group.group_title : `Group ${groupId}`;
 }
 
-/**
- * Load group information by ID
- * @param {number} groupId - Group ID to lookup
- * @returns {Object} Group information object
- */
-function loadGroupInfo(groupId) {
-  // Find the group in our cached data
-  const group = groupsData.find(g => g.id === parseInt(groupId));
-  
-  if (!group) {
-    console.warn(`Group ${groupId} not found in data`);
-    return null;
-  }
-
-  return {
-    id: group.id,
-    name: group.group_title || `Group ${group.id}`,
-    description: group.description || '',
-    group_title: group.group_title
-  };
-}
 
 /**
  * Fallback function for direct data loading (when shared loader fails)
@@ -420,7 +399,6 @@ try {
     get client() { return ensureInitialized(); },
     loadData,
     loadDataDirectly,
-    loadGroupInfo,
     trackAnalytics,
     getAvailableYears,
     getScatterData,

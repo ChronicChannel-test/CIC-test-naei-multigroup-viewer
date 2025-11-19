@@ -52,10 +52,9 @@ All 20 required functions verified to exist:
 - ✅ getCleanChartImageURI
 - ✅ dataURLtoBlob
 
-### supabase.js (6 functions)
+### supabase.js (5 functions)
 - ✅ loadUnits
 - ✅ loadData
-- ✅ loadGroupInfo
 - ✅ trackAnalytics
 - ✅ getUserCountry
 - ✅ generateUserFingerprint
@@ -93,7 +92,6 @@ Variables explicitly exposed on window object:
 5. `init()` loads data from Supabase:
    - `loadUnits()` - pollutant units
    - `loadData()` - timeseries data
-   - `loadGroupInfo()` - group descriptions
 6. `setupSelectors()` populates dropdowns
 7. URL parameters parsed (if present)
 8. Default selections made

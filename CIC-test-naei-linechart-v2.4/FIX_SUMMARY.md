@@ -123,8 +123,7 @@ index.html
 4. Google Charts ready → calls init()
 5. init() executes:
    ├─ loadUnits() - fetch pollutant units
-   ├─ loadData() - fetch timeseries data
-   └─ loadGroupInfo() - fetch group descriptions
+   └─ loadData() - fetch timeseries data
 6. setupSelectors() - populate dropdowns
 7. Parse URL parameters (if shared link)
 8. Set default selections

@@ -104,31 +104,7 @@
         
         <div id="groupContainer"></div>
         
-        <details id="groupInfoDetails" class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
-          <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
-            📘 See Group Info
-          </summary>
-          <div id="group-info" class="mt-3 text-gray-800 leading-relaxed overflow-x-auto" style="cursor: pointer;">
-            <p>Loading group information...</p>
-          </div>
-        </details>
-
-        <script>
-          // Add click handler for See Group Info - click anywhere to close and scroll to top
-          document.addEventListener('DOMContentLoaded', function() {
-            const groupInfo = document.getElementById('group-info');
-            const groupInfoDetails = document.getElementById('groupInfoDetails');
-            
-            if (groupInfo && groupInfoDetails) {
-              groupInfo.addEventListener('click', function() {
-                if (groupInfoDetails.hasAttribute('open')) {
-                  groupInfoDetails.removeAttribute('open');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-              });
-            }
-          });
-        </script>
+        <!-- Group info now lives in its dedicated tab within the parent experience -->
       </div>
 
       <div id="mainContentBottom">
@@ -209,6 +185,7 @@
   <script src="../SharedResources/analytics.js"></script>
   <script src="../SharedResources/supabase-config.js"></script>
   <script src="../SharedResources/shared-data-loader.js"></script>
+  <script src="../SharedResources/layout-height-manager.js"></script>
   <script src="colors.js"></script>
   <script src="supabase.js"></script>
   

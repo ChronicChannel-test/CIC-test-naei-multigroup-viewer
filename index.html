@@ -776,20 +776,27 @@
       return cachedParentFooterHeight;
     }
 
-    function broadcastViewportMetrics() {
-      const iframe = iframeElements.bubble;
-      if (!iframe || !iframe.contentWindow) {
-        return;
-      }
+    function broadcastViewportMetrics(targetKeys) {
+      const keys = Array.isArray(targetKeys)
+        ? targetKeys
+        : (targetKeys ? [targetKeys] : ['bubble', 'line']);
+
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
       if (viewportHeight) {
         cachedViewportHeight = viewportHeight;
       }
-      iframe.contentWindow.postMessage({
-        type: 'parentViewportMetrics',
-        viewportHeight: cachedViewportHeight,
-        footerHeight: cachedParentFooterHeight
-      }, '*');
+
+      keys.forEach(key => {
+        const iframe = iframeElements[key];
+        if (!iframe || !iframe.contentWindow) {
+          return;
+        }
+        iframe.contentWindow.postMessage({
+          type: 'parentViewportMetrics',
+          viewportHeight: cachedViewportHeight,
+          footerHeight: cachedParentFooterHeight
+        }, '*');
+      });
     }
 
     window.addEventListener('resize', () => {
@@ -805,6 +812,11 @@
           value: cachedParentFooterHeight
         }, '*');
       }
+    });
+
+    window.addEventListener('load', () => {
+      getParentFooterHeight();
+      broadcastViewportMetrics();
     });
 
     if (debugLoggingEnabled) {
@@ -1440,9 +1452,9 @@
           }
 
           iframe.style.height = finalHeight + 'px';
-          if (chartKey === 'bubble') {
+          if (chartKey === 'bubble' || chartKey === 'line') {
             getParentFooterHeight();
-            broadcastViewportMetrics();
+            broadcastViewportMetrics(chartKey);
           }
           
           heightsReceived[chartKey] = true;

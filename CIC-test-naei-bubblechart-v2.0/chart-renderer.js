@@ -361,6 +361,10 @@ function drawBubbleChart(year, pollutantId, groupIds) {
 
   // Build legend before sizing so its height is accounted for
   createCustomLegend(chart, data, groupIds, dataPoints);
+  const chartTitleEl = document.getElementById('chartTitle');
+  const customLegendEl = document.getElementById('customLegend');
+  const titleHeight = chartTitleEl ? Math.round(chartTitleEl.getBoundingClientRect().height || 0) : 0;
+  const legendHeight = customLegendEl ? Math.round(customLegendEl.getBoundingClientRect().height || 0) : 0;
   const cachedHeight = window.__NAEI_LAST_CHART_HEIGHT;
   const chartRect = chartDiv.getBoundingClientRect();
   let requestedChartHeight = Number.isFinite(cachedHeight) && cachedHeight > 0
@@ -368,12 +372,16 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     : Math.round(chartRect.height || CHART_RENDERER_MIN_CANVAS_HEIGHT);
 
   const wrapper = chartDiv.closest('.chart-wrapper');
+  let wrapperRect = null;
+  let paddingBottom = 0;
+  let chartTopOffset = 0;
+  let availableHeight = null;
   if (wrapper) {
-    const wrapperRect = wrapper.getBoundingClientRect();
+    wrapperRect = wrapper.getBoundingClientRect();
     const wrapperStyles = window.getComputedStyle(wrapper);
-    const paddingBottom = parseFloat(wrapperStyles.paddingBottom) || 0;
-    const chartTopOffset = chartRect.top - wrapperRect.top;
-    const availableHeight = Math.max(0, wrapperRect.height - chartTopOffset - paddingBottom);
+    paddingBottom = parseFloat(wrapperStyles.paddingBottom) || 0;
+    chartTopOffset = chartRect.top - wrapperRect.top;
+    availableHeight = Math.max(0, wrapperRect.height - chartTopOffset - paddingBottom);
     if (availableHeight > 0) {
       requestedChartHeight = Math.min(requestedChartHeight, availableHeight);
     }
@@ -386,6 +394,19 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   chartDiv.style.height = `${appliedChartHeight}px`;
   chartDiv.style.minHeight = `${appliedChartHeight}px`;
   chartDiv.style.maxHeight = `${appliedChartHeight}px`;
+
+  if (window.__NAEI_DEBUG__) {
+    console.warn('📏 Bubble chart sizing resolution', {
+      wrapperHeight: wrapperRect ? Math.round(wrapperRect.height) : null,
+      paddingBottom: Math.round(paddingBottom),
+      chartTopOffset: Math.round(chartTopOffset),
+      titleHeight,
+      legendHeight,
+      availableHeight: Number.isFinite(availableHeight) ? Math.round(availableHeight) : null,
+      requestedChartHeight: Math.round(requestedChartHeight),
+      appliedChartHeight
+    });
+  }
 
   // Prepare colors for each group (use visible data points only)
   const colors = [];

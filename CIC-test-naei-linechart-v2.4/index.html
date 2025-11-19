@@ -108,32 +108,7 @@
           <select id="pollutantSelect" name="pollutantSelect"><option value="">Select pollutant</option></select>
         </div>
         <div id="groupContainer"></div>
-        <details id="groupInfoDetails" class="my-4 bg-gray-50 border border-gray-300 rounded-2xl p-4 shadow-sm">
-          <summary class="cursor-pointer text-lg font-semibold text-blue-700 hover:text-blue-900">
-            📘 See Group Info
-          </summary>
-
-          <div id="group-info" class="mt-3 text-gray-800 leading-relaxed overflow-x-auto" style="cursor: pointer;">
-            <p>Loading group information...</p>
-          </div>
-        </details>
-
-        <script>
-          // Add click handler for See Group Info - click anywhere to close and scroll to top
-          document.addEventListener('DOMContentLoaded', function() {
-            const groupInfo = document.getElementById('group-info');
-            const groupInfoDetails = document.getElementById('groupInfoDetails');
-            
-            if (groupInfo && groupInfoDetails) {
-              groupInfo.addEventListener('click', function() {
-                if (groupInfoDetails.hasAttribute('open')) {
-                  groupInfoDetails.removeAttribute('open');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-              });
-            }
-          });
-        </script>
+        <!-- Group info content now lives in the dedicated tab within the parent experience -->
       </div>
 
       <div id="mainContentBottom">
@@ -178,6 +153,7 @@
   <script src="../SharedResources/supabase-config.js"></script>
   <script src="../SharedResources/analytics.js"></script>
   <script src="../SharedResources/colors.js"></script>
+  <script src="../SharedResources/layout-height-manager.js"></script>
   
   <!-- Application Modules -->
   <script src="supabase.js"></script>

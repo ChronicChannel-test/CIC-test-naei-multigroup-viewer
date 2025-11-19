@@ -1,6 +1,10 @@
 /* Extracted styles from v2.2 index.html */
 
 /* Base styles */
+:root {
+  --line-footer-height: 160px;
+  --line-viewport-height: 100vh;
+}
 body {
   font-family: system-ui, sans-serif;
   margin: 0;
@@ -328,33 +332,52 @@ button, .add-btn, .remove-btn, .dragHandle {
   line-height: 1.1;
 }
 
+
+/* Mirror bubble chart wrapper behavior so iframe heights match */
 .chart-wrapper {
   width: calc(100% - 140px);
-  padding: 4px 4px 0 4px;
+  padding: 4px 4px 12px 4px;
   margin: 0 auto 0 0;
   border: 1px solid #ccc;
   border-radius: 6px;
   box-sizing: border-box;
   background-color: #fff;
   overflow: visible;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out 0.1s;
+  min-height: 480px;
+  height: calc(var(--line-viewport-height) - var(--line-footer-height));
+  max-height: calc(var(--line-viewport-height) - var(--line-footer-height));
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
-#chart_div { 
-  width: 100%; 
-  height: 600px; 
-  margin-top: 0; 
-  opacity: 0; 
-  transition: opacity .35s ease; 
-  min-height: 400px; 
+.chart-wrapper.visible {
+  opacity: 1;
+}
+
+#chart_div {
+  width: 100%;
+  margin-top: 0;
+  opacity: 0;
+  transition: opacity .35s ease;
+  min-height: 420px;
+  height: 100%;
+  max-height: none;
   border: none;
-  border-radius: 0; 
-  padding: 0; 
+  border-radius: 0;
+  padding: 0;
   box-sizing: border-box;
+  position: relative;
+  overflow: visible;
+  flex: 1 1 auto;
 }
 
 #chart_div.visible { 
   opacity: 1; 
 }
+
 
 .chart-container, #chart_div { 
   cursor: default; 

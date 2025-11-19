@@ -1446,9 +1446,6 @@ async function init() {
     // Then, set up the UI selectors with the loaded data
     setupSelectors(pollutants, groups);
 
-    // Load group information table
-    await window.supabaseModule.loadGroupInfo();
-
     // Set up event listeners for buttons
     setupEventListeners();
     setupShareButton();

@@ -6,6 +6,11 @@
 
 const lineUrlParams = new URLSearchParams(window.location.search || '');
 const lineDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => lineUrlParams.has(flag));
+const lineDebugWarn = (...args) => {
+  if (lineDebugLoggingEnabled) {
+    console.warn(...args);
+  }
+};
 window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || lineDebugLoggingEnabled;
 
 if (!lineDebugLoggingEnabled) {
@@ -52,6 +57,209 @@ if (!window.Colors) {
       return chosen;
     }
   };
+}
+
+const LINE_MIN_CHART_CANVAS_HEIGHT = 420;
+const LINE_CHART_HEADER_BUFFER = 10;
+const LINE_FOOTER_GAP = 6;
+const LINE_MIN_HEIGHT_DELTA = 8;
+const LINE_DEFAULT_PARENT_FOOTER = 140;
+const LINE_DEFAULT_PARENT_VIEWPORT = 900;
+const LINE_DEFAULT_CSS_FOOTER_RESERVE = 160;
+const LINE_CSS_VISUAL_PADDING = 32;
+const LINE_IS_EMBEDDED = window.parent && window.parent !== window;
+
+function computeEffectiveLineViewportHeight() {
+  const runtimeViewport = () => (
+    window.visualViewport?.height
+    || window.innerHeight
+    || document.documentElement?.clientHeight
+    || 0
+  );
+
+  if (!LINE_IS_EMBEDDED) {
+    return runtimeViewport();
+  }
+
+  const managerViewport = lineLayoutHeightManager?.getParentViewportHeight?.();
+  if (Number.isFinite(managerViewport) && managerViewport > 0) {
+    return Math.round(managerViewport);
+  }
+
+  if (Number.isFinite(lineParentViewportHeight) && lineParentViewportHeight > 0) {
+    return Math.round(lineParentViewportHeight);
+  }
+
+  const liveViewport = runtimeViewport();
+  return liveViewport > 0 ? Math.round(liveViewport) : 0;
+}
+
+const lineLayoutHeightManager = window.LayoutHeightManager?.create({
+  namespace: 'line',
+  wrapperSelector: '.chart-wrapper',
+  chartSelector: '#chart_div',
+  minChartHeight: LINE_MIN_CHART_CANVAS_HEIGHT,
+  footerGap: LINE_FOOTER_GAP,
+  visualPadding: LINE_CSS_VISUAL_PADDING,
+  minHeightDelta: LINE_MIN_HEIGHT_DELTA,
+  heightDebounce: 250
+});
+
+let lineParentFooterHeight = LINE_DEFAULT_PARENT_FOOTER;
+let lineParentViewportHeight = LINE_DEFAULT_PARENT_VIEWPORT;
+let lineLastSentHeight = 0;
+
+function applyLineCssViewportHeight(value) {
+  if (lineLayoutHeightManager?.applyViewportHeight) {
+    return lineLayoutHeightManager.applyViewportHeight(value);
+  }
+
+  const finalValue = typeof value === 'string'
+    ? value
+    : `${Math.max(0, Math.round(Number(value) || 0))}px`;
+
+  try {
+    document.documentElement?.style?.setProperty('--line-viewport-height', finalValue);
+  } catch (error) {
+    lineDebugWarn('Unable to apply line viewport height CSS variable', error);
+  }
+
+  return finalValue;
+}
+
+function applyLineCssFooterReserve(pixels) {
+  if (lineLayoutHeightManager?.applyFooterReserve) {
+    return lineLayoutHeightManager.applyFooterReserve(pixels);
+  }
+
+  const numeric = Math.max(LINE_FOOTER_GAP, Math.round(Number(pixels) || 0));
+  const padded = numeric + Math.max(0, Math.round(LINE_CSS_VISUAL_PADDING || 0));
+  const finalValue = `${padded}px`;
+
+  try {
+    document.documentElement?.style?.setProperty('--line-footer-height', finalValue);
+  } catch (error) {
+    lineDebugWarn('Unable to apply line footer reserve CSS variable', error);
+  }
+
+  return finalValue;
+}
+
+function getLineStandaloneFooterHeight() {
+  const footer = document.querySelector('footer');
+  if (!footer) {
+    return LINE_DEFAULT_PARENT_FOOTER;
+  }
+
+  const rect = footer.getBoundingClientRect();
+  const styles = window.getComputedStyle(footer);
+  const margins = (parseFloat(styles.marginTop) || 0) + (parseFloat(styles.marginBottom) || 0);
+  const total = Math.round((rect.height || 0) + margins);
+  return total || LINE_DEFAULT_PARENT_FOOTER;
+}
+
+function updateChartWrapperHeight(contextLabel = 'init') {
+  const viewportHeight = computeEffectiveLineViewportHeight();
+  if (!viewportHeight) {
+    lineDebugWarn('Line viewport height unavailable while updating chart wrapper height');
+    return lineLayoutHeightManager?.getLastEstimatedHeight?.() || LINE_MIN_CHART_CANVAS_HEIGHT;
+  }
+
+  if (!LINE_IS_EMBEDDED) {
+    applyLineCssViewportHeight(`${viewportHeight}px`);
+  }
+
+  const managerFooter = lineLayoutHeightManager?.getParentFooterHeight?.();
+  const footerSource = LINE_IS_EMBEDDED
+    ? (Number.isFinite(managerFooter) ? managerFooter : lineParentFooterHeight)
+    : getLineStandaloneFooterHeight();
+  const footerReserve = Math.max(LINE_FOOTER_GAP, footerSource) + LINE_FOOTER_GAP;
+
+  applyLineCssFooterReserve(footerReserve);
+
+  const chromeBuffer = LINE_CHART_HEADER_BUFFER;
+  const estimatedChartHeight = lineLayoutHeightManager
+    ? lineLayoutHeightManager.estimateChartHeight({
+        viewportHeight,
+        footerReserve,
+        chromeBuffer
+      })
+    : Math.max(
+        LINE_MIN_CHART_CANVAS_HEIGHT,
+        viewportHeight - footerReserve - chromeBuffer
+      );
+
+  window.__NAEI_LAST_CHART_HEIGHT = estimatedChartHeight;
+
+  if (lineDebugLoggingEnabled) {
+    console.log(
+      `📐 Line height estimate (${LINE_IS_EMBEDDED ? 'embed' : 'standalone'} ${contextLabel}): viewport=${viewportHeight}px footerReserve=${footerReserve}px chrome=${chromeBuffer}px estimate=${estimatedChartHeight}px`
+    );
+  }
+
+  return estimatedChartHeight;
+}
+
+function logLineViewportHeight(contextLabel = 'resize') {
+  if (!lineDebugLoggingEnabled) {
+    return;
+  }
+
+  try {
+    const innerHeight = window.innerHeight || 0;
+    const outerHeight = window.outerHeight || 0;
+    const clientHeight = document.documentElement?.clientHeight || 0;
+    const visualViewportHeight = window.visualViewport?.height || null;
+    const bodyScrollHeight = document.body?.scrollHeight || 0;
+    const bodyOffsetHeight = document.body?.offsetHeight || 0;
+    const chartWrapper = document.querySelector('.chart-wrapper');
+    const chartDiv = document.getElementById('chart_div');
+    const wrapperHeight = chartWrapper ? Math.round(chartWrapper.getBoundingClientRect().height) : 'n/a';
+    const chartDivHeight = chartDiv ? Math.round(chartDiv.getBoundingClientRect().height) : 'n/a';
+
+    console.warn(
+      `📏 Line viewport (${contextLabel}): innerHeight=${innerHeight}px, clientHeight=${clientHeight}px, outerHeight=${outerHeight}px${visualViewportHeight ? `, visualViewport=${Math.round(visualViewportHeight)}px` : ''}, parentFooter=${lineParentFooterHeight}px, parentViewport=${lineParentViewportHeight}px`
+    );
+    console.warn(
+      `📦 Line layout (${contextLabel}): wrapper=${wrapperHeight}px, chartDiv=${chartDivHeight}px, bodyScroll=${bodyScrollHeight}px, bodyOffset=${bodyOffsetHeight}px`
+    );
+  } catch (error) {
+    lineDebugWarn('Unable to log line viewport metrics', error);
+  }
+}
+
+function updateLineChartTitle(yearLabel, pollutantTitle) {
+  const chartTitleEl = document.getElementById('chartTitle');
+  if (!chartTitleEl) {
+    return { element: null, height: 0 };
+  }
+
+  chartTitleEl.innerHTML = '';
+
+  const yearElement = document.createElement('div');
+  yearElement.className = 'chart-title__year-range';
+  yearElement.textContent = yearLabel;
+  chartTitleEl.appendChild(yearElement);
+
+  const pollutantElement = document.createElement('div');
+  pollutantElement.className = 'chart-title__pollutant';
+  pollutantElement.textContent = pollutantTitle;
+  chartTitleEl.appendChild(pollutantElement);
+
+  const measuredHeight = chartTitleEl.getBoundingClientRect?.().height || 0;
+  return { element: chartTitleEl, height: Math.round(measuredHeight) };
+}
+
+window.logLineViewportHeight = logLineViewportHeight;
+
+function syncLineChartHeight(contextLabel = 'update', { redraw = false } = {}) {
+  logLineViewportHeight(contextLabel);
+  const estimated = updateChartWrapperHeight(contextLabel);
+  if (redraw) {
+    window._pendingHeightUpdate = true;
+    updateChart();
+  }
+  return estimated;
 }
 
 function loadGoogleChartsLibrary() {
@@ -224,39 +432,13 @@ const isOperaBrowser = (() => {
   }
 })();
 
-const SMOOTHING_TOGGLE_LABELS = {
-  smoothingOn: '🚫 Disable Smoothing',
-  smoothingOff: '✅ Enable Smoothing'
-};
-
-function updateSmoothingToggleLabel(button, isSmooth) {
-  if (!button) {
-    return;
-  }
-  button.textContent = isSmooth ? SMOOTHING_TOGGLE_LABELS.smoothingOn : SMOOTHING_TOGGLE_LABELS.smoothingOff;
-}
-
-function freezeSmoothingToggleWidth() {
-  const button = document.getElementById('toggleSmoothBtn');
-  if (!button) {
-    return;
-  }
-
-  requestAnimationFrame(() => {
-    const width = Math.ceil(button.getBoundingClientRect().width);
-    if (width > 0) {
-      button.style.minWidth = `${width}px`;
-      button.style.maxWidth = `${width}px`;
-    }
-  });
-}
-
 function applyOperaFixedWidth(el, widthPx) {
   if (!el || !widthPx) {
     return;
   }
+
+  const widthValue = `${Math.max(0, Math.round(widthPx))}px`;
   el.classList.add('opera-wide-select');
-  const widthValue = `${Math.round(widthPx)}px`;
   el.style.setProperty('width', widthValue, 'important');
   el.style.setProperty('min-width', widthValue, 'important');
   el.style.setProperty('max-width', widthValue, 'important');
@@ -284,10 +466,11 @@ function freezeWidthForOpera(selectors = [], opts = {}) {
         if (!el) {
           return;
         }
-        // Clear prior width locks so each measurement reflects natural content width
+
         el.style.width = '';
         el.style.minWidth = '';
         el.style.maxWidth = '';
+
         const rectWidth = Math.ceil(el.getBoundingClientRect().width || 0);
         const scrollWidth = Math.ceil(el.scrollWidth || 0);
         const baseWidth = Math.max(rectWidth, scrollWidth);
@@ -322,6 +505,230 @@ function freezeWidthForOpera(selectors = [], opts = {}) {
   }
 }
 
+const SMOOTHING_TOGGLE_LABELS = {
+  smoothingOn: '🚫 Disable Smoothing',
+  smoothingOff: '✅ Enable Smoothing'
+};
+
+function freezeSmoothingToggleWidth(options = {}) {
+  const button = document.getElementById('toggleSmoothBtn');
+  if (!button || !document.body) {
+    return;
+  }
+
+  const config = typeof options === 'number' ? { attempts: options } : options;
+  const attempts = Math.max(1, Number.isFinite(config.attempts) ? Number(config.attempts) : 4);
+  const attemptDelay = Math.max(16, Number.isFinite(config.attemptDelay) ? Number(config.attemptDelay) : 140);
+  const extraPadding = Number.isFinite(config.extraPadding) ? Number(config.extraPadding) : 6;
+
+  const measureCandidate = (label) => {
+    if (!label) {
+      return 0;
+    }
+    const clone = button.cloneNode(true);
+    clone.removeAttribute('id');
+    clone.textContent = label;
+    clone.style.position = 'absolute';
+    clone.style.visibility = 'hidden';
+    clone.style.pointerEvents = 'none';
+    clone.style.width = 'auto';
+    clone.style.minWidth = '';
+    clone.style.maxWidth = '';
+    clone.style.whiteSpace = 'nowrap';
+    document.body.appendChild(clone);
+    const width = Math.ceil(clone.getBoundingClientRect().width || 0);
+    clone.remove();
+    return width;
+  };
+
+  const freezeWidth = () => {
+    const labels = [
+      button.dataset.labelOn,
+      button.dataset.labelOff,
+      SMOOTHING_TOGGLE_LABELS.smoothingOn,
+      SMOOTHING_TOGGLE_LABELS.smoothingOff,
+      button.textContent
+    ].filter(Boolean);
+
+    if (!labels.length) {
+      return;
+    }
+
+    const widest = labels.reduce((maxWidth, label) => {
+      return Math.max(maxWidth, measureCandidate(label));
+    }, 0);
+
+    if (widest > 0) {
+      const paddedWidth = Math.ceil(widest + extraPadding);
+      const widthValue = `${paddedWidth}px`;
+      button.style.width = widthValue;
+      button.style.minWidth = widthValue;
+      button.style.maxWidth = widthValue;
+      button.dataset.smoothingWidthFrozen = widthValue;
+    }
+  };
+
+  let remaining = attempts;
+  const schedule = () => {
+    if (remaining <= 0) {
+      return;
+    }
+    remaining -= 1;
+    requestAnimationFrame(freezeWidth);
+    if (remaining > 0) {
+      setTimeout(schedule, attemptDelay);
+    }
+  };
+
+  schedule();
+
+  if (document.fonts?.ready) {
+    document.fonts.ready.then(freezeWidth).catch(freezeWidth);
+  }
+}
+
+function updateSmoothingToggleLabel(button, isSmooth) {
+  if (!button) {
+    return;
+  }
+
+  const nextLabel = isSmooth
+    ? SMOOTHING_TOGGLE_LABELS.smoothingOn
+    : SMOOTHING_TOGGLE_LABELS.smoothingOff;
+
+  button.textContent = nextLabel;
+  button.setAttribute('aria-pressed', isSmooth ? 'true' : 'false');
+  button.setAttribute('aria-label', nextLabel);
+}
+
+function getElementBottom(el) {
+  if (!el) {
+    return 0;
+  }
+  const rect = el.getBoundingClientRect();
+  const scrollOffset = window.scrollY || window.pageYOffset || 0;
+  return Math.max(0, Math.round((rect.bottom || 0) + scrollOffset));
+}
+
+function measureLineContentHeight() {
+  const body = document.body;
+  const html = document.documentElement;
+  const documentHeight = Math.max(
+    body?.scrollHeight || 0,
+    body?.offsetHeight || 0,
+    html?.scrollHeight || 0,
+    html?.offsetHeight || 0
+  );
+
+  const chartShell = document.querySelector('.chart-shell');
+  const mainContent = document.getElementById('mainContent');
+  const wrapperEl = lineLayoutHeightManager?.getWrapperElement?.() || document.querySelector('.chart-wrapper');
+  const loadingOverlay = document.getElementById('loadingOverlay');
+
+  const shellBottom = getElementBottom(chartShell);
+  const mainContentBottom = getElementBottom(mainContent);
+  const wrapperBottom = getElementBottom(wrapperEl);
+  const overlayBottom = (loadingOverlay && !loadingOverlay.classList.contains('hidden') && loadingOverlay.offsetParent !== null)
+    ? getElementBottom(loadingOverlay)
+    : 0;
+
+  const candidates = [
+    { label: 'chartShell', value: shellBottom },
+    { label: 'mainContent', value: mainContentBottom },
+    { label: 'chartWrapper', value: wrapperBottom }
+  ].filter(candidate => candidate.value > 0);
+
+  let measuredHeight = 0;
+  let preferredSource = 'none';
+
+  if (candidates.length) {
+    const bestCandidate = candidates.reduce((prev, next) => (next.value > prev.value ? next : prev));
+    measuredHeight = bestCandidate.value;
+    preferredSource = bestCandidate.label;
+  }
+
+  const fallbackEstimate = Math.max(
+    LINE_MIN_CHART_CANVAS_HEIGHT + LINE_CHART_HEADER_BUFFER + LINE_FOOTER_GAP,
+    lineLayoutHeightManager?.getLastEstimatedHeight?.() || window.__NAEI_LAST_CHART_HEIGHT || LINE_MIN_CHART_CANVAS_HEIGHT
+  );
+
+  if (!measuredHeight && documentHeight) {
+    measuredHeight = documentHeight;
+    preferredSource = 'document';
+  }
+
+  if (!measuredHeight) {
+    measuredHeight = fallbackEstimate;
+    preferredSource = 'fallback';
+  }
+
+  if (measuredHeight < 300) {
+    measuredHeight = Math.max(1100, fallbackEstimate);
+    preferredSource = 'fallback-min';
+  }
+
+  return {
+    height: Math.round(measuredHeight),
+    source: preferredSource,
+    documentHeight: Math.round(documentHeight || 0),
+    shellBottom,
+    mainContentBottom,
+    wrapperBottom,
+    overlayBottom,
+    fallbackEstimate: Math.round(fallbackEstimate)
+  };
+}
+
+function sendContentHeightToParent(force = false) {
+  try {
+    if (!LINE_IS_EMBEDDED) {
+      return;
+    }
+
+    const measurement = measureLineContentHeight();
+    const measuredHeight = Math.max(LINE_MIN_CHART_CANVAS_HEIGHT, measurement.height);
+
+    if (lineDebugLoggingEnabled) {
+      lineDebugWarn('📏 Line content height components', { ...measurement, measuredHeight });
+    }
+
+    if (!force && lineLastSentHeight && Math.abs(measuredHeight - lineLastSentHeight) < LINE_MIN_HEIGHT_DELTA) {
+      if (lineDebugLoggingEnabled) {
+        console.log('↩️ Line height delta below threshold, skipping postMessage', {
+          measuredHeight,
+          lastSent: lineLastSentHeight
+        });
+      }
+      return;
+    }
+
+    lineLastSentHeight = measuredHeight;
+
+    if (lineDebugLoggingEnabled) {
+      console.log('📤 Line contentHeight measurement', {
+        measuredHeight,
+        source: measurement.source
+      });
+    }
+
+    window.parent.postMessage({
+      type: 'contentHeight',
+      chart: 'line',
+      height: measuredHeight
+    }, '*');
+
+    requestAnimationFrame(() => updateChartWrapperHeight('post-height-send'));
+  } catch (error) {
+    console.error('Unable to send line chart content height to parent:', error);
+  }
+}
+
+applyLineCssFooterReserve(LINE_DEFAULT_CSS_FOOTER_RESERVE);
+applyLineCssViewportHeight('100vh');
+if (LINE_IS_EMBEDDED) {
+  applyLineCssViewportHeight(`${lineParentViewportHeight}px`);
+}
+
 // Listen for messages from parent
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'overlayHidden') {
@@ -336,6 +743,34 @@ window.addEventListener('message', (event) => {
   // Handle height request from parent (sent before hiding overlay to prevent layout shift)
   if (event.data && event.data.type === 'requestHeight') {
     sendContentHeightToParent();
+  }
+
+  if (event.data && event.data.type === 'parentViewportMetrics') {
+    if (lineLayoutHeightManager) {
+      const metrics = lineLayoutHeightManager.handleParentMetrics(event.data) || {};
+      if (Number.isFinite(metrics.footerHeight)) {
+        lineParentFooterHeight = Math.max(metrics.footerHeight, LINE_FOOTER_GAP);
+      }
+      if (Number.isFinite(metrics.viewportHeight)) {
+        lineParentViewportHeight = metrics.viewportHeight;
+      }
+    } else {
+      const footerCandidate = Number(event.data.footerHeight);
+      const viewportCandidate = Number(event.data.viewportHeight);
+
+      if (Number.isFinite(footerCandidate) && footerCandidate >= 0) {
+        lineParentFooterHeight = Math.max(footerCandidate, LINE_FOOTER_GAP);
+        applyLineCssFooterReserve(lineParentFooterHeight + LINE_FOOTER_GAP);
+      }
+
+      if (Number.isFinite(viewportCandidate) && viewportCandidate > 0) {
+        lineParentViewportHeight = Math.round(viewportCandidate);
+        applyLineCssViewportHeight(`${lineParentViewportHeight}px`);
+      }
+    }
+
+    updateChartWrapperHeight('parent-viewport');
+    logLineViewportHeight('parent-viewport');
   }
 });
 
@@ -906,6 +1341,8 @@ function updateChart(){
   const selectedGroups = getSelectedGroups();
   if (!pollutant || !startYear || !endYear || !selectedGroups.length) return;
 
+  const preLegendEstimate = updateChartWrapperHeight('updateChart');
+
   // Update the URL with the new state (debounced)
   updateUrlFromChartState();
 
@@ -1036,17 +1473,104 @@ function updateChart(){
   const extraChars = Math.max(0, labelLength - 3);
   const leftMargin = Math.min(140, baseMargin + (extraChars * 6)); // dynamic left padding
 
-  // Set a fixed height for the chart container to prevent layout shifts
   const chartContainer = document.getElementById('chart_div');
-  if (chartContainer) {
-    chartContainer.style.minHeight = '800px';
-  } else {
+  if (!chartContainer) {
     console.error('chart_div element not found when attempting to draw line chart');
     return;
   }
 
+  // Build custom legend before measuring height so offsets match the bubble chart
+  const legendDiv = document.getElementById('customLegend');
+  legendDiv.innerHTML = '';
+
+  if (seriesVisibility.length !== selectedGroups.length) {
+    seriesVisibility = Array(selectedGroups.length).fill(true);
+    window.seriesVisibility = seriesVisibility; // Update window reference
+  }
+
+  selectedGroups.forEach((g, i) => {
+    const item = document.createElement('span');
+    const dot = document.createElement('span');
+    dot.style.display = 'inline-block';
+    dot.style.width = '12px';
+    dot.style.height = '12px';
+    dot.style.borderRadius = '50%';
+    dot.style.backgroundColor = colors[i];
+    item.appendChild(dot);
+
+    const labelText = document.createTextNode(g + (groupHasData[i] ? '' : ' (No data available)'));
+    item.appendChild(labelText);
+
+    item.style.opacity = (!groupHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
+    if (!groupHasData[i]) {
+      item.title = 'No data available';
+    }
+
+    if (groupHasData[i]) {
+      item.addEventListener('click', () => {
+        seriesVisibility[i] = !seriesVisibility[i];
+        window.seriesVisibility = seriesVisibility; // Update window reference
+        updateChart();
+      });
+    }
+
+    legendDiv.appendChild(item);
+  });
   const yearLabel = startYear === endYear ? String(startYear) : `${startYear} - ${endYear}`;
   const pollutantTitle = unit ? `${pollutant} - ${unit}` : pollutant;
+  const { height: titleHeight } = updateLineChartTitle(yearLabel, pollutantTitle);
+  const chartRect = chartContainer.getBoundingClientRect();
+  const wrapperElement = chartContainer.closest('.chart-wrapper');
+  const wrapperRect = wrapperElement ? wrapperElement.getBoundingClientRect() : null;
+  const wrapperStyles = wrapperElement ? window.getComputedStyle(wrapperElement) : null;
+  const paddingBottom = wrapperStyles ? (parseFloat(wrapperStyles.paddingBottom) || 0) : 0;
+  const chartTopOffset = wrapperRect ? Math.max(0, chartRect.top - wrapperRect.top) : 0;
+  const legendEl = document.getElementById('customLegend');
+  const legendHeight = legendEl ? Math.round(legendEl.getBoundingClientRect().height || 0) : 0;
+  const cachedHeight = Number.isFinite(preLegendEstimate) && preLegendEstimate > 0
+    ? preLegendEstimate
+    : (lineLayoutHeightManager?.getLastEstimatedHeight?.() ?? window.__NAEI_LAST_CHART_HEIGHT);
+
+  let requestedChartHeight = Math.round(
+    Number.isFinite(cachedHeight) && cachedHeight > 0
+      ? cachedHeight
+      : (chartRect.height || LINE_MIN_CHART_CANVAS_HEIGHT)
+  );
+
+  if (!Number.isFinite(requestedChartHeight) || requestedChartHeight <= 0) {
+    requestedChartHeight = LINE_MIN_CHART_CANVAS_HEIGHT;
+  }
+
+  const availableHeight = wrapperRect
+    ? Math.max(0, wrapperRect.height - chartTopOffset - paddingBottom)
+    : null;
+
+  if (Number.isFinite(availableHeight) && availableHeight > 0) {
+    requestedChartHeight = Math.min(requestedChartHeight, availableHeight);
+  }
+
+  const appliedChartHeight = Math.max(
+    LINE_MIN_CHART_CANVAS_HEIGHT,
+    Math.round(requestedChartHeight)
+  );
+
+  chartContainer.style.height = `${appliedChartHeight}px`;
+  chartContainer.style.minHeight = `${appliedChartHeight}px`;
+  chartContainer.style.maxHeight = `${appliedChartHeight}px`;
+
+  if (lineDebugLoggingEnabled) {
+    lineDebugWarn('📏 Line chart sizing resolution', {
+      wrapperHeight: wrapperRect ? Math.round(wrapperRect.height) : null,
+      paddingBottom: Math.round(paddingBottom),
+      chartTopOffset: Math.round(chartTopOffset),
+      titleHeight,
+      legendHeight,
+      availableHeight: Number.isFinite(availableHeight) ? Math.round(availableHeight) : null,
+      requestedChartHeight: Math.round(requestedChartHeight),
+      appliedChartHeight
+    });
+  }
+
   const yAxisTitle = pollutantTitle;
 
   const options = {
@@ -1103,9 +1627,10 @@ function updateChart(){
 
   // Compute safe width/height to avoid negative SVG dimensions
   const safeWidth = Math.max(chartContainer.offsetWidth || 0, 200);
-  const safeHeight = Math.max(chartContainer.offsetHeight || 0, 200);
+  const safeHeight = Math.max(appliedChartHeight, LINE_MIN_CHART_CANVAS_HEIGHT);
   options.width = safeWidth;
   options.height = safeHeight;
+  window.__NAEI_LAST_CHART_HEIGHT = safeHeight;
 
   // On mobile, show only first and last year for clarity
   const isMobile = window.innerWidth < 600;
@@ -1120,6 +1645,10 @@ function updateChart(){
     // Only add visible class when parent is already visible to prevent flash
     if (document.getElementById('mainContent').classList.contains('loaded')) {
       chartContainer.classList.add('visible');
+      const wrapperEl = chartContainer.closest('.chart-wrapper');
+      if (wrapperEl) {
+        wrapperEl.classList.add('visible');
+      }
     }
     
     // After chart finishes drawing, update height if we're in a resize
@@ -1141,106 +1670,12 @@ function updateChart(){
     }
   }, 100);
 
-  // update visible title on page
-  const titleEl = document.getElementById('chartTitle');
-  if (titleEl) {
-    titleEl.innerHTML = '';
+  updateChartWrapperHeight('post-legend');
 
-    const yearElement = document.createElement('div');
-    yearElement.className = 'chart-title__year-range';
-    yearElement.textContent = yearLabel;
-    titleEl.appendChild(yearElement);
-
-    const pollutantElement = document.createElement('div');
-    pollutantElement.className = 'chart-title__pollutant';
-    pollutantElement.textContent = pollutantTitle;
-    titleEl.appendChild(pollutantElement);
-  }
-
-  // build custom legend (interactive)
-  const legendDiv = document.getElementById('customLegend');
-  legendDiv.innerHTML = '';
-
-  // Ensure visibility array is correctly sized before building the legend
-  if (seriesVisibility.length !== selectedGroups.length) {
-    seriesVisibility = Array(selectedGroups.length).fill(true);
-    window.seriesVisibility = seriesVisibility; // Update window reference
-  }
-
-  selectedGroups.forEach((g, i) => {
-    const item = document.createElement('span');
-    const dot = document.createElement('span');
-    dot.style.display = 'inline-block';
-    dot.style.width = '12px';
-    dot.style.height = '12px';
-    dot.style.borderRadius = '50%';
-    dot.style.backgroundColor = colors[i];
-    item.appendChild(dot);
-
-    const labelText = document.createTextNode(g + (groupHasData[i] ? '' : ' (No data available)'));
-    item.appendChild(labelText);
-
-    // Fade if no data, or if the series is toggled off
-    item.style.opacity = (!groupHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
-    if (!groupHasData[i]) {
-      item.title = 'No data available';
-    }
-
-    // Toggle visibility only if data exists
-    if (groupHasData[i]) {
-      item.addEventListener('click', () => {
-        // Toggle the visibility state for the clicked series
-        seriesVisibility[i] = !seriesVisibility[i];
-        window.seriesVisibility = seriesVisibility; // Update window reference
-        // Trigger a full chart update to redraw everything correctly
-        updateChart();
-      });
-    }
-
-    legendDiv.appendChild(item);
-  });
 
   // ensure controls reflect available choices
   refreshGroupDropdowns();
   refreshButtons();
-}
-
-// Helper to send content height to parent (called once after initial render)
-function sendContentHeightToParent() {
-  const body = document.body;
-  
-  // Only use body measurements - html measurements reflect the iframe size set by parent
-  let measuredHeight = Math.max(
-    body?.scrollHeight || 0,
-    body?.offsetHeight || 0
-  );
-
-  if (!measuredHeight || measuredHeight < 200) {
-    const mainContent = document.getElementById('mainContent');
-    const contentHeight = Math.max(mainContent?.scrollHeight || 0, mainContent?.offsetHeight || 0);
-    const fallbackHeight = 1100;
-    measuredHeight = Math.max(contentHeight, fallbackHeight);
-    console.warn('Line chart content height below threshold; using fallback height:', measuredHeight);
-  }
-  
-  window.parent.postMessage({
-    type: 'contentHeight',
-    chart: 'line',
-    height: measuredHeight
-  }, '*');
-}
-
-// No need for dynamic height - chart is fixed at 600px
-// Parent will set iframe to fixed height
-
-// Backward compatibility: some older code paths may still call drawChart()
-// Ensure it simply delegates to the modern updateChart() with readiness guards
-function drawChart() {
-  try {
-    return updateChart();
-  } catch (e) {
-    console.error('drawChart fallback failed:', e);
-  }
 }
 
 // Track last window width to detect real user resizes vs parent iframe height adjustments
@@ -1251,16 +1686,15 @@ window.addEventListener('resize', () => {
   clearTimeout(window._resizeTimer);
   window._resizeTimer = setTimeout(() => {
     const currentWidth = window.innerWidth;
-    
-    // Only proceed if width actually changed (real user resize, not parent adjusting iframe height)
+
+    // Only redraw if width actually changed; otherwise keep CSS vars in sync only
     if (currentWidth !== lastWindowWidth) {
       lastWindowWidth = currentWidth;
-      
-      window._pendingHeightUpdate = true;
-      updateChart();
+      syncLineChartHeight('window-resize', { redraw: true });
       // Height will be sent after chart finishes drawing (see updateChart's setTimeout callback)
     } else {
-      return;
+      logLineViewportHeight('window-resize');
+      updateChartWrapperHeight('window-resize');
     }
   }, 200);
 });
@@ -1319,6 +1753,7 @@ async function revealMainContent() {
     mainContent.style.display = 'block';
     mainContent.removeAttribute('aria-hidden');
     mainContent.classList.add('loaded'); // Add loaded class immediately
+    updateChartWrapperHeight('revealMainContent-visible');
     freezeSmoothingToggleWidth();
     freezeWidthForOpera('#downloadBtn', {
       extraPadding: 0,
@@ -1338,14 +1773,18 @@ async function revealMainContent() {
           const maxTries = 30; // ~3s
           function tick(){
             if (selectionsReady()) {
-              updateChart();
-              afterDraw();
+              requestAnimationFrame(() => {
+                syncLineChartHeight('initial-draw', { redraw: true });
+                afterDraw();
+              });
             } else if (++tries < maxTries) {
               setTimeout(tick, 100);
             } else {
               console.warn('Selections not ready after waiting — drawing anyway');
-              updateChart();
-              afterDraw();
+              requestAnimationFrame(() => {
+                syncLineChartHeight('initial-draw-timeout', { redraw: true });
+                afterDraw();
+              });
             }
           }
           function afterDraw(){
@@ -1355,6 +1794,11 @@ async function revealMainContent() {
               const chartDiv = document.getElementById('chart_div');
               if (chartDiv) {
                 chartDiv.classList.add('visible');
+                const wrapperEl = chartDiv.closest('.chart-wrapper');
+                if (wrapperEl) {
+                  wrapperEl.classList.add('visible');
+                }
+                updateChartWrapperHeight('chart-visible');
               }
 
               const loadingOverlay = document.getElementById('loadingOverlay');
@@ -1522,6 +1966,15 @@ function setupEventListeners() {
   if (downloadXLSXBtn) {
     downloadXLSXBtn.addEventListener('click', () => exportData('xlsx'));
   }
+
+  if (lineLayoutHeightManager) {
+    lineLayoutHeightManager.observeWrapper(() => {
+      console.log('📐 Line chart wrapper height changed – redrawing chart');
+      window._pendingHeightUpdate = true;
+      updateChart();
+      setTimeout(() => sendContentHeightToParent(true), 150);
+    });
+  }
 }
 
 /**
@@ -1530,6 +1983,8 @@ function setupEventListeners() {
  */
 async function init() {
   try {
+    updateChartWrapperHeight('init');
+    logLineViewportHeight('init');
     // Wait for supabaseModule to be available (with timeout)
     let attempts = 0;
     const maxAttempts = 50; // 5 seconds total
@@ -1557,8 +2012,7 @@ async function init() {
     // Then, set up the UI selectors with the loaded data
     setupSelectors(pollutants, groups);
 
-    // Load group information table
-    await window.supabaseModule.loadGroupInfo();
+    // Group info content now lives in the dedicated tab; no need to load it inside the chart iframe.
 
     // Set up event listeners for buttons
     setupEventListeners();
