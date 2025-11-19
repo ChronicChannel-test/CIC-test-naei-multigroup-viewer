@@ -365,7 +365,23 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   const customLegendEl = document.getElementById('customLegend');
   const titleHeight = chartTitleEl ? Math.round(chartTitleEl.getBoundingClientRect().height || 0) : 0;
   const legendHeight = customLegendEl ? Math.round(customLegendEl.getBoundingClientRect().height || 0) : 0;
-  const cachedHeight = window.__NAEI_LAST_CHART_HEIGHT;
+  const layoutManager = window.__bubbleLayoutHeightManager;
+  const preLegendEstimate = (() => {
+    const pendingEstimate = window.__BUBBLE_PRE_LEGEND_ESTIMATE;
+    if (Number.isFinite(pendingEstimate) && pendingEstimate > 0) {
+      return pendingEstimate;
+    }
+    if (layoutManager?.getLastEstimatedHeight) {
+      const managerEstimate = layoutManager.getLastEstimatedHeight();
+      if (Number.isFinite(managerEstimate) && managerEstimate > 0) {
+        return managerEstimate;
+      }
+    }
+    return null;
+  })();
+  const cachedHeight = Number.isFinite(preLegendEstimate) && preLegendEstimate > 0
+    ? preLegendEstimate
+    : window.__NAEI_LAST_CHART_HEIGHT;
   const chartRect = chartDiv.getBoundingClientRect();
   let requestedChartHeight = Number.isFinite(cachedHeight) && cachedHeight > 0
     ? cachedHeight
@@ -387,6 +403,10 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     }
   }
 
+  if (!Number.isFinite(requestedChartHeight) || requestedChartHeight <= 0) {
+    requestedChartHeight = CHART_RENDERER_MIN_CANVAS_HEIGHT;
+  }
+
   const appliedChartHeight = Math.max(
     CHART_RENDERER_MIN_CANVAS_HEIGHT,
     Math.round(requestedChartHeight)
@@ -394,17 +414,35 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   chartDiv.style.height = `${appliedChartHeight}px`;
   chartDiv.style.minHeight = `${appliedChartHeight}px`;
   chartDiv.style.maxHeight = `${appliedChartHeight}px`;
+  const clampResult = window.__bubbleLayoutHeightManager?.ensureWrapperCapacity
+    ? window.__bubbleLayoutHeightManager.ensureWrapperCapacity({
+        wrapperElement: wrapper,
+        chartHeight: appliedChartHeight,
+        chromeBeforeChart: chartTopOffset,
+        chromeAfterChart: paddingBottom
+      })
+    : enforceBubbleWrapperMinimumHeight({
+        wrapperElement: wrapper,
+        wrapperRect,
+        chartTopOffset,
+        paddingBottom,
+        appliedChartHeight
+      });
+  const effectiveWrapperHeight = clampResult?.finalHeight
+    || (wrapperRect ? Math.round(wrapperRect.height) : null);
 
   if (window.__NAEI_DEBUG__) {
     console.warn('📏 Bubble chart sizing resolution', {
-      wrapperHeight: wrapperRect ? Math.round(wrapperRect.height) : null,
+      wrapperHeight: effectiveWrapperHeight,
       paddingBottom: Math.round(paddingBottom),
       chartTopOffset: Math.round(chartTopOffset),
       titleHeight,
       legendHeight,
       availableHeight: Number.isFinite(availableHeight) ? Math.round(availableHeight) : null,
       requestedChartHeight: Math.round(requestedChartHeight),
-      appliedChartHeight
+      appliedChartHeight,
+      wrapperExpanded: clampResult?.expanded || false,
+      wrapperRequiredHeight: clampResult?.requiredHeight || null
     });
   }
 
@@ -777,6 +815,22 @@ function addBubbleExplanationOverlay() {
   
   // Append to chart_div so it overlays the chart
   chartDiv.appendChild(overlay);
+}
+
+function enforceBubbleWrapperMinimumHeight(params) {
+  if (!params?.wrapperElement) {
+    return {
+      expanded: false,
+      requiredHeight: null,
+      finalHeight: params?.wrapperRect ? Math.round(params.wrapperRect.height || 0) : null
+    };
+  }
+
+  return {
+    expanded: false,
+    requiredHeight: null,
+    finalHeight: params.wrapperRect ? Math.round(params.wrapperRect.height || 0) : null
+  };
 }
 
 /**

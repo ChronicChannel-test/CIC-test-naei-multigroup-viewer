@@ -105,6 +105,10 @@ const lineLayoutHeightManager = window.LayoutHeightManager?.create({
   heightDebounce: 250
 });
 
+if (lineLayoutHeightManager) {
+  window.__lineLayoutHeightManager = lineLayoutHeightManager;
+}
+
 let lineParentFooterHeight = LINE_DEFAULT_PARENT_FOOTER;
 let lineParentViewportHeight = LINE_DEFAULT_PARENT_VIEWPORT;
 let lineLastSentHeight = 0;
@@ -249,6 +253,7 @@ function updateLineChartTitle(yearLabel, pollutantTitle) {
   const measuredHeight = chartTitleEl.getBoundingClientRect?.().height || 0;
   return { element: chartTitleEl, height: Math.round(measuredHeight) };
 }
+
 
 window.logLineViewportHeight = logLineViewportHeight;
 
@@ -1558,16 +1563,33 @@ function updateChart(){
   chartContainer.style.minHeight = `${appliedChartHeight}px`;
   chartContainer.style.maxHeight = `${appliedChartHeight}px`;
 
+  const wrapperAdjustment = window.__lineLayoutHeightManager?.ensureWrapperCapacity
+    ? window.__lineLayoutHeightManager.ensureWrapperCapacity({
+        wrapperElement: wrapperElement || chartContainer.closest('.chart-wrapper'),
+        chartHeight: appliedChartHeight,
+        chromeBeforeChart: chartTopOffset,
+        chromeAfterChart: paddingBottom
+      })
+    : {
+        expanded: false,
+        requiredHeight: null,
+        finalHeight: wrapperRect ? Math.round(wrapperRect.height) : null
+      };
+  const effectiveWrapperHeight = wrapperAdjustment.finalHeight
+    || (wrapperRect ? Math.round(wrapperRect.height) : null);
+
   if (lineDebugLoggingEnabled) {
     lineDebugWarn('📏 Line chart sizing resolution', {
-      wrapperHeight: wrapperRect ? Math.round(wrapperRect.height) : null,
+      wrapperHeight: effectiveWrapperHeight,
       paddingBottom: Math.round(paddingBottom),
       chartTopOffset: Math.round(chartTopOffset),
       titleHeight,
       legendHeight,
       availableHeight: Number.isFinite(availableHeight) ? Math.round(availableHeight) : null,
       requestedChartHeight: Math.round(requestedChartHeight),
-      appliedChartHeight
+      appliedChartHeight,
+      wrapperExpanded: wrapperAdjustment.expanded,
+      wrapperRequiredHeight: wrapperAdjustment.requiredHeight || null
     });
   }
 

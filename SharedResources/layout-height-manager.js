@@ -8,7 +8,8 @@
     visualPadding: 0,
     minHeightDelta: 8,
     heightDebounce: 250,
-    autoApplyParentMetrics: true
+    autoApplyParentMetrics: true,
+    minClampDatasetKey: null
   };
 
   function create(userOptions = {}) {
@@ -16,6 +17,8 @@
     const cssViewportVar = settings.viewportVar || `--${settings.namespace}-viewport-height`;
     const cssFooterVar = settings.footerVar || `--${settings.namespace}-footer-height`;
 
+    const datasetKey = settings.minClampDatasetKey || `${settings.namespace}MinClamp`;
+    const HEIGHT_EPSILON = 1;
     const state = {
       parentFooterHeight: null,
       parentViewportHeight: null,
@@ -23,7 +26,8 @@
       lastAppliedFooter: null,
       lastEstimatedChartHeight: null,
       lastWrapperHeight: 0,
-      wrapperElement: null
+      wrapperElement: null,
+      wrapperClampActive: false
     };
 
     let resizeObserver = null;
@@ -98,6 +102,117 @@
       return {
         footerHeight: state.parentFooterHeight,
         viewportHeight: state.parentViewportHeight
+      };
+    }
+
+    function getWrapperElement() {
+      if (state.wrapperElement && document.body.contains(state.wrapperElement)) {
+        return state.wrapperElement;
+      }
+      state.wrapperElement = document.querySelector(settings.wrapperSelector) || null;
+      return state.wrapperElement;
+    }
+
+    function clearWrapperClamp(wrapperElement = getWrapperElement()) {
+      if (!wrapperElement) {
+        return;
+      }
+      if (!state.wrapperClampActive && !(wrapperElement.dataset && wrapperElement.dataset[datasetKey])) {
+        return;
+      }
+      wrapperElement.style.minHeight = '';
+      wrapperElement.style.height = '';
+      wrapperElement.style.maxHeight = '';
+      if (wrapperElement.dataset && wrapperElement.dataset[datasetKey]) {
+        delete wrapperElement.dataset[datasetKey];
+      }
+      state.wrapperClampActive = false;
+    }
+
+    function parsePixelValue(value) {
+      if (typeof value === 'number' && Number.isFinite(value)) {
+        return Math.round(value);
+      }
+      if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        if (!Number.isNaN(parsed)) {
+          return Math.round(parsed);
+        }
+      }
+      return null;
+    }
+
+    function ensureWrapperCapacity({
+      wrapperElement = getWrapperElement(),
+      chartHeight,
+      chromeBeforeChart = 0,
+      chromeAfterChart = 0
+    } = {}) {
+      if (!wrapperElement) {
+        return {
+          expanded: false,
+          requiredHeight: null,
+          finalHeight: null
+        };
+      }
+
+      const minCanvas = Math.max(settings.minChartHeight, 0);
+      const chromeBefore = Math.max(0, Math.round(chromeBeforeChart || 0));
+      const chromeAfter = Math.max(0, Math.round(chromeAfterChart || 0));
+      const numericChartHeight = Number.isFinite(chartHeight)
+        ? Math.max(0, Math.round(chartHeight))
+        : null;
+      const effectiveChartHeight = Math.max(minCanvas, numericChartHeight || minCanvas);
+      const requiredHeight = Math.round(chromeBefore + effectiveChartHeight + chromeAfter);
+      const currentHeight = Math.round(wrapperElement.getBoundingClientRect?.().height || 0);
+      const datasetClampActive = Boolean(wrapperElement.dataset && wrapperElement.dataset[datasetKey]);
+      const currentlyClamped = state.wrapperClampActive || datasetClampActive;
+
+      const naturalWrapperHeight = (() => {
+        const viewportPx = parsePixelValue(state.lastAppliedViewport) ?? parsePixelValue(state.parentViewportHeight);
+        const footerPx = parsePixelValue(state.lastAppliedFooter)
+          ?? (Number.isFinite(state.parentFooterHeight)
+            ? Math.round(state.parentFooterHeight + settings.footerGap + Math.max(0, Math.round(settings.visualPadding || 0)))
+            : null);
+        if (Number.isFinite(viewportPx) && Number.isFinite(footerPx)) {
+          return Math.max(0, viewportPx - footerPx);
+        }
+        return null;
+      })();
+
+      const requiresClampIncrease = requiredHeight > currentHeight + HEIGHT_EPSILON;
+      const clampDrifted = currentlyClamped && Math.abs(requiredHeight - currentHeight) > HEIGHT_EPSILON;
+
+      if (requiresClampIncrease || clampDrifted) {
+        wrapperElement.style.minHeight = `${requiredHeight}px`;
+        wrapperElement.style.height = `${requiredHeight}px`;
+        wrapperElement.style.maxHeight = `${requiredHeight}px`;
+        if (wrapperElement.dataset) {
+          wrapperElement.dataset[datasetKey] = '1';
+        }
+        state.wrapperClampActive = true;
+        state.lastWrapperHeight = requiredHeight;
+        return {
+          expanded: true,
+          requiredHeight,
+          finalHeight: requiredHeight
+        };
+      }
+
+      if (currentlyClamped && Number.isFinite(naturalWrapperHeight) && naturalWrapperHeight >= requiredHeight - HEIGHT_EPSILON) {
+        clearWrapperClamp(wrapperElement);
+        const relaxedHeight = Math.round(wrapperElement.getBoundingClientRect?.().height || naturalWrapperHeight || 0);
+        return {
+          expanded: false,
+          requiredHeight: null,
+          finalHeight: relaxedHeight
+        };
+      }
+
+      return {
+        expanded: false,
+        requiredHeight: null,
+        finalHeight: currentHeight
       };
     }
 
@@ -183,7 +298,8 @@
       handleParentMetrics,
       observeWrapper,
       disconnect,
-      getWrapperElement: () => document.querySelector(settings.wrapperSelector),
+      ensureWrapperCapacity,
+      getWrapperElement,
       getChartElement: () => document.querySelector(settings.chartSelector),
       getParentViewportHeight: () => state.parentViewportHeight,
       getParentFooterHeight: () => state.parentFooterHeight,
