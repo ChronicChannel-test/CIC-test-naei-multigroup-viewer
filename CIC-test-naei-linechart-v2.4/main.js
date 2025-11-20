@@ -107,6 +107,10 @@ const lineLayoutHeightManager = window.LayoutHeightManager?.create({
 
 if (lineLayoutHeightManager) {
   window.__lineLayoutHeightManager = lineLayoutHeightManager;
+
+  lineLayoutHeightManager.onParentViewportChange?.(() => {
+    syncLineChartHeight('parent-viewport', { redraw: true });
+  });
 }
 
 let lineParentFooterHeight = LINE_DEFAULT_PARENT_FOOTER;
@@ -760,6 +764,8 @@ window.addEventListener('message', (event) => {
         lineParentViewportHeight = metrics.viewportHeight;
       }
     } else {
+      const previousFooter = lineParentFooterHeight;
+      const previousViewport = lineParentViewportHeight;
       const footerCandidate = Number(event.data.footerHeight);
       const viewportCandidate = Number(event.data.viewportHeight);
 
@@ -772,8 +778,24 @@ window.addEventListener('message', (event) => {
         lineParentViewportHeight = Math.round(viewportCandidate);
         applyLineCssViewportHeight(`${lineParentViewportHeight}px`);
       }
-    }
 
+      const footerDelta = Math.abs((lineParentFooterHeight || 0) - (previousFooter || 0));
+      const viewportDelta = Math.abs((lineParentViewportHeight || 0) - (previousViewport || 0));
+      if (Math.max(footerDelta, viewportDelta) >= RESIZE_THRESHOLD) {
+        if (parentViewportRedrawTimer) {
+          clearTimeout(parentViewportRedrawTimer);
+        }
+        parentViewportRedrawTimer = setTimeout(() => {
+          parentViewportRedrawTimer = null;
+          syncLineChartHeight('parent-viewport', { redraw: true });
+        }, 200);
+      } else {
+        updateChartWrapperHeight('parent-viewport');
+        logLineViewportHeight('parent-viewport');
+      }
+      return;
+    }
+    // Layout manager present: it will invoke the registered callback after debouncing
     updateChartWrapperHeight('parent-viewport');
     logLineViewportHeight('parent-viewport');
   }
@@ -1546,7 +1568,7 @@ function updateChart(){
     requestedChartHeight = LINE_MIN_CHART_CANVAS_HEIGHT;
   }
 
-  const availableHeight = wrapperRect
+  let availableHeight = wrapperRect
     ? Math.max(0, wrapperRect.height - chartTopOffset - paddingBottom)
     : null;
 
@@ -1577,6 +1599,10 @@ function updateChart(){
       };
   const effectiveWrapperHeight = wrapperAdjustment.finalHeight
     || (wrapperRect ? Math.round(wrapperRect.height) : null);
+
+  if (Number.isFinite(effectiveWrapperHeight)) {
+    availableHeight = Math.max(0, effectiveWrapperHeight - chartTopOffset - paddingBottom);
+  }
 
   if (lineDebugLoggingEnabled) {
     lineDebugWarn('📏 Line chart sizing resolution', {
@@ -1700,24 +1726,38 @@ function updateChart(){
   refreshButtons();
 }
 
-// Track last window width to detect real user resizes vs parent iframe height adjustments
+// Track last window dimensions to detect real user resizes vs parent iframe height adjustments
 let lastWindowWidth = window.innerWidth;
+let lastWindowHeight = window.innerHeight;
+const RESIZE_THRESHOLD = 3;
+let pendingHeightPokeTimer = null;
+let parentViewportRedrawTimer = null;
 
 // Resize handler - only update height when WIDTH changes (real user resize)
 window.addEventListener('resize', () => {
   clearTimeout(window._resizeTimer);
   window._resizeTimer = setTimeout(() => {
     const currentWidth = window.innerWidth;
+    const currentHeight = window.innerHeight;
+    const widthDelta = Math.abs((currentWidth || 0) - (lastWindowWidth || 0));
+    const heightDelta = Math.abs((currentHeight || 0) - (lastWindowHeight || 0));
 
-    // Only redraw if width actually changed; otherwise keep CSS vars in sync only
-    if (currentWidth !== lastWindowWidth) {
-      lastWindowWidth = currentWidth;
-      syncLineChartHeight('window-resize', { redraw: true });
-      // Height will be sent after chart finishes drawing (see updateChart's setTimeout callback)
-    } else {
+    if (widthDelta < RESIZE_THRESHOLD && heightDelta < RESIZE_THRESHOLD) {
       logLineViewportHeight('window-resize');
       updateChartWrapperHeight('window-resize');
+      if (!pendingHeightPokeTimer) {
+        pendingHeightPokeTimer = setTimeout(() => {
+          pendingHeightPokeTimer = null;
+          sendContentHeightToParent(true);
+        }, 200);
+      }
+      return;
     }
+
+    lastWindowWidth = currentWidth;
+    lastWindowHeight = currentHeight;
+    syncLineChartHeight('window-resize', { redraw: true });
+    // Height will be sent after chart finishes drawing (see updateChart's setTimeout callback)
   }, 200);
 });
 

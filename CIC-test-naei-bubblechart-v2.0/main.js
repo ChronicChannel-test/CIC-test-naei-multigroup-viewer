@@ -131,6 +131,7 @@ const DEFAULT_PARENT_FOOTER = 140;
 const DEFAULT_PARENT_VIEWPORT = 900;
 const CSS_DEFAULT_FOOTER_RESERVE = 160; // Mirrors --bubble-footer-height default in styles.css
 const CSS_VISUAL_PADDING = 27; // Extra breathing room so chart clears the footer visually
+const RESIZE_THRESHOLD = 3;
 const TUTORIAL_SLIDE_MATRIX = [
   ['002', '003', '004', '005'],
   ['002', '003', '004', '007'],
@@ -158,6 +159,14 @@ const layoutHeightManager = window.LayoutHeightManager?.create({
 
 if (layoutHeightManager) {
   window.__bubbleLayoutHeightManager = layoutHeightManager;
+
+  const parentChangeDelay = layoutHeightManager.settings?.parentChangeDebounce || 200;
+  layoutHeightManager.onParentViewportChange?.(({ viewportHeight }) => {
+    lastKnownViewportHeight = viewportHeight || lastKnownViewportHeight;
+    updateChartWrapperHeight('parent-viewport');
+    drawChart(true);
+    setTimeout(() => sendContentHeightToParent(true), parentChangeDelay);
+  });
 }
 
 const tutorialOverlayApi = {
@@ -169,6 +178,9 @@ let pendingTutorialOpenReason = null;
 
 let lastSentHeight = 0;
 let lastKnownViewportWidth = 0;
+let lastKnownViewportHeight = window.innerHeight || 0;
+let pendingHeightPokeTimer = null;
+let parentViewportRedrawTimer = null;
 let parentFooterHeight = DEFAULT_PARENT_FOOTER;
 let parentViewportHeight = DEFAULT_PARENT_VIEWPORT;
 let chartReadyNotified = false;
@@ -286,6 +298,8 @@ window.addEventListener('message', (event) => {
         parentViewportHeight = metrics.viewportHeight;
       }
     } else {
+      const previousFooter = parentFooterHeight;
+      const previousViewport = parentViewportHeight;
       const footerCandidate = Number(event.data.footerHeight);
       const viewportCandidate = Number(event.data.viewportHeight);
 
@@ -297,6 +311,20 @@ window.addEventListener('message', (event) => {
       if (Number.isFinite(viewportCandidate) && viewportCandidate > 0) {
         parentViewportHeight = viewportCandidate;
         applyCssViewportHeight(`${parentViewportHeight}px`);
+      }
+
+      const footerDelta = Math.abs((parentFooterHeight || 0) - (previousFooter || 0));
+      const viewportDelta = Math.abs((parentViewportHeight || 0) - (previousViewport || 0));
+      if (Math.max(footerDelta, viewportDelta) >= RESIZE_THRESHOLD) {
+        if (parentViewportRedrawTimer) {
+          clearTimeout(parentViewportRedrawTimer);
+        }
+        parentViewportRedrawTimer = setTimeout(() => {
+          parentViewportRedrawTimer = null;
+          lastKnownViewportHeight = parentViewportHeight;
+          drawChart(true);
+          setTimeout(() => sendContentHeightToParent(true), 200);
+        }, 200);
       }
     }
 
@@ -1801,18 +1829,28 @@ function setupEventListeners() {
     window.ExportShare.exportData('xlsx');
   });
 
-  // Resize handler – only redraw when width changes to avoid loops with parent height updates
+  // Resize handler – only redraw when width/height change beyond threshold to avoid loops
   lastKnownViewportWidth = window.innerWidth || lastKnownViewportWidth;
   window.addEventListener('resize', debounce(() => {
     logViewportHeight('window-resize');
     updateChartWrapperHeight('window-resize');
     const currentWidth = window.innerWidth || 0;
-    if (currentWidth === lastKnownViewportWidth) {
-      console.debug('📐 Height-only resize detected; skipping redraw to prevent postMessage loop');
+    const currentHeight = window.innerHeight || 0;
+    const widthDelta = Math.abs(currentWidth - lastKnownViewportWidth);
+    const heightDelta = Math.abs(currentHeight - lastKnownViewportHeight);
+    if (widthDelta < RESIZE_THRESHOLD && heightDelta < RESIZE_THRESHOLD) {
+      console.debug('📐 Minor resize detected; refreshing parent height only');
+      if (!pendingHeightPokeTimer) {
+        pendingHeightPokeTimer = setTimeout(() => {
+          pendingHeightPokeTimer = null;
+          sendContentHeightToParent(true);
+        }, 200);
+      }
       return;
     }
 
     lastKnownViewportWidth = currentWidth;
+    lastKnownViewportHeight = currentHeight;
     console.log('📐 Width changed - redrawing chart');
     drawChart(true); // Pass skipHeightUpdate flag to prevent immediate update
     

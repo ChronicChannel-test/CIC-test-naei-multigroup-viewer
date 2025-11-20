@@ -9,7 +9,9 @@
     minHeightDelta: 8,
     heightDebounce: 250,
     autoApplyParentMetrics: true,
-    minClampDatasetKey: null
+    minClampDatasetKey: null,
+    parentChangeThreshold: 3,
+    parentChangeDebounce: 200
   };
 
   function create(userOptions = {}) {
@@ -32,6 +34,9 @@
 
     let resizeObserver = null;
     let resizeTimer = null;
+    let parentChangeTimer = null;
+    let pendingParentChange = null;
+    const parentChangeHandlers = new Set();
 
     function setCssVar(varName, value) {
       if (!varName || typeof value !== 'string') {
@@ -82,6 +87,8 @@
     }
 
     function handleParentMetrics(payload = {}) {
+      const previousFooter = state.parentFooterHeight;
+      const previousViewport = state.parentViewportHeight;
       const footerCandidate = Number(payload.footerHeight);
       const viewportCandidate = Number(payload.viewportHeight);
 
@@ -96,6 +103,37 @@
         state.parentViewportHeight = viewportCandidate;
         if (settings.autoApplyParentMetrics !== false) {
           applyViewportHeight(`${Math.round(viewportCandidate)}px`);
+        }
+      }
+
+      const footerDelta = Math.abs((state.parentFooterHeight || 0) - (previousFooter || 0));
+      const viewportDelta = Math.abs((state.parentViewportHeight || 0) - (previousViewport || 0));
+      const threshold = Math.max(0, Math.round(settings.parentChangeThreshold || 0));
+      if (Math.max(footerDelta, viewportDelta) >= threshold) {
+        pendingParentChange = {
+          footerHeight: state.parentFooterHeight,
+          viewportHeight: state.parentViewportHeight,
+          footerDelta,
+          viewportDelta
+        };
+        if (!parentChangeTimer) {
+          parentChangeTimer = setTimeout(() => {
+            parentChangeTimer = null;
+            const payloadToSend = pendingParentChange;
+            pendingParentChange = null;
+            if (!payloadToSend) {
+              return;
+            }
+            parentChangeHandlers.forEach(handler => {
+              try {
+                handler(payloadToSend);
+              } catch (error) {
+                if (global.__NAEI_DEBUG__) {
+                  console.warn('LayoutHeightManager parent change handler failed', error);
+                }
+              }
+            });
+          }, settings.parentChangeDebounce);
         }
       }
 
@@ -287,6 +325,20 @@
         clearTimeout(resizeTimer);
         resizeTimer = null;
       }
+      if (parentChangeTimer) {
+        clearTimeout(parentChangeTimer);
+        parentChangeTimer = null;
+      }
+    }
+
+    function onParentViewportChange(handler) {
+      if (typeof handler !== 'function') {
+        return () => {};
+      }
+      parentChangeHandlers.add(handler);
+      return () => {
+        parentChangeHandlers.delete(handler);
+      };
     }
 
     return {
@@ -303,7 +355,8 @@
       getChartElement: () => document.querySelector(settings.chartSelector),
       getParentViewportHeight: () => state.parentViewportHeight,
       getParentFooterHeight: () => state.parentFooterHeight,
-      getLastEstimatedHeight: () => state.lastEstimatedChartHeight
+      getLastEstimatedHeight: () => state.lastEstimatedChartHeight,
+      onParentViewportChange
     };
   }
 
