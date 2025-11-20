@@ -77,25 +77,33 @@
 
     async function fetchSelectiveDataset(client) {
       const timings = [];
-      const addTiming = (label, start) => {
-        timings.push({ label, ms: +(performance.now() - start).toFixed(2) });
+
+      const measure = (label, promiseFactory) => {
+        const start = performance.now();
+        return promiseFactory().then((result) => {
+          timings.push({ label, ms: +(performance.now() - start).toFixed(2) });
+          return result;
+        });
       };
 
       const overallStart = performance.now();
 
-      const pollutantsStart = performance.now();
-      const { data: pollutants, error: pollutantsError } = await client
-        .from('NAEI_global_Pollutants')
-        .select('id, pollutant');
-      addTiming('pollutants', pollutantsStart);
-      if (pollutantsError) throw pollutantsError;
+      const [pollutantsRes, groupsRes] = await Promise.all([
+        measure('pollutants', () => client
+          .from('NAEI_global_Pollutants')
+          .select('id, pollutant')
+        ),
+        measure('groups', () => client
+          .from('NAEI_global_t_Group')
+          .select('id, group_title')
+        )
+      ]);
 
-      const groupsStart = performance.now();
-      const { data: groups, error: groupsError } = await client
-        .from('NAEI_global_t_Group')
-        .select('id, group_title');
-      addTiming('groups', groupsStart);
-      if (groupsError) throw groupsError;
+      if (pollutantsRes.error) throw pollutantsRes.error;
+      if (groupsRes.error) throw groupsRes.error;
+
+      const pollutants = pollutantsRes.data;
+      const groups = groupsRes.data;
 
       const findPollutantId = (name) => {
         const target = name.toLowerCase();
@@ -119,63 +127,49 @@
 
       const dataTable = 'NAEI_2023ds_t_Group_Data';
 
-      const pm25AllStart = performance.now();
-      const { data: pm25All, error: pm25AllError } = await client
-        .from(dataTable)
-        .select('*')
-        .eq('pollutant_id', pm25Id)
-        .eq('group_id', allGroupId)
-        .limit(1);
-      addTiming('pm25_all_group', pm25AllStart);
-      if (pm25AllError) throw pm25AllError;
+      const heroGroupIds = [allGroupId, ecoGroupId, gasGroupId];
 
-      const pm25EcoStart = performance.now();
-      const { data: pm25Eco, error: pm25EcoError } = await client
-        .from(dataTable)
-        .select('*')
-        .eq('pollutant_id', pm25Id)
-        .eq('group_id', ecoGroupId)
-        .limit(1);
-      addTiming('pm25_ecortb', pm25EcoStart);
-      if (pm25EcoError) throw pm25EcoError;
+      const [
+        pm25HeroRes,
+        actHeroRes,
+        actAllGroupsRes
+      ] = await Promise.all([
+        measure('pm25_selected_groups', () => client
+          .from(dataTable)
+          .select('*')
+          .eq('pollutant_id', pm25Id)
+          .in('group_id', heroGroupIds)
+        ),
+        measure('actdata_selected_groups', () => client
+          .from(dataTable)
+          .select('*')
+          .eq('pollutant_id', actDataId)
+          .in('group_id', heroGroupIds)
+        ),
+        measure('actdata_all_groups shortlist', () => client
+          .from(dataTable)
+          .select('group_id, pollutant_id, f1970, f1980, f1990, f2000, f2010, f2015, f2020, f2021, f2022, f2023')
+          .eq('pollutant_id', actDataId)
+        )
+      ]);
 
-      const pm25GasStart = performance.now();
-      const { data: pm25Gas, error: pm25GasError } = await client
-        .from(dataTable)
-        .select('*')
-        .eq('pollutant_id', pm25Id)
-        .eq('group_id', gasGroupId)
-        .limit(1);
-      addTiming('pm25_gas_boilers', pm25GasStart);
-      if (pm25GasError) throw pm25GasError;
+      const responseErrors = [
+        pm25HeroRes.error,
+        actHeroRes.error,
+        actAllGroupsRes.error
+      ].filter(Boolean);
+      if (responseErrors.length) {
+        throw responseErrors[0];
+      }
 
-      const actEcoStart = performance.now();
-      const { data: actEco, error: actEcoError } = await client
-        .from(dataTable)
-        .select('*')
-        .eq('pollutant_id', actDataId)
-        .eq('group_id', ecoGroupId)
-        .limit(1);
-      addTiming('actdata_ecortb', actEcoStart);
-      if (actEcoError) throw actEcoError;
+      const pickByGroup = (rows, targetId) => rows.filter(row => row.group_id === targetId);
 
-      const actGasStart = performance.now();
-      const { data: actGas, error: actGasError } = await client
-        .from(dataTable)
-        .select('*')
-        .eq('pollutant_id', actDataId)
-        .eq('group_id', gasGroupId)
-        .limit(1);
-      addTiming('actdata_gas_boilers', actGasStart);
-      if (actGasError) throw actGasError;
-
-      const actAllGroupsStart = performance.now();
-      const { data: actAllGroups, error: actAllGroupsError } = await client
-        .from(dataTable)
-        .select('group_id, pollutant_id, f1970, f1980, f1990, f2000, f2010, f2015, f2020, f2021, f2022, f2023')
-        .eq('pollutant_id', actDataId);
-      addTiming('actdata_all_groups shortlist', actAllGroupsStart);
-      if (actAllGroupsError) throw actAllGroupsError;
+      const pm25All = pickByGroup(pm25HeroRes.data, allGroupId);
+      const pm25Eco = pickByGroup(pm25HeroRes.data, ecoGroupId);
+      const pm25Gas = pickByGroup(pm25HeroRes.data, gasGroupId);
+      const actEco = pickByGroup(actHeroRes.data, ecoGroupId);
+      const actGas = pickByGroup(actHeroRes.data, gasGroupId);
+      const actAllGroups = actAllGroupsRes.data;
 
       const totalMs = +(performance.now() - overallStart).toFixed(2);
 
