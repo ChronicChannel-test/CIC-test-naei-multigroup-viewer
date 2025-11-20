@@ -261,6 +261,12 @@ button {
   margin: 0 !important;
 }
 
+.controls-wrapper.controls-grid button {
+  max-width: 220px;
+  width: auto;
+  white-space: nowrap;
+}
+
 @media (min-width: 1100px) {
   .controls-wrapper.controls-grid {
     display: flex;
@@ -297,7 +303,6 @@ button {
 
   .controls-wrapper.controls-grid button {
     width: auto;
-    max-width: 220px;
     justify-self: start;
     white-space: nowrap;
   }

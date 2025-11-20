@@ -563,6 +563,9 @@ body.tutorial-open {
   padding-right: 0px;
   padding-left: 0px; 
   font-weight: bold;
+.main-title {
+  white-space: nowrap;
+}
   opacity: 0;
   transition: opacity 0.3s ease-in-out 0.1s;
 }
@@ -586,10 +589,6 @@ body.tutorial-open {
 @media (max-width: 830px) {
   .main-title {
     padding-right: 0;
-  }
-
-  .main-title .title-part-2 {
-    display: block;
   }
 
   #mainContentTop {
@@ -731,6 +730,7 @@ body.tutorial-open {
   .main-title {
     padding-right: 0;
     width: 100%;
+    white-space: nowrap;
   }
 
   #mainContentTop {

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>UK Air Pollution and Emissions Data Explorer</title>
+  <title>UK Air Pollution/Emissions Data Explorer</title>
   <link rel="icon" type="image/png" sizes="64x64" href="SharedResources/images/favicon.png">
   <link rel="apple-touch-icon" href="SharedResources/images/favicon.png">
 
@@ -10,7 +10,7 @@
   <meta name="description" content="Interactive charts using UK Government data"> 
   <!-- Open Graph (Facebook, LinkedIn, Slack, etc.) -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="UK Air Pollution and Emissions Data Explorer">
+  <meta property="og:title" content="UK Air Pollution/Emissions Data Explorer">
   <meta property="og:description" content="Interactive charts using UK Government data">
   <meta property="og:url" content="https://github.com/Chronic-Illness-Channel/naei-multigroup-viewer">
   <meta property="og:image" content="SharedResources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
@@ -19,7 +19,7 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="UK Air Pollution and Emissions Data Explorer">
+  <meta name="twitter:title" content="UK Air Pollution/Emissions Data Explorer">
   <meta name="twitter:description" content="Interactive charts using UK Government data">
   <meta name="twitter:image" content="SharedResources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
   <meta name="twitter:site" content="@Chronic_Channel">
@@ -247,6 +247,62 @@
       width: 295px;
     }
 
+    .chart-tab-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-start;
+      align-items: center;
+      padding-right: 130px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .chart-tab-nav > button {
+      flex: 0 0 auto;
+      min-width: 190px;
+      max-width: 240px;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 620px) {
+      .chart-tab-nav {
+        padding-right: 0;
+      }
+    }
+
+    .header-bar {
+      min-height: 4rem;
+      height: auto;
+      flex-wrap: wrap;
+      row-gap: 4px;
+      align-items: flex-start;
+    }
+
+    .page-title {
+      line-height: 1.2;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 7px;
+      padding-right: 130px;
+    }
+
+    .page-title-word {
+      display: inline-flex;
+      white-space: nowrap;
+    }
+
+    .page-title-word--chunk {
+      gap: 7px;
+    }
+
+    @media (max-width: 620px) {
+      .page-title {
+        padding-right: 0;
+      }
+    }
+
     @supports (-webkit-appearance: none) {
       .kofi-button .kofi-text {
         font-size: 16px;
@@ -432,10 +488,18 @@
   <!-- Header -->
   <div class="bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+      <div class="flex items-center justify-between header-bar">
         <div class="flex items-center">
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">UK Air Pollution and Emissions Data Explorer</h1>
+            <h1 class="text-3xl font-bold text-gray-900 page-title">
+              <span class="page-title-word">UK</span>
+              <span class="page-title-word">Air</span>
+              <span class="page-title-word">Pollution/Emissions</span>
+              <span class="page-title-word page-title-word--chunk">
+                <span>Data</span>
+                <span>Explorer</span>
+              </span>
+            </h1>
             <p class="text-sm text-gray-500">Interactive Charts using UK Government Data</p>
           </div>
         </div>
@@ -448,7 +512,7 @@
     <div class="bg-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="border-b border-gray-200">
-          <nav class="-mb-px flex flex-wrap items-center gap-6" role="tablist" aria-label="Chart views">
+          <nav class="-mb-px flex flex-wrap items-center gap-6 chart-tab-nav" role="tablist" aria-label="Chart views">
             <button type="button" id="tab-1" data-chart="1" onclick="switchChart('1')" role="tab" aria-controls="chart-1" aria-selected="true" tabindex="0" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Bubble-Chart-Icon4.png" alt="Bubble chart icon" class="w-auto" style="height: 37px;">
               <span>Bubble Chart</span>
