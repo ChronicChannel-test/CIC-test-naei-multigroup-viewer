@@ -172,6 +172,8 @@ let lastKnownViewportWidth = 0;
 let parentFooterHeight = DEFAULT_PARENT_FOOTER;
 let parentViewportHeight = DEFAULT_PARENT_VIEWPORT;
 let chartReadyNotified = false;
+let chartRenderingUnlocked = false;
+let pendingDrawRequest = null;
 
 function applyCssFooterReserve(pixels) {
   if (layoutHeightManager) {
@@ -1110,7 +1112,10 @@ async function revealMainContent() {
     // Render the chart
     console.log('Drawing chart...');
     console.log('Pre-draw sanity:', { selectedYear, selectedPollutantId, groups: getSelectedGroups() });
-    drawChart();
+    chartRenderingUnlocked = true;
+    const pendingSkipFlag = pendingDrawRequest?.skipHeightUpdate || false;
+    pendingDrawRequest = null;
+    drawChart(pendingSkipFlag);
     updateChartWrapperHeight('revealMainContent');
     
     // Wait for chart to render, then complete the loading process
@@ -1839,6 +1844,11 @@ function setupEventListeners() {
  */
 function drawChart(skipHeightUpdate = false) {
   console.log('drawChart() called', skipHeightUpdate ? '(skip height update)' : '');
+  if (!chartRenderingUnlocked) {
+    pendingDrawRequest = { skipHeightUpdate };
+    console.log('⏸️ drawChart deferred until main content is visible');
+    return;
+  }
   window.ChartRenderer.clearMessage();
 
   if (!selectedYear) {
