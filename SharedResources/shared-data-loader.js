@@ -23,6 +23,7 @@ window.SharedDataCache = window.SharedDataCache || {
   isLoaded: false,
   isLoading: false,
   loadPromise: null,
+  defaultSnapshot: null,
   data: {
     pollutants: [],
     groups: [],
@@ -36,6 +37,48 @@ window.SharedDataCache = window.SharedDataCache || {
     pollutantUnits: {}
   }
 };
+
+const DEFAULT_SNAPSHOT_PATHS = [
+  'SharedResources/default-chart-data.json',
+  '../SharedResources/default-chart-data.json',
+  '../../SharedResources/default-chart-data.json'
+];
+
+let defaultSnapshotPromise = null;
+
+async function loadDefaultSnapshot() {
+  if (window.SharedDataCache.defaultSnapshot) {
+    return window.SharedDataCache.defaultSnapshot;
+  }
+
+  if (!defaultSnapshotPromise) {
+    defaultSnapshotPromise = (async () => {
+      for (const candidate of DEFAULT_SNAPSHOT_PATHS) {
+        try {
+          const response = await fetch(candidate, { cache: 'no-store' });
+          if (!response.ok) {
+            continue;
+          }
+          const snapshot = await response.json();
+          window.SharedDataCache.defaultSnapshot = snapshot;
+          return snapshot;
+        } catch (error) {
+          sharedDataDebugLog(`Default snapshot fetch failed for ${candidate}:`, error);
+        }
+      }
+      return null;
+    })();
+  }
+
+  try {
+    const snapshot = await defaultSnapshotPromise;
+    return snapshot || null;
+  } finally {
+    if (window.SharedDataCache.defaultSnapshot) {
+      defaultSnapshotPromise = Promise.resolve(window.SharedDataCache.defaultSnapshot);
+    }
+  }
+}
 
 /**
  * Initialize Supabase client (reuses existing SupabaseConfig)
@@ -228,7 +271,9 @@ function clearCache() {
 // Export functions to global scope
 window.SharedDataLoader = {
   loadSharedData,
+  loadDefaultSnapshot,
   getCachedData,
+  hasDefaultSnapshot: () => Boolean(window.SharedDataCache.defaultSnapshot),
   getPollutantName,
   getPollutantId,
   getGroupName,

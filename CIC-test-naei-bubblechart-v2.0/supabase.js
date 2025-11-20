@@ -40,12 +40,26 @@ let groupedData = {};
 let allGroupsList = [];
 let allPollutants = [];
 let allGroups = [];
-  let activeActDataGroups = [];
-  let activeActDataGroupIds = [];
-  let inactiveActDataGroupIds = [];
+let activeActDataGroups = [];
+let activeActDataGroupIds = [];
+let inactiveActDataGroupIds = [];
 let pollutantsData = []; // Store raw pollutant data for ID lookups
 let groupsData = []; // Store raw group data for ID lookups
-  let actDataPollutantId = null;
+let actDataPollutantId = null;
+
+const ACTIVITY_POLLUTANT_NAME = 'Activity Data';
+let hasFullDataset = false;
+let latestDatasetSource = null;
+let fullDatasetPromise = null;
+const hydrationListeners = new Set();
+let isHydratingFullDataset = false;
+const urlOverrideParams = ['pollutant','pollutantId','group','groupId','groupIds','activityGroup','actGroup','dataset','year'];
+let groupMetadataCache = null;
+let groupMetadataPromise = null;
+
+function hasUrlOverrides() {
+  return urlOverrideParams.some(param => supabaseUrlParams.has(param));
+}
 
 /**
  * Track analytics events to Supabase (wrapper for shared Analytics module)
@@ -63,196 +77,180 @@ async function trackAnalytics(eventName, details = {}) {
 /**
  * Load all data from Supabase for scatter chart (using shared data loader)
  */
-async function loadData() {
-  console.log("Loading scatter chart data using shared data loader...");
+async function resolveSharedLoader() {
+  try {
+    if (window.parent && window.parent.SharedDataLoader) {
+      return window.parent.SharedDataLoader;
+    }
+  } catch (error) {
+    console.log('Cannot access parent SharedDataLoader:', error);
+  }
+  return window.SharedDataLoader || null;
+}
+
+function getCachedGroupMetadata(sharedLoader) {
+  try {
+    if (sharedLoader?.isDataLoaded()) {
+      const cached = sharedLoader.getCachedData();
+      if (Array.isArray(cached?.groups) && cached.groups.length) {
+        return cached.groups;
+      }
+    }
+  } catch (error) {
+    console.log('Unable to read groups from shared loader cache:', error);
+  }
+
+  if (window.SharedDataCache?.data?.groups?.length) {
+    return window.SharedDataCache.data.groups;
+  }
+
+  return null;
+}
+
+async function ensureAllGroupMetadata(sharedLoader) {
+  if (Array.isArray(groupMetadataCache) && groupMetadataCache.length) {
+    return groupMetadataCache;
+  }
+
+  const cachedGroups = getCachedGroupMetadata(sharedLoader);
+  if (Array.isArray(cachedGroups) && cachedGroups.length) {
+    groupMetadataCache = cachedGroups;
+    return groupMetadataCache;
+  }
+
+  if (!groupMetadataPromise) {
+    groupMetadataPromise = (async () => {
+      const client = ensureInitialized();
+      if (!client) {
+        throw new Error('Supabase client not available for group metadata');
+      }
+      const response = await client.from('NAEI_global_t_Group').select('*');
+      if (response.error) {
+        throw response.error;
+      }
+      groupMetadataCache = response.data || [];
+      return groupMetadataCache;
+    })().catch(error => {
+      console.error('Failed to fetch group metadata:', error);
+      groupMetadataPromise = null;
+      throw error;
+    });
+  }
+
+  return groupMetadataPromise;
+}
+
+function mergeGroupCollections(primary = [], secondary = []) {
+  const merged = [];
+  const seen = new Set();
+
+  const push = (group) => {
+    if (!group || typeof group !== 'object') {
+      return;
+    }
+    const key = group.id ?? group.group_id ?? group.group_title;
+    if (key == null) {
+      merged.push(group);
+      return;
+    }
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    merged.push(group);
+  };
+
+  primary.forEach(push);
+  secondary.forEach(push);
+
+  return merged;
+}
+
+async function loadData(options = {}) {
+  const { useDefaultSnapshot = !hasUrlOverrides() } = options;
+  console.log('Loading scatter chart data using shared data loader...');
+
+  const sharedLoader = await resolveSharedLoader();
+  let snapshotPromise = null;
+  if (useDefaultSnapshot && sharedLoader?.loadDefaultSnapshot) {
+    snapshotPromise = sharedLoader.loadDefaultSnapshot();
+  }
 
   try {
-    // Track page load
-    await trackAnalytics('page_load', { 
-  page: 'bubble_chart',
+    await trackAnalytics('page_load', {
+      page: 'bubble_chart',
       timestamp: new Date().toISOString()
     });
 
-    // Check if parent window has shared data loader
-    let sharedLoader = null;
-    try {
-      if (window.parent && window.parent.SharedDataLoader) {
-        sharedLoader = window.parent.SharedDataLoader;
-        console.log("Using parent window's shared data loader");
-      } else if (window.SharedDataLoader) {
-        sharedLoader = window.SharedDataLoader;
-        console.log("Using local shared data loader");
-      }
-    } catch (e) {
-      console.log("Cannot access parent window, using fallback data loading");
-    }
+    let pollutants = [];
+    let groups = [];
+    let rows = [];
 
-    let pollutants, groups, rows;
-
-    if (sharedLoader && sharedLoader.isDataLoaded()) {
-      // Use cached data from shared loader
-      console.log("Using cached data from shared loader");
+    if (sharedLoader?.isDataLoaded()) {
+      console.log('Using cached data from shared loader');
       const cachedData = sharedLoader.getCachedData();
       pollutants = cachedData.pollutants;
       groups = cachedData.groups;
       rows = cachedData.timeseries;
-    } else if (sharedLoader) {
-      // Load data through shared loader
-      console.log("Loading data through shared loader");
-      try {
-        const sharedData = await sharedLoader.loadSharedData();
-        pollutants = sharedData.pollutants;
-        groups = sharedData.groups;
-        rows = sharedData.timeseries;
-      } catch (error) {
-        console.error("Failed to load through shared loader, falling back to direct loading:", error);
-        // Fallback to direct loading
+      hasFullDataset = true;
+      latestDatasetSource = 'cache';
+    } else if (snapshotPromise) {
+      const snapshot = await snapshotPromise;
+      if (snapshot?.data) {
+        console.log('Using default snapshot for initial bubble render');
+        pollutants = snapshot.data.pollutants || [];
+        groups = snapshot.data.groups || [];
+        rows = snapshot.data.timeseries || snapshot.data.rows || snapshot.data.data || [];
+        hasFullDataset = false;
+        latestDatasetSource = 'snapshot';
+        scheduleFullDatasetLoad(sharedLoader);
+      }
+    }
+
+    if (!pollutants.length || !groups.length || !rows.length) {
+      if (sharedLoader) {
+        try {
+          console.log('Loading bubble data through shared loader');
+          const sharedData = await sharedLoader.loadSharedData();
+          pollutants = sharedData.pollutants;
+          groups = sharedData.groups;
+          rows = sharedData.timeseries;
+          hasFullDataset = true;
+          latestDatasetSource = 'shared-loader';
+        } catch (error) {
+          console.error('Shared loader failed, falling back to direct load:', error);
+          const result = await loadDataDirectly();
+          pollutants = result.pollutants;
+          groups = result.groups;
+          rows = result.rows;
+          hasFullDataset = true;
+          latestDatasetSource = 'direct';
+        }
+      } else {
         const result = await loadDataDirectly();
         pollutants = result.pollutants;
         groups = result.groups;
         rows = result.rows;
+        hasFullDataset = true;
+        latestDatasetSource = 'direct';
       }
-    } else {
-      // Fallback to direct loading
-      console.log("No shared loader available, loading data directly");
-      const result = await loadDataDirectly();
-      pollutants = result.pollutants;
-      groups = result.groups;
-      rows = result.rows;
+    }
+
+    if (!hasFullDataset) {
+      try {
+        const metadata = await ensureAllGroupMetadata(sharedLoader);
+        if (Array.isArray(metadata) && metadata.length) {
+          groups = mergeGroupCollections(metadata, groups);
+        }
+      } catch (error) {
+        console.warn('Unable to load full group metadata before hydration:', error.message || error);
+      }
     }
     
-    // Store globally for URL parameter lookups
-    window.allPollutantsData = pollutants;
-    window.allGroupsData = groups;
-
-    // Build pollutant units map
-    pollutants.forEach(p => {
-      if (p.pollutant && p["emission unit"]) {
-        pollutantUnits[p.pollutant] = p["emission unit"];
-      }
+    const dataset = applyDataset({ pollutants, groups, rows }, {
+      enforceActivityDataFilter: hasFullDataset
     });
-
-    // Find Activity Data pollutant ID
-    const actDataPollutant = pollutants.find(p => 
-      p.pollutant && p.pollutant.toLowerCase() === 'activity data'
-    );
-    
-    if (actDataPollutant) {
-      actDataPollutantId = actDataPollutant.id;
-      console.log("Activity Data pollutant ID:", actDataPollutantId);
-    } else {
-      console.warn("Activity Data not found in pollutants list");
-    }
-
-  // Store data globally for access by other modules
-  allPollutants = pollutants;
-  allGroups = groups;
-  globalRows = rows;
-  pollutantsData = pollutants;
-  groupsData = groups;
-
-    // Get available years from data columns
-    if (rows.length > 0) {
-      const sample = rows[0];
-      const headers = Object.keys(sample).filter(k => /^f\d{4}$/.test(k)).sort((a,b)=> +a.slice(1) - +b.slice(1));
-      globalHeaders = headers;
-      window.globalHeaders = headers;
-      window.globalYears = headers.map(h => h.slice(1));
-      window.globalYearKeys = headers;
-    }
-
-    // Determine which groups have any non-zero Activity Data across available years
-    activeActDataGroups = [];
-    activeActDataGroupIds = [];
-    inactiveActDataGroupIds = [];
-
-    if (actDataPollutantId && globalHeaders.length > 0) {
-      const actDataRowsByGroup = new Map();
-      globalRows.forEach(row => {
-        if (row.pollutant_id === actDataPollutantId) {
-          actDataRowsByGroup.set(row.group_id, row);
-        }
-      });
-
-      groups.forEach(group => {
-        const actDataRow = actDataRowsByGroup.get(group.id);
-
-        if (!actDataRow) {
-          inactiveActDataGroupIds.push(group.id);
-          return;
-        }
-
-        const hasActData = globalHeaders.some(header => {
-          const value = actDataRow[header];
-          if (value === null || value === undefined) return false;
-          const numeric = Number(value);
-          if (!Number.isFinite(numeric)) return false;
-          return numeric !== 0;
-        });
-
-        if (hasActData) {
-          activeActDataGroups.push(group);
-          activeActDataGroupIds.push(group.id);
-        } else {
-          inactiveActDataGroupIds.push(group.id);
-        }
-      });
-
-      if (activeActDataGroups.length === 0 && groups.length > 0) {
-        console.warn('No groups reported Activity Data; reverting to full group list.');
-        activeActDataGroups = [...groups];
-        activeActDataGroupIds = activeActDataGroups.map(g => g.id);
-        inactiveActDataGroupIds = [];
-      }
-    } else {
-      // Fallback: if we cannot determine Activity Data, treat all groups as active
-      activeActDataGroups = [...groups];
-      activeActDataGroupIds = activeActDataGroups.map(g => g.id);
-      inactiveActDataGroupIds = [];
-    }
-
-    // Always exclude the aggregate "All" group from bubble chart selectors
-    const allGroupEntry = groups.find(g => typeof g.group_title === 'string' && g.group_title.trim().toLowerCase() === 'all');
-    if (allGroupEntry) {
-      const allGroupId = allGroupEntry.id;
-      activeActDataGroups = activeActDataGroups.filter(g => g.id !== allGroupId);
-      activeActDataGroupIds = activeActDataGroupIds.filter(id => id !== allGroupId);
-      if (!inactiveActDataGroupIds.includes(allGroupId)) {
-        inactiveActDataGroupIds.push(allGroupId);
-      }
-    }
-
-    // Build groups list for dropdowns using only active groups (fallback to all if none identified)
-    const baseGroupsForDropdown = activeActDataGroups.length > 0 ? activeActDataGroups : groups;
-    const groupsForDropdown = baseGroupsForDropdown.filter(g => {
-      if (typeof g.group_title !== 'string') return true;
-      return g.group_title.trim().toLowerCase() !== 'all';
-    });
-    allGroupsList = groupsForDropdown.map(g => ({
-      id: g.id,
-      name: g.group_title || `Group ${g.id}`
-    })).sort((a, b) => a.name.localeCompare(b.name));
-
-    if (inactiveActDataGroupIds.length > 0) {
-      const inactiveNames = inactiveActDataGroupIds
-        .map(id => groups.find(g => g.id === id)?.group_title || `Group ${id}`)
-        .filter(Boolean)
-        .sort();
-      window.groupsWithoutActData = inactiveNames;
-      window.groupsWithoutActivityData = inactiveNames; // legacy alias for any embeds not yet renamed
-      console.log('Groups without Activity Data (excluded from bubble chart dropdown):', inactiveNames);
-    } else {
-      window.groupsWithoutActData = [];
-      window.groupsWithoutActivityData = [];
-    }
-
-    console.log(`Loaded ${pollutants.length} pollutants, ${groups.length} groups, ${rows.length} data rows`);
-    
-    return {
-      pollutants: allPollutants,
-      groups: allGroups,
-      data: globalRows
-    };
+    return dataset;
 
   } catch (error) {
     console.error('Error loading scatter chart data:', error);
@@ -261,7 +259,7 @@ async function loadData() {
     await trackAnalytics('error', {
       error_type: 'data_load_error',
       error_message: error.message,
-  page: 'bubble_chart'
+      page: 'bubble_chart'
     });
     
     throw error;
@@ -425,6 +423,221 @@ function getGroupShortTitle(identifier) {
   return (group?.group_title || group?.group_name || null);
 }
 
+function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {}) {
+  const { enforceActivityDataFilter = true } = options || {};
+  window.allPollutantsData = pollutants;
+  window.allGroupsData = groups;
+
+  pollutantUnits = {};
+  pollutants.forEach(p => {
+    if (p.pollutant && p["emission unit"]) {
+      pollutantUnits[p.pollutant] = p["emission unit"];
+    }
+  });
+
+  const actDataPollutant = pollutants.find(p =>
+    p.pollutant && p.pollutant.toLowerCase() === ACTIVITY_POLLUTANT_NAME.toLowerCase()
+  );
+
+  if (actDataPollutant) {
+    actDataPollutantId = actDataPollutant.id;
+    console.log('Activity Data pollutant ID:', actDataPollutantId);
+  } else {
+    console.warn('Activity Data not found in pollutants list');
+    actDataPollutantId = null;
+  }
+
+  allPollutants = pollutants;
+  allGroups = groups;
+  if (Array.isArray(groups) && groups.length) {
+    if (!Array.isArray(groupMetadataCache) || groups.length > groupMetadataCache.length) {
+      groupMetadataCache = groups;
+    }
+  }
+  globalRows = rows;
+  pollutantsData = pollutants;
+  groupsData = groups;
+
+  if (rows.length > 0) {
+    const sample = rows[0];
+    const headers = Object.keys(sample)
+      .filter(k => /^f\d{4}$/i.test(k))
+      .sort((a, b) => +a.slice(1) - +b.slice(1));
+    globalHeaders = headers;
+    window.globalHeaders = headers;
+    window.globalYears = headers.map(h => h.slice(1));
+    window.globalYearKeys = headers;
+  } else {
+    globalHeaders = [];
+    window.globalHeaders = [];
+    window.globalYears = [];
+    window.globalYearKeys = [];
+  }
+
+  activeActDataGroups = [];
+  activeActDataGroupIds = [];
+  inactiveActDataGroupIds = [];
+
+  if (enforceActivityDataFilter && actDataPollutantId && globalHeaders.length > 0) {
+    const actDataRowsByGroup = new Map();
+    globalRows.forEach(row => {
+      if (row.pollutant_id === actDataPollutantId) {
+        actDataRowsByGroup.set(row.group_id, row);
+      }
+    });
+
+    groups.forEach(group => {
+      const actDataRow = actDataRowsByGroup.get(group.id);
+
+      if (!actDataRow) {
+        inactiveActDataGroupIds.push(group.id);
+        return;
+      }
+
+      const hasActData = globalHeaders.some(header => {
+        const value = actDataRow[header];
+        if (value === null || value === undefined) return false;
+        const numeric = Number(value);
+        if (!Number.isFinite(numeric)) return false;
+        return numeric !== 0;
+      });
+
+      if (hasActData) {
+        activeActDataGroups.push(group);
+        activeActDataGroupIds.push(group.id);
+      } else {
+        inactiveActDataGroupIds.push(group.id);
+      }
+    });
+
+    if (activeActDataGroups.length === 0 && groups.length > 0) {
+      console.warn('No groups reported Activity Data; reverting to full group list.');
+      activeActDataGroups = [...groups];
+      activeActDataGroupIds = activeActDataGroups.map(g => g.id);
+      inactiveActDataGroupIds = [];
+    }
+  } else {
+    activeActDataGroups = [...groups];
+    activeActDataGroupIds = activeActDataGroups.map(g => g.id);
+    inactiveActDataGroupIds = [];
+  }
+
+  const allGroupEntry = groups.find(g => typeof g.group_title === 'string' && g.group_title.trim().toLowerCase() === 'all');
+  if (allGroupEntry) {
+    const allGroupId = allGroupEntry.id;
+    activeActDataGroups = activeActDataGroups.filter(g => g.id !== allGroupId);
+    activeActDataGroupIds = activeActDataGroupIds.filter(id => id !== allGroupId);
+    if (!inactiveActDataGroupIds.includes(allGroupId)) {
+      inactiveActDataGroupIds.push(allGroupId);
+    }
+  }
+
+  const baseGroupsForDropdown = activeActDataGroups.length > 0 ? activeActDataGroups : groups;
+  const groupsForDropdown = baseGroupsForDropdown.filter(g => {
+    if (typeof g.group_title !== 'string') return true;
+    return g.group_title.trim().toLowerCase() !== 'all';
+  });
+  allGroupsList = groupsForDropdown
+    .map(g => ({
+      id: g.id,
+      name: g.group_title || `Group ${g.id}`
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  if (inactiveActDataGroupIds.length > 0) {
+    const inactiveNames = inactiveActDataGroupIds
+      .map(id => groups.find(g => g.id === id)?.group_title || `Group ${id}`)
+      .filter(Boolean)
+      .sort();
+    window.groupsWithoutActData = inactiveNames;
+    window.groupsWithoutActivityData = inactiveNames;
+    console.log('Groups without Activity Data (excluded from bubble chart dropdown):', inactiveNames);
+  } else {
+    window.groupsWithoutActData = [];
+    window.groupsWithoutActivityData = [];
+  }
+
+  console.log(`Loaded ${pollutants.length} pollutants, ${groups.length} groups, ${rows.length} data rows`);
+
+  return {
+    pollutants: allPollutants,
+    groups: allGroups,
+    data: globalRows
+  };
+}
+
+function triggerFullDatasetHydrated(metadata = {}) {
+  hydrationListeners.forEach(listener => {
+    try {
+      listener(metadata);
+    } catch (error) {
+      console.error('Hydration listener failed:', error);
+    }
+  });
+}
+
+function onFullDatasetHydrated(listener) {
+  if (typeof listener !== 'function') {
+    return () => {};
+  }
+  hydrationListeners.add(listener);
+  return () => hydrationListeners.delete(listener);
+}
+
+function applyHydratedDataset(dataset, source = 'shared-loader') {
+  if (!dataset) return;
+  const normalizedRows = dataset.rows || dataset.timeseries || dataset.data || [];
+  if (!Array.isArray(normalizedRows) || normalizedRows.length === 0) {
+    console.warn('Hydrated dataset missing rows; skipping update');
+    return;
+  }
+
+  const result = applyDataset({
+    pollutants: dataset.pollutants || [],
+    groups: dataset.groups || [],
+    rows: normalizedRows
+  }, {
+    enforceActivityDataFilter: true
+  });
+
+  hasFullDataset = true;
+  latestDatasetSource = source;
+  triggerFullDatasetHydrated({ source, dataset: result, timestamp: Date.now() });
+}
+
+function scheduleFullDatasetLoad(sharedLoader) {
+  if (hasFullDataset || isHydratingFullDataset || fullDatasetPromise) {
+    return fullDatasetPromise;
+  }
+
+  const loadFullDataset = async () => {
+    isHydratingFullDataset = true;
+    try {
+      if (sharedLoader?.loadSharedData) {
+        console.log('Hydrating bubble chart with shared loader dataset...');
+        const sharedData = await sharedLoader.loadSharedData();
+        applyHydratedDataset({
+          pollutants: sharedData.pollutants,
+          groups: sharedData.groups,
+          rows: sharedData.timeseries
+        }, 'shared-loader');
+      } else {
+        console.log('Hydrating bubble chart with direct Supabase dataset...');
+        const directData = await loadDataDirectly();
+        applyHydratedDataset(directData, 'direct');
+      }
+    } catch (error) {
+      console.error('Failed to hydrate full dataset:', error);
+    } finally {
+      isHydratingFullDataset = false;
+      fullDatasetPromise = null;
+    }
+  };
+
+  fullDatasetPromise = loadFullDataset();
+  return fullDatasetPromise;
+}
+
 
 /**
  * Fallback function for direct data loading (when shared loader fails)
@@ -480,7 +693,11 @@ try {
     get activityDataId() { return actDataPollutantId; },
     get activeGroups() { return activeActDataGroups; },
     get activeGroupIds() { return activeActDataGroupIds; },
-    get inactiveActivityGroupIds() { return inactiveActDataGroupIds; }
+    get inactiveActivityGroupIds() { return inactiveActDataGroupIds; },
+    get hasFullDataset() { return hasFullDataset; },
+    get latestDatasetSource() { return latestDatasetSource; },
+    scheduleFullDatasetLoad,
+    onFullDatasetHydrated
   };
   console.log('supabaseModule for scatter chart initialized successfully');
 } catch (error) {
