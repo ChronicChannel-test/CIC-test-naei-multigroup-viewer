@@ -842,6 +842,24 @@ function exportData(format = 'csv') {
   const year = chartData.year;
   const dataPoints = chartData.dataPoints;
 
+  const csvNumberFormatter = new Intl.NumberFormat('en-US', {
+    useGrouping: false,
+    notation: 'standard',
+    maximumFractionDigits: 20
+  });
+
+  const formatCsvValue = (value) => {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return csvNumberFormatter.format(value);
+    }
+    return value ?? '';
+  };
+
+  const toNumberOrEmpty = (value) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : '';
+  };
+
   // Track export analytics
   if (window.Analytics && supabase) {
     window.Analytics.trackAnalytics(supabase, 'data_export', {
@@ -867,12 +885,12 @@ function exportData(format = 'csv') {
   dataPoints.forEach(point => {
     const emissionFactor = point.EF !== undefined ? point.EF : 
       (point.actDataValue !== 0 ? (point.pollutantValue / point.actDataValue) * 1000000 : 0);
-    
+
     rows.push([
       point.groupName,
-      point.actDataValue.toFixed(2),
-      point.pollutantValue.toFixed(6),
-      emissionFactor.toFixed(2)
+      toNumberOrEmpty(point.actDataValue),
+      toNumberOrEmpty(point.pollutantValue),
+      toNumberOrEmpty(emissionFactor)
     ]);
   });
 
@@ -883,7 +901,9 @@ function exportData(format = 'csv') {
   const filename = buildBubbleFilenameBase(chartData);
 
   if (format === 'csv') {
-    const csvContent = rows.map(r => r.join(',')).join('\n');
+    const csvContent = rows
+      .map(row => row.map(formatCsvValue).join(','))
+      .join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -931,6 +951,25 @@ function exportData(format = 'csv') {
       };
     });
     ws['!cols'] = columnDefs;
+
+    const dataRowStartIndex = 3; // zero-based index where data rows begin
+    const dataRowEndIndex = dataRowStartIndex + dataPoints.length;
+    const numberColumns = [
+      { index: 1, format: '0.####################' },
+      { index: 2, format: '0.####################' },
+      { index: 3, format: '0.####################' }
+    ];
+
+    numberColumns.forEach(({ index, format }) => {
+      for (let r = dataRowStartIndex; r < dataRowEndIndex; r += 1) {
+        const cellRef = XLSX.utils.encode_cell({ r, c: index });
+        const cell = ws[cellRef];
+        if (cell && typeof cell.v === 'number') {
+          cell.t = 'n';
+          cell.z = format;
+        }
+      }
+    });
 
     XLSX.utils.book_append_sheet(wb, ws, 'Data');
     XLSX.writeFile(wb, `${filename}.xlsx`);
