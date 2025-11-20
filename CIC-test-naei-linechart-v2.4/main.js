@@ -801,6 +801,59 @@ window.addEventListener('message', (event) => {
   }
 });
 
+function shouldSkipDirectionalNavigationTarget(target) {
+  if (!target) {
+    return false;
+  }
+
+  if (target.isContentEditable) {
+    return true;
+  }
+
+  const tagName = typeof target.tagName === 'string' ? target.tagName.toLowerCase() : '';
+  return ['input', 'textarea', 'select'].includes(tagName);
+}
+
+function setupParentNavigationForwarding(sourceLabel = 'line') {
+  if (!LINE_IS_EMBEDDED || !window.parent) {
+    return;
+  }
+
+  const forwardDirectionalKeys = (event) => {
+    if (event.defaultPrevented) {
+      return;
+    }
+
+    if (event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') {
+      return;
+    }
+
+    const target = event.target || document.activeElement;
+    if (shouldSkipDirectionalNavigationTarget(target)) {
+      return;
+    }
+
+    try {
+      window.parent.postMessage({
+        type: 'requestChartNavigation',
+        direction: event.key === 'ArrowRight' ? 'next' : 'previous',
+        source: sourceLabel
+      }, '*');
+      event.preventDefault();
+    } catch (error) {
+      lineDebugWarn('Unable to forward navigation request to parent', error);
+    }
+  };
+
+  document.addEventListener('keydown', forwardDirectionalKeys);
+}
+
+setupParentNavigationForwarding('line');
+
 // ---- Helpers for selection readiness & notices ----
 function selectionsReady() {
   try {

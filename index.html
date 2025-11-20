@@ -1220,6 +1220,28 @@
 
     }
 
+    function navigateChartByDelta(delta) {
+      if (!currentChart || !Number.isFinite(delta) || delta === 0) {
+        return null;
+      }
+
+      const normalizedCurrent = normalizeChartId(currentChart) || '1';
+      const currentIndex = CHART_SEQUENCE.indexOf(normalizedCurrent);
+      if (currentIndex === -1) {
+        return null;
+      }
+
+      const nextIndex = (currentIndex + delta + CHART_SEQUENCE.length) % CHART_SEQUENCE.length;
+      const nextChartId = CHART_SEQUENCE[nextIndex];
+
+      if (nextChartId === normalizedCurrent) {
+        return null;
+      }
+
+      switchChart(nextChartId);
+      return nextChartId;
+    }
+
     function handleTabKeyboardNavigation(event) {
       if (event.defaultPrevented) {
         return;
@@ -1238,30 +1260,16 @@
         return;
       }
 
-      if (!currentChart) {
-        return;
-      }
-
       event.preventDefault();
-
-      const normalizedCurrent = normalizeChartId(currentChart) || '1';
-      const currentIndex = CHART_SEQUENCE.indexOf(normalizedCurrent);
-      if (currentIndex === -1) {
-        return;
-      }
-
-      const delta = event.key === 'ArrowRight' ? 1 : -1;
-      const nextIndex = (currentIndex + delta + CHART_SEQUENCE.length) % CHART_SEQUENCE.length;
-      const nextChartId = CHART_SEQUENCE[nextIndex];
-
-      if (nextChartId === normalizedCurrent) {
-        return;
-      }
 
       const preservedScrollX = window.scrollX;
       const preservedScrollY = window.scrollY;
+      const delta = event.key === 'ArrowRight' ? 1 : -1;
+      const nextChartId = navigateChartByDelta(delta);
 
-      switchChart(nextChartId);
+      if (!nextChartId) {
+        return;
+      }
 
       requestAnimationFrame(() => {
         window.scrollTo({ top: preservedScrollY, left: preservedScrollX });
@@ -1311,6 +1319,23 @@
     console.log('🎯 Setting up message listener...');
     window.addEventListener('message', function(event) {
       console.log('🔥 Parent received message:', event.data);
+
+      if (event.data && event.data.type === 'requestChartNavigation') {
+        const direction = event.data.direction === 'previous' ? -1 : 1;
+        const preservedScrollX = window.scrollX;
+        const preservedScrollY = window.scrollY;
+        const nextChartId = navigateChartByDelta(direction);
+
+        if (!nextChartId) {
+          return;
+        }
+
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: preservedScrollY, left: preservedScrollX });
+          focusTab(nextChartId);
+        });
+        return;
+      }
 
       if (event.data && event.data.type === 'scrollToBubbleTutorial') {
         const requestId = event.data.requestId;
