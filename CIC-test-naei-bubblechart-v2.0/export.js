@@ -3,6 +3,45 @@
  * Handles PNG export and share functionality for scatter charts
  */
 
+function sanitizeFilenameSegment(value) {
+  return (value ?? '')
+    .toString()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9\-]/gi, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'NA';
+}
+
+function buildBubbleFilenameBase(chartData) {
+  if (!chartData) {
+    return 'Bubble-Chart';
+  }
+
+  const pollutantShort = typeof window.supabaseModule?.getPollutantShortName === 'function'
+    ? window.supabaseModule.getPollutantShortName(chartData.pollutantId)
+    : null;
+
+  const firstGroupId = Array.isArray(chartData.groupIds) && chartData.groupIds.length
+    ? chartData.groupIds[0]
+    : null;
+
+  const groupShort = firstGroupId !== null && typeof window.supabaseModule?.getGroupShortTitle === 'function'
+    ? window.supabaseModule.getGroupShortTitle(firstGroupId)
+    : null;
+
+  const groupName = firstGroupId !== null && typeof window.supabaseModule?.getGroupName === 'function'
+    ? window.supabaseModule.getGroupName(firstGroupId)
+    : (chartData.dataPoints?.[0]?.groupName || null);
+
+  const yearSegment = sanitizeFilenameSegment(chartData.year ?? 'Year');
+  const pollutantSegment = sanitizeFilenameSegment(pollutantShort || chartData.pollutantName || 'Pollutant');
+  const groupSegment = sanitizeFilenameSegment(groupShort || groupName || 'Group');
+
+  return `${yearSegment}_Bubble-Chart_${pollutantSegment}_${groupSegment}`;
+}
+
 /**
  * Get chart SVG and convert to high-resolution image URI
  * @param {Object} chart - Google Charts instance
@@ -506,7 +545,7 @@ async function downloadChartPNG() {
 
     const imageData = await generateChartImage();
     const link = document.createElement('a');
-    const filename = `${chartData.pollutantName.replace(/[^a-z0-9_\-]/gi, '_')}_vs_Activity_${chartData.year}.png`;
+    const filename = `${buildBubbleFilenameBase(chartData)}.png`;
     link.download = filename;
     link.href = imageData;
     link.click();
@@ -841,8 +880,7 @@ function exportData(format = 'csv') {
   rows.push([`Downloaded on: ${timestamp}`]);
 
   // Generate and download file
-  const safePollutant = pollutantName.replace(/[^a-z0-9_\-]/gi, '_');
-  const filename = `${safePollutant}_vs_Activity_${year}`;
+  const filename = buildBubbleFilenameBase(chartData);
 
   if (format === 'csv') {
     const csvContent = rows.map(r => r.join(',')).join('\n');
@@ -861,20 +899,20 @@ function exportData(format = 'csv') {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
 
-    // Size Column A by its longest entry and other columns by row 3 headers
+    // Auto-size columns with explicit width metadata understood by Excel/Numbers/Sheets
     const measuredWidths = [];
-    rows.forEach((row, rowIndex) => {
+    rows.forEach(row => {
       row.forEach((cell, colIndex) => {
         if (cell == null) {
           return;
         }
 
-        const shouldMeasure = colIndex === 0 || rowIndex === 2;
-        if (!shouldMeasure) {
-          return;
-        }
+        const text = String(cell);
+        const longestLine = text
+          .split(/\r?\n/)
+          .reduce((max, part) => Math.max(max, part.length), 0);
+        const length = Math.max(longestLine, text.length) + 2; // padding
 
-        const length = String(cell).length + 2; // add padding for readability
         if (!measuredWidths[colIndex] || length > measuredWidths[colIndex]) {
           measuredWidths[colIndex] = length;
         }
@@ -882,7 +920,17 @@ function exportData(format = 'csv') {
     });
 
     const columnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
-    ws['!cols'] = Array.from({ length: columnCount }, (_, idx) => ({ wch: measuredWidths[idx] || 12 }));
+    const columnDefs = Array.from({ length: columnCount }, (_, idx) => {
+      const rawWidth = measuredWidths[idx] || 12;
+      const charWidth = Math.min(32, Math.max(10, rawWidth));
+      const pixelWidth = Math.max(60, Math.round(charWidth * 6.5));
+      return {
+        wch: charWidth,
+        wpx: pixelWidth,
+        customWidth: 1
+      };
+    });
+    ws['!cols'] = columnDefs;
 
     XLSX.utils.book_append_sheet(wb, ws, 'Data');
     XLSX.writeFile(wb, `${filename}.xlsx`);

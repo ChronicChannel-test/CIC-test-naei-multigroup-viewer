@@ -43,6 +43,82 @@ let allGroups = [];
 let pollutantsData = []; // Store raw pollutant data for ID lookups
 let groupsData = []; // Store raw group data for ID lookups
 
+function resolvePollutantRecord(identifier) {
+  if (identifier === null || identifier === undefined) {
+    return null;
+  }
+
+  const normalized = typeof identifier === 'string'
+    ? identifier.trim().toLowerCase()
+    : null;
+
+  return pollutantsData.find(p => {
+    if (typeof identifier === 'number') {
+      return p.id === identifier;
+    }
+    if (normalized) {
+      const primary = (p.pollutant || p.Pollutant || '').toLowerCase();
+      return primary === normalized;
+    }
+    return false;
+  }) || null;
+}
+
+function resolveGroupRecord(identifier) {
+  if (identifier === null || identifier === undefined) {
+    return null;
+  }
+
+  const normalized = typeof identifier === 'string'
+    ? identifier.trim().toLowerCase()
+    : null;
+
+  return groupsData.find(g => {
+    if (typeof identifier === 'number') {
+      return g.id === identifier;
+    }
+    if (normalized) {
+      const title = (g.group_title || g.group_name || '').toLowerCase();
+      return title === normalized;
+    }
+    return false;
+  }) || null;
+}
+
+function getPollutantShortName(identifier) {
+  const record = resolvePollutantRecord(identifier);
+  if (!record) {
+    return null;
+  }
+
+  const shortName = typeof record.short_pollutant === 'string'
+    ? record.short_pollutant.trim()
+    : '';
+
+  if (shortName) {
+    return shortName;
+  }
+
+  return record.pollutant || record.Pollutant || null;
+}
+
+function getGroupShortTitle(identifier) {
+  const record = resolveGroupRecord(identifier);
+  if (!record) {
+    return null;
+  }
+
+  const shortTitle = typeof record.short_group_title === 'string'
+    ? record.short_group_title.trim()
+    : '';
+
+  if (shortTitle) {
+    return shortTitle;
+  }
+
+  return record.group_title || record.group_name || null;
+}
+
 /**
  * Track analytics events to Supabase (wrapper for shared Analytics module)
  * @param {string} eventName - Type of event to track
@@ -254,6 +330,8 @@ try {
     loadData,
     loadDataDirectly,
     trackAnalytics,
+    getPollutantShortName,
+    getGroupShortTitle,
   };
   console.log('supabaseModule initialized successfully');
 } catch (error) {

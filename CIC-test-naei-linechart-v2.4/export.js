@@ -4,6 +4,37 @@
  * Extracted from v2.2 index.html for modular architecture
  */
 
+function sanitizeFilenameSegment(value) {
+  return (value ?? '')
+    .toString()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9\-]/gi, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    || 'NA';
+}
+
+function buildLineFilenameBase({ startYear, endYear, pollutantName, firstGroupName }) {
+  const pollutantShort = typeof window.supabaseModule?.getPollutantShortName === 'function'
+    ? window.supabaseModule.getPollutantShortName(pollutantName)
+    : null;
+
+  const groupShort = typeof window.supabaseModule?.getGroupShortTitle === 'function'
+    ? window.supabaseModule.getGroupShortTitle(firstGroupName)
+    : null;
+
+  const yearLabel = Number.isFinite(startYear) && Number.isFinite(endYear)
+    ? (startYear === endYear ? `${startYear}` : `${startYear}-${endYear}`)
+    : 'Years';
+
+  const yearSegment = sanitizeFilenameSegment(yearLabel);
+  const pollutantSegment = sanitizeFilenameSegment(pollutantShort || pollutantName || 'Pollutant');
+  const groupSegment = sanitizeFilenameSegment(groupShort || firstGroupName || 'Group');
+
+  return `${yearSegment}_Line-Chart_${pollutantSegment}_${groupSegment}`;
+}
+
 function exportData(format = 'csv') {
   const pollutant = document.getElementById('pollutantSelect').value;
   const startYear = +document.getElementById('startYear').value;
@@ -22,6 +53,14 @@ function exportData(format = 'csv') {
     return;
   }
 
+  const primaryGroup = selectedGroups[0];
+  const filenameBase = buildLineFilenameBase({
+    startYear,
+    endYear,
+    pollutantName: pollutant,
+    firstGroupName: primaryGroup
+  });
+
   // Track export analytics when available
   const exportAnalyticsPayload = {
     format: format,
@@ -31,7 +70,7 @@ function exportData(format = 'csv') {
     groups: selectedGroups,
     groups_count: selectedGroups.length,
     year_range: endYear - startYear + 1,
-    filename: pollutant.replace(/[^a-z0-9_\-]/gi, '_') + '_' + startYear + '-' + endYear + '_comparison'
+    filename: filenameBase
   };
 
   if (window.supabaseModule?.trackAnalytics) {
@@ -80,19 +119,75 @@ function exportData(format = 'csv') {
   rows.push([`Downloaded on: ${timestamp}`]);
 
   // --- Generate and download file ---
-  const safePollutant = pollutant.replace(/[^a-z0-9_\-]/gi, '_');
   if (format === 'csv') {
     const csvContent = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `${safePollutant}_data.csv`;
+    link.download = `${filenameBase}.csv`;
     link.click();
   } else if (format === 'xlsx') {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.aoa_to_sheet(rows);
+    const dataRowStartIndex = 3; // rows 0-2 are metadata + header
+    const dataRowEndIndex = dataRowStartIndex + selectedGroups.length;
+    const dataRows = rows.slice(dataRowStartIndex, dataRowEndIndex);
+
+    const groupCells = dataRows
+      .map(row => Array.isArray(row) ? row[0] : null)
+      .filter(cell => typeof cell === 'string' && cell.trim().length > 0);
+
+    const longestGroupLength = groupCells.reduce(
+      (max, cell) => Math.max(max, cell.length),
+      'Group'.length
+    );
+
+    const longestYearValueLength = dataRows.reduce((max, row) => {
+      if (!Array.isArray(row)) {
+        return max;
+      }
+      years.forEach((_, idx) => {
+        const cell = row[idx + 1];
+        if (cell == null) {
+          return;
+        }
+        const length = String(cell).length;
+        if (length > max) {
+          max = length;
+        }
+      });
+      return max;
+    }, 0);
+
+    const longestYearHeaderLength = years.reduce(
+      (max, yearLabel) => Math.max(max, String(yearLabel).length),
+      0
+    );
+
+    const longestYearLength = Math.max(longestYearValueLength, longestYearHeaderLength, 1);
+
+    const baseGroupWidth = (longestGroupLength || 0) + 2;
+    const baseYearWidth = longestYearLength + 2;
+    const groupCharWidth = Math.max(14, baseGroupWidth);
+    const yearCharWidth = Math.min(20, Math.max(10, baseYearWidth));
+
+    const columnCount = rows.reduce((max, row) => Math.max(max, row.length), 0);
+    const columnDefs = Array.from({ length: columnCount }, (_, idx) => {
+      const charWidth = idx === 0 ? groupCharWidth : yearCharWidth;
+      const pixelWidth = idx === 0
+        ? Math.max(90, Math.round(charWidth * 6.2))
+        : Math.max(60, Math.round(charWidth * 5.2));
+      return {
+        wch: charWidth,
+        wpx: pixelWidth,
+        customWidth: 1
+      };
+    });
+
+    ws['!cols'] = columnDefs;
+
     XLSX.utils.book_append_sheet(wb, ws, 'Data');
-    XLSX.writeFile(wb, `${safePollutant}_data.xlsx`);
+    XLSX.writeFile(wb, `${filenameBase}.xlsx`);
   }
 }
 
@@ -709,9 +804,18 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         const dataURL = await generateChartImage();
         const pollutant = document.getElementById('pollutantSelect').value;
+        const startYear = +document.getElementById('startYear').value;
+        const endYear = +document.getElementById('endYear').value;
+        const firstGroup = getSelectedGroups()[0];
+        const filenameBase = buildLineFilenameBase({
+          startYear,
+          endYear,
+          pollutantName: pollutant,
+          firstGroupName: firstGroup
+        });
         const link = document.createElement('a');
         link.href = dataURL;
-        link.download = `${pollutant.replace(/[^a-z0-9_\-]/gi, '_')}_chart.png`;
+        link.download = `${filenameBase}.png`;
         link.click();
       } catch (error) {
         console.error('Failed to download chart image:', error);

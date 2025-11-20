@@ -363,6 +363,68 @@ function getGroupName(groupId) {
   return group ? group.group_title : `Group ${groupId}`;
 }
 
+function getPollutantShortName(identifier) {
+  if (identifier === null || identifier === undefined) {
+    return null;
+  }
+
+  const normalized = typeof identifier === 'string'
+    ? identifier.trim().toLowerCase()
+    : null;
+
+  const pollutant = allPollutants.find(p => {
+    if (typeof identifier === 'number') {
+      return p.id === identifier;
+    }
+    if (normalized) {
+      const candidate = (p.pollutant || p.Pollutant || '').toLowerCase();
+      return candidate === normalized;
+    }
+    return false;
+  }) || null;
+
+  const shortName = typeof pollutant?.short_pollutant === 'string'
+    ? pollutant.short_pollutant.trim()
+    : '';
+
+  if (shortName) {
+    return shortName;
+  }
+
+  return (pollutant?.pollutant || pollutant?.Pollutant || null);
+}
+
+function getGroupShortTitle(identifier) {
+  if (identifier === null || identifier === undefined) {
+    return null;
+  }
+
+  const normalized = typeof identifier === 'string'
+    ? identifier.trim().toLowerCase()
+    : null;
+
+  const group = allGroups.find(g => {
+    if (typeof identifier === 'number') {
+      return g.id === identifier;
+    }
+    if (normalized) {
+      const title = (g.group_title || g.group_name || '').toLowerCase();
+      return title === normalized;
+    }
+    return false;
+  }) || null;
+
+  const shortTitle = typeof group?.short_group_title === 'string'
+    ? group.short_group_title.trim()
+    : '';
+
+  if (shortTitle) {
+    return shortTitle;
+  }
+
+  return (group?.group_title || group?.group_name || null);
+}
+
 
 /**
  * Fallback function for direct data loading (when shared loader fails)
@@ -405,6 +467,8 @@ try {
     getPollutantName,
     getPollutantUnit,
     getGroupName,
+    getPollutantShortName,
+    getGroupShortTitle,
     get allPollutants() { return allPollutants; },
     get allGroups() { return allGroups; },
     get allGroupsList() { return allGroupsList; },
