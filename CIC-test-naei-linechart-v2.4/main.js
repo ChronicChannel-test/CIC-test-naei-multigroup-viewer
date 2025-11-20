@@ -66,7 +66,7 @@ const LINE_MIN_HEIGHT_DELTA = 8;
 const LINE_DEFAULT_PARENT_FOOTER = 140;
 const LINE_DEFAULT_PARENT_VIEWPORT = 900;
 const LINE_DEFAULT_CSS_FOOTER_RESERVE = 160;
-const LINE_CSS_VISUAL_PADDING = 32;
+const LINE_CSS_VISUAL_PADDING = 27;
 const LINE_IS_EMBEDDED = window.parent && window.parent !== window;
 
 function computeEffectiveLineViewportHeight() {

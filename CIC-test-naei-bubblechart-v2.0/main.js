@@ -130,7 +130,7 @@ const MIN_HEIGHT_DELTA = 8; // px difference required before re-sending height
 const DEFAULT_PARENT_FOOTER = 140;
 const DEFAULT_PARENT_VIEWPORT = 900;
 const CSS_DEFAULT_FOOTER_RESERVE = 160; // Mirrors --bubble-footer-height default in styles.css
-const CSS_VISUAL_PADDING = 32; // Extra breathing room so chart clears the footer visually
+const CSS_VISUAL_PADDING = 27; // Extra breathing room so chart clears the footer visually
 const TUTORIAL_SLIDE_MATRIX = [
   ['002', '003', '004', '005'],
   ['002', '003', '004', '007'],
