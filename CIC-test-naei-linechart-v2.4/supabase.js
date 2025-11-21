@@ -7,7 +7,28 @@
 // Initialize Supabase client and analytics lazily to avoid dependency issues
 let supabase = null;
 
-const lineSupabaseUrlParams = new URLSearchParams(window.location.search || '');
+function getLineSearchParams() {
+  if (window.__lineSupabaseCachedSearchParams) {
+    return window.__lineSupabaseCachedSearchParams;
+  }
+
+  let search = window.location.search || '';
+  try {
+    if (window.parent && window.parent !== window) {
+      const parentSearch = window.parent.location?.search;
+      if (parentSearch) {
+        search = parentSearch;
+      }
+    }
+  } catch (error) {
+    // Ignore cross-origin errors; fallback to local search
+  }
+
+  window.__lineSupabaseCachedSearchParams = new URLSearchParams(search || '');
+  return window.__lineSupabaseCachedSearchParams;
+}
+
+const lineSupabaseUrlParams = getLineSearchParams();
 const lineSupabaseDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => lineSupabaseUrlParams.has(flag));
 const lineSupabaseDataLoggingEnabled = ['lineDataLogs', 'lineLoaderLogs', 'linechartLogs', 'lineSupabaseLogs'].some(flag => lineSupabaseUrlParams.has(flag));
 window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || lineSupabaseDebugLoggingEnabled;
@@ -72,6 +93,31 @@ const lineUrlOverrideParams = ['pollutant','pollutant_id','pollutantId','group',
 let lineHasFullDataset = false;
 let lineDatasetSource = null;
 let lineFullDatasetPromise = null;
+
+function dispatchLineFullDatasetEvent(detail = {}) {
+  const payload = {
+    source: detail.source || null,
+    timestamp: Date.now()
+  };
+
+  try {
+    window.dispatchEvent(new CustomEvent('lineFullDatasetHydrated', { detail: payload }));
+  } catch (error) {
+    try {
+      window.dispatchEvent(new Event('lineFullDatasetHydrated'));
+    } catch (fallbackError) {
+      /* noop */
+    }
+  }
+
+  if (typeof window.onLineFullDatasetHydrated === 'function') {
+    try {
+      window.onLineFullDatasetHydrated(payload);
+    } catch (handlerError) {
+      lineSupabaseWarnLog('onLineFullDatasetHydrated handler failed', handlerError);
+    }
+  }
+}
 
 function resolvePollutantRecord(identifier) {
   if (identifier === null || identifier === undefined) {
@@ -402,6 +448,7 @@ async function loadUnits() {
 }
 
 function applyLineDataset(dataset = {}, options = {}) {
+  const wasHydrated = lineHasFullDataset;
   const rowsInput = dataset.rows || dataset.timeseries || [];
   const pollutants = Array.isArray(dataset.pollutants) ? dataset.pollutants : [];
   const groups = Array.isArray(dataset.groups) ? dataset.groups : [];
@@ -501,6 +548,10 @@ function applyLineDataset(dataset = {}, options = {}) {
   }
   if (options.markFullDataset) {
     lineHasFullDataset = true;
+  }
+
+  if (options.markFullDataset && !wasHydrated) {
+    dispatchLineFullDatasetEvent({ source: options.source || null });
   }
 
   return { pollutants, groups, yearKeys: headers, pollutantUnits, groupedData };

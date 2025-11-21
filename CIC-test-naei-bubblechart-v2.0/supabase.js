@@ -7,8 +7,8 @@
 // Initialize Supabase client and analytics lazily to avoid dependency issues
 let supabase = null;
 
-const supabaseUrlParams = new URLSearchParams(window.location.search || '');
-const supabaseDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => supabaseUrlParams.has(flag));
+const supabaseInitialParams = new URLSearchParams(window.location.search || '');
+const supabaseDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => supabaseInitialParams.has(flag));
 const bubbleDataInfoLog = (() => {
   const info = console.info ? console.info.bind(console) : console.log.bind(console);
   return (...args) => info('[Bubble data]', ...args);
@@ -57,6 +57,47 @@ const supabaseDebugWarn = (...args) => {
 };
 let supabaseUnavailableLogged = false;
 let localSessionId = null;
+
+function readParentSearchParams() {
+  let search = window.location.search || '';
+  try {
+    if (window.parent && window.parent !== window) {
+      const parentSearch = window.parent.location?.search;
+      if (typeof parentSearch === 'string') {
+        search = parentSearch;
+      }
+    }
+  } catch (error) {
+    // Ignore cross-origin issues and fall back to iframe query string
+  }
+  return new URLSearchParams(search || '');
+}
+
+function normalizeChartId(value) {
+  if (!value) {
+    return null;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  if (normalized === '1' || normalized === 'bubble' || normalized === 'bubble-chart') {
+    return '1';
+  }
+  if (normalized === '2' || normalized === 'line' || normalized === 'line-chart') {
+    return '2';
+  }
+  return normalized;
+}
+
+function isBubbleChartActive(params) {
+  const chartParam = normalizeChartId(params.get('chart'));
+  if (!chartParam) {
+    return true;
+  }
+  return chartParam === '1';
+}
+
+function getEffectiveBubbleUrlParams() {
+  return readParentSearchParams();
+}
 
 // Initialize client and session ID when first needed
 function ensureInitialized() {
@@ -139,27 +180,31 @@ function matchesNameSet(values = [], defaults = []) {
   return normalizedValues.every((value, index) => value === normalizedDefaults[index]);
 }
 
-function isDefaultBubbleSelection() {
+function isDefaultBubbleSelection(params = getEffectiveBubbleUrlParams()) {
   const overrideExclusiveParams = ['dataset', 'activityGroup', 'actGroup'];
-  if (overrideExclusiveParams.some(param => supabaseUrlParams.has(param))) {
+  if (!isBubbleChartActive(params)) {
+    return true;
+  }
+
+  if (overrideExclusiveParams.some(param => params.has(param))) {
     return false;
   }
 
   const pollutantIds = parseIdList(
-    supabaseUrlParams.get('pollutant_id')
-    || supabaseUrlParams.get('pollutantId')
+    params.get('pollutant_id')
+    || params.get('pollutantId')
   );
   const pollutantNames = parseNameList(
-    supabaseUrlParams.get('pollutant')
+    params.get('pollutant')
   );
   const groupIds = parseIdList(
-    supabaseUrlParams.get('group_ids')
-    || supabaseUrlParams.get('groupIds')
-    || supabaseUrlParams.get('groupId')
+    params.get('group_ids')
+    || params.get('groupIds')
+    || params.get('groupId')
   );
   const groupNames = parseNameList(
-    supabaseUrlParams.get('groups')
-    || supabaseUrlParams.get('group')
+    params.get('groups')
+    || params.get('group')
   );
 
   const pollutantIdsDefault = !pollutantIds.length
@@ -170,7 +215,7 @@ function isDefaultBubbleSelection() {
     || matchesNumericSet(groupIds, DEFAULT_BUBBLE_GROUP_IDS);
   const groupNamesDefault = !groupNames.length
     || matchesNameSet(groupNames, DEFAULT_BUBBLE_GROUP_TITLES);
-  const yearParam = supabaseUrlParams.get('year');
+  const yearParam = params.get('year');
   const yearDefault = !yearParam || Number(yearParam) === DEFAULT_BUBBLE_YEAR;
 
   return (
@@ -183,10 +228,14 @@ function isDefaultBubbleSelection() {
 }
 
 function hasUrlOverrides() {
-  if (!urlOverrideParams.some(param => supabaseUrlParams.has(param))) {
+  const params = getEffectiveBubbleUrlParams();
+  if (!isBubbleChartActive(params)) {
     return false;
   }
-  return !isDefaultBubbleSelection();
+  if (!urlOverrideParams.some(param => params.has(param))) {
+    return false;
+  }
+  return !isDefaultBubbleSelection(params);
 }
 
 function mergeRecordCollections(primary = [], secondary = [], keyResolver) {
@@ -254,20 +303,25 @@ function parseNameList(value) {
 }
 
 function buildBubbleHeroOptions() {
+  const params = getEffectiveBubbleUrlParams();
+  if (!isBubbleChartActive(params)) {
+    return null;
+  }
+
   const pollutantIds = parseIdList(
-    supabaseUrlParams.get('pollutant_id')
-    || supabaseUrlParams.get('pollutantId')
+    params.get('pollutant_id')
+    || params.get('pollutantId')
   );
   const pollutantNames = parseNameList(
-    supabaseUrlParams.get('pollutant')
+    params.get('pollutant')
   );
   const groupIds = parseIdList(
-    supabaseUrlParams.get('group_ids')
-    || supabaseUrlParams.get('groupIds')
+    params.get('group_ids')
+    || params.get('groupIds')
   );
   const groupNames = parseNameList(
-    supabaseUrlParams.get('groups')
-    || supabaseUrlParams.get('group')
+    params.get('groups')
+    || params.get('group')
   );
 
   if (!pollutantIds.length && !pollutantNames.length) {
@@ -306,6 +360,9 @@ async function loadBubbleHeroDataset(sharedLoader) {
     return null;
   }
   const options = buildBubbleHeroOptions();
+  if (!options) {
+    return null;
+  }
   bubbleDataInfoLog('Requesting bubble hero dataset', {
     pollutants: options.pollutantIds.length || options.pollutantNames.length,
     groups: options.groupIds.length || options.groupNames.length

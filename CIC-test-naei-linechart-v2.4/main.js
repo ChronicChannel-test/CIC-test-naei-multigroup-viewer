@@ -30,6 +30,41 @@ let googleChartsReady = false;
 let googleChartsLoadPromise = null;
 let initialLoadComplete = false; // Track if initial chart load is done (prevent resize redraw)
 let initFailureNotified = false; // Ensure we only notify parent once on failure
+let hydrationRefreshPending = false;
+let hydrationRefreshTimer = null;
+
+function scheduleHydrationRefreshAttempt(attempt = 0) {
+  if (!hydrationRefreshPending) {
+    return;
+  }
+
+  if (!selectionsReady()) {
+    if (attempt >= 6) {
+      return;
+    }
+    hydrationRefreshTimer = setTimeout(() => scheduleHydrationRefreshAttempt(attempt + 1), 150);
+    return;
+  }
+
+  hydrationRefreshPending = false;
+  hydrationRefreshTimer = null;
+
+  try {
+    updateChart();
+  } catch (error) {
+    lineDebugWarn('Unable to refresh line chart after dataset hydration', error);
+  }
+}
+
+function requestHydrationRefresh() {
+  hydrationRefreshPending = true;
+  if (hydrationRefreshTimer) {
+    clearTimeout(hydrationRefreshTimer);
+  }
+
+  const delay = initialLoadComplete ? 30 : 160;
+  hydrationRefreshTimer = setTimeout(() => scheduleHydrationRefreshAttempt(0), delay);
+}
 
 function hasGoogleCoreChartConstructors() {
   return Boolean(window.google?.visualization?.DataTable && window.google?.visualization?.LineChart);
@@ -116,6 +151,13 @@ if (lineLayoutHeightManager) {
     syncLineChartHeight('parent-viewport', { redraw: true });
   });
 }
+
+window.addEventListener('lineFullDatasetHydrated', (event) => {
+  if (lineDebugLoggingEnabled) {
+    console.warn('Line chart full dataset hydrated; refreshing chart', event?.detail || {});
+  }
+  requestHydrationRefresh();
+});
 
 let lineParentFooterHeight = LINE_DEFAULT_PARENT_FOOTER;
 let lineParentViewportHeight = LINE_DEFAULT_PARENT_VIEWPORT;
@@ -1333,18 +1375,20 @@ function updateUrlFromChartState() {
           
           // Only send if chart=2 (line chart)
           if (chartParam === '2') {
-            window.parent.postMessage({
-              type: 'updateURL',
-              params: queryParts
-            }, '*');
+              window.parent.postMessage({
+                type: 'updateURL',
+                params: queryParts,
+                chart: '2'
+              }, '*');
           } else {
             return;
           }
         } catch (e) {
           // Cross-origin restriction - send anyway (standalone mode)
           window.parent.postMessage({
-            type: 'updateURL',
-            params: queryParts
+              type: 'updateURL',
+              params: queryParts,
+              chart: '2'
           }, '*');
         }
       } else {

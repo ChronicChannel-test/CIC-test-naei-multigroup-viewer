@@ -909,13 +909,25 @@
 
     if (debugLoggingEnabled) {
       Object.values(iframeElements).forEach(iframe => {
-        if (!iframe) return;
+        if (!iframe) {
+          return;
+        }
 
         try {
-          const iframeUrl = new URL(iframe.getAttribute('src'), window.location.href);
+          const currentSrcAttr = iframe.getAttribute('src');
+          const effectiveSrc = currentSrcAttr || iframe.dataset.src;
+          if (!effectiveSrc) {
+            return;
+          }
+
+          const iframeUrl = new URL(effectiveSrc, window.location.href);
           if (!iframeUrl.searchParams.has('debug')) {
             iframeUrl.searchParams.set('debug', '1');
-            iframe.src = iframeUrl.toString();
+            if (currentSrcAttr) {
+              iframe.src = iframeUrl.toString();
+            } else {
+              iframe.dataset.src = iframeUrl.toString();
+            }
           }
         } catch (error) {
           debugWarn('Unable to append debug flag to iframe source', error);
@@ -1677,6 +1689,19 @@
         }
 
         const paramsArray = Array.isArray(event.data.params) ? event.data.params : [];
+        if (!paramsArray.length) {
+          return;
+        }
+
+        const messageChart = normalizeChartId(event.data.chart);
+        if (messageChart && messageChart !== chartKey) {
+          return;
+        }
+
+        const chartFromParams = normalizeChartId(new URLSearchParams(paramsArray.join('&')).get('chart'));
+        if (chartFromParams && chartFromParams !== chartKey) {
+          return;
+        }
         chartStates[chartKey] = paramsArray;
 
         if (currentChart !== chartKey) {
@@ -1684,7 +1709,15 @@
         }
 
         const basePath = getBasePath();
-        const newParams = ['chart=' + chartKey, ...paramsArray];
+        const paramsSearch = new URLSearchParams(paramsArray.join('&'));
+        paramsSearch.set('chart', chartKey);
+        const newParams = [`chart=${chartKey}`];
+        paramsSearch.forEach((value, key) => {
+          if (key === 'chart') {
+            return;
+          }
+          newParams.push(`${key}=${value}`);
+        });
         const newUrl = `${basePath}?${newParams.join('&')}`;
 
         updateHistoryState('replaceState', newUrl);
