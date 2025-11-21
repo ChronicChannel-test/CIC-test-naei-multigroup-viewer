@@ -21,8 +21,11 @@ const SUPABASE_KEY = process.env.NAEI_SUPABASE_KEY
 
 const OUTPUT_PATH = path.join(__dirname, '..', 'SharedResources', 'default-chart-data.json');
 
-const TARGET_POLLUTANTS = ['PM2.5', 'Activity Data'];
-const TARGET_GROUPS = ['All', 'Ecodesign Stove - Ready To Burn', 'Gas Boilers'];
+const DEFAULT_LINE_POLLUTANT = 'PM2.5';
+const DEFAULT_BUBBLE_POLLUTANT = 'PM2.5';
+const DEFAULT_ACTIVITY_POLLUTANT = 'Activity Data';
+const DEFAULT_LINE_GROUPS = ['All'];
+const DEFAULT_BUBBLE_GROUPS = ['Ecodesign Stove - Ready To Burn', 'Gas Boilers'];
 const DEFAULT_YEAR = 2023;
 
 async function main() {
@@ -37,74 +40,142 @@ async function main() {
     }
   });
 
-  console.log('Fetching default pollutants:', TARGET_POLLUTANTS.join(', '));
+  console.log('Fetching full pollutant metadata...');
   const { data: pollutantRows, error: pollutantError } = await client
     .from('NAEI_global_Pollutants')
-    .select('*')
-    .in('pollutant', TARGET_POLLUTANTS);
+    .select('id,pollutant,emission_unit')
+    .order('pollutant', { ascending: true });
   if (pollutantError) throw pollutantError;
 
-  if (!pollutantRows || pollutantRows.length < TARGET_POLLUTANTS.length) {
-    throw new Error(`Expected ${TARGET_POLLUTANTS.length} pollutant rows, received ${pollutantRows?.length || 0}`);
+  if (!pollutantRows || pollutantRows.length === 0) {
+    throw new Error('No pollutant metadata returned.');
   }
 
+  console.log('Fetching full group metadata...');
   const { data: groupRows, error: groupError } = await client
     .from('NAEI_global_t_Group')
-    .select('*')
-    .in('group_title', TARGET_GROUPS);
+    .select('id,group_title')
+    .order('group_title', { ascending: true });
   if (groupError) throw groupError;
 
-  if (!groupRows || groupRows.length < TARGET_GROUPS.length) {
-    throw new Error(`Expected ${TARGET_GROUPS.length} group rows, received ${groupRows?.length || 0}`);
+  if (!groupRows || groupRows.length === 0) {
+    throw new Error('No group metadata returned.');
   }
 
   const pollutantIdMap = Object.fromEntries(pollutantRows.map(row => [row.pollutant, row.id]));
   const groupIdMap = Object.fromEntries(groupRows.map(row => [row.group_title, row.id]));
 
-  const pollutantIds = Object.values(pollutantIdMap);
-  const groupIds = Object.values(groupIdMap);
+  const linePollutantId = pollutantIdMap[DEFAULT_LINE_POLLUTANT];
+  const bubblePollutantId = pollutantIdMap[DEFAULT_BUBBLE_POLLUTANT];
+  const activityPollutantId = pollutantIdMap[DEFAULT_ACTIVITY_POLLUTANT];
 
-  console.log('Fetching timeseries rows for', pollutantIds.length, 'pollutants and', groupIds.length, 'groups');
-  const { data: timeseriesRows, error: timeseriesError } = await client
-    .from('NAEI_2023ds_t_Group_Data')
-    .select('*')
-    .in('pollutant_id', pollutantIds)
-    .in('group_id', groupIds);
-  if (timeseriesError) throw timeseriesError;
-
-  if (!timeseriesRows || !timeseriesRows.length) {
-    throw new Error('No timeseries data returned for default export.');
+  if (!linePollutantId || !bubblePollutantId || !activityPollutantId) {
+    throw new Error('Missing required pollutant IDs in metadata.');
   }
 
-  const sampleRow = timeseriesRows[0] || {};
+  const lineGroupIds = DEFAULT_LINE_GROUPS.map(name => {
+    const id = groupIdMap[name];
+    if (!id) {
+      throw new Error(`Missing required line group: ${name}`);
+    }
+    return id;
+  });
+
+  const bubbleGroupIds = DEFAULT_BUBBLE_GROUPS.map(name => {
+    const id = groupIdMap[name];
+    if (!id) {
+      throw new Error(`Missing required bubble group: ${name}`);
+    }
+    return id;
+  });
+
+  console.log('Fetching line-chart timeseries rows...');
+  const { data: lineTimeseriesRows, error: lineTimeseriesError } = await client
+    .from('NAEI_2023ds_t_Group_Data')
+    .select('*')
+    .eq('pollutant_id', linePollutantId)
+    .in('group_id', lineGroupIds);
+  if (lineTimeseriesError) throw lineTimeseriesError;
+
+  if (!lineTimeseriesRows || !lineTimeseriesRows.length) {
+    throw new Error('No timeseries data returned for default line dataset.');
+  }
+
+  console.log('Fetching bubble snapshot rows...');
+  const { data: bubbleSnapshotRows, error: bubbleSnapshotError } = await client
+    .from('NAEI_2023ds_t_Group_Data')
+    .select('id,pollutant_id,group_id,f2023')
+    .in('pollutant_id', [bubblePollutantId, activityPollutantId])
+    .in('group_id', bubbleGroupIds);
+  if (bubbleSnapshotError) throw bubbleSnapshotError;
+
+  if (!bubbleSnapshotRows || !bubbleSnapshotRows.length) {
+    throw new Error('No bubble snapshot rows returned.');
+  }
+
+  console.log('Fetching activity coverage map...');
+  const { data: activityCoverageRows, error: activityCoverageError } = await client
+    .from('NAEI_2023ds_t_Group_Data')
+    .select('group_id')
+    .eq('pollutant_id', activityPollutantId);
+  if (activityCoverageError) throw activityCoverageError;
+
+  const activityGroupSet = new Set(
+    (activityCoverageRows || []).map(row => row.group_id)
+  );
+
+  const sampleRow = lineTimeseriesRows[0] || {};
   const yearKeys = Object.keys(sampleRow)
     .filter(key => /^f\d{4}$/.test(key))
     .sort((a, b) => Number(a.slice(1)) - Number(b.slice(1)));
   const years = yearKeys.map(key => key.slice(1));
+
+  const trimmedBubbleRows = bubbleSnapshotRows.map(row => ({
+    id: row.id,
+    pollutant_id: row.pollutant_id,
+    group_id: row.group_id,
+    f2023: row.f2023
+  }));
+
+  const timeseriesRows = [...lineTimeseriesRows, ...trimmedBubbleRows];
 
   const payload = {
     generatedAt: new Date().toISOString(),
     source: 'supabase',
     defaults: {
       lineChart: {
-        pollutant: 'PM2.5',
-        groups: ['All'],
+        pollutant: DEFAULT_LINE_POLLUTANT,
+        groups: DEFAULT_LINE_GROUPS,
         startYear: years[0] ? Number(years[0]) : null,
         endYear: years[years.length - 1] ? Number(years[years.length - 1]) : null
       },
       bubbleChart: {
-        pollutant: 'PM2.5',
-        activityPollutant: 'Activity Data',
-        groups: TARGET_GROUPS.filter(name => name !== 'All'),
+        pollutant: DEFAULT_BUBBLE_POLLUTANT,
+        activityPollutant: DEFAULT_ACTIVITY_POLLUTANT,
+        groups: DEFAULT_BUBBLE_GROUPS,
         year: DEFAULT_YEAR
       }
     },
     data: {
-      pollutants: pollutantRows,
-      groups: groupRows,
+      pollutants: pollutantRows.map(row => {
+        const base = {
+          id: row.id,
+          pollutant: row.pollutant
+        };
+        if (row.pollutant === DEFAULT_LINE_POLLUTANT && row.emission_unit) {
+          base.emission_unit = row.emission_unit;
+        }
+        return base;
+      }),
+      groups: groupRows.map(row => ({
+        id: row.id,
+        group_title: row.group_title,
+        has_activity_data: activityGroupSet.has(row.id)
+      })),
       timeseries: timeseriesRows,
       yearKeys,
-      years
+      years,
+      bubbleYear: DEFAULT_YEAR
     }
   };
 

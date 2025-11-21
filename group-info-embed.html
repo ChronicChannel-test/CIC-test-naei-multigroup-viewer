@@ -280,6 +280,25 @@
       }
     }
   </style>
+  <script>
+    (function preloadSharedReferences() {
+      try {
+        if (!window.SharedDataLoader && window.parent && window.parent.SharedDataLoader) {
+          window.SharedDataLoader = window.parent.SharedDataLoader;
+        }
+      } catch (error) {
+        console.warn('Unable to mirror SharedDataLoader from parent frame:', error);
+      }
+
+      try {
+        if (!window.SupabaseConfig && window.parent && window.parent.SupabaseConfig) {
+          window.SupabaseConfig = window.parent.SupabaseConfig;
+        }
+      } catch (error) {
+        console.warn('Unable to mirror SupabaseConfig from parent frame:', error);
+      }
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="SharedResources/supabase-config.js"></script>
   <script src="SharedResources/shared-data-loader.js"></script>
@@ -340,6 +359,7 @@
       const highlightMatchesEnabled = true;
       let filterInputActive = true;
       const MIN_HEIGHT_DELTA = 8;
+      let sharedLoaderRef = null;
       let lastSentHeight = 0;
       let contentResizeObserver = null;
       const actDataStatus = {
@@ -348,6 +368,156 @@
         hasActDataByGroupId: new Map(),
         groupsWithoutActData: []
       };
+      const DEFAULT_SNAPSHOT_PATHS = [
+        'SharedResources/default-chart-data.json',
+        '../SharedResources/default-chart-data.json'
+      ];
+      let defaultSnapshotPromise = null;
+      let cachedDefaultSnapshot = null;
+      let directGroupDatasetPromise = null;
+      let directGroupDataset = null;
+      let supabaseClient = null;
+      let groupInfoDatasetSource = 'unknown';
+
+      function resolveSupabaseConfig() {
+        if (window.SupabaseConfig?.initSupabaseClient) {
+          return window.SupabaseConfig;
+        }
+        try {
+          if (window.parent && window.parent !== window && window.parent.SupabaseConfig?.initSupabaseClient) {
+            window.SupabaseConfig = window.parent.SupabaseConfig;
+            return window.SupabaseConfig;
+          }
+        } catch (error) {
+          console.warn('Unable to access SupabaseConfig reference:', error);
+        }
+        return null;
+      }
+
+      function getSupabaseClient() {
+        if (supabaseClient) {
+          return supabaseClient;
+        }
+        const config = resolveSupabaseConfig();
+        if (!config?.initSupabaseClient) {
+          return null;
+        }
+        try {
+          supabaseClient = config.initSupabaseClient();
+        } catch (error) {
+          console.warn('Failed to initialize Supabase client for group info:', error);
+        }
+        return supabaseClient;
+      }
+
+      async function loadDefaultSnapshot() {
+        if (cachedDefaultSnapshot) {
+          return cachedDefaultSnapshot;
+        }
+        if (!defaultSnapshotPromise) {
+          defaultSnapshotPromise = (async () => {
+            for (const path of DEFAULT_SNAPSHOT_PATHS) {
+              try {
+                const response = await fetch(path, { cache: 'no-store' });
+                if (!response.ok) {
+                  continue;
+                }
+                const snapshot = await response.json();
+                cachedDefaultSnapshot = snapshot;
+                return snapshot;
+              } catch (error) {
+                console.warn('Default snapshot fetch failed:', error);
+              }
+            }
+            return null;
+          })();
+        }
+        const snapshot = await defaultSnapshotPromise;
+        if (snapshot && !cachedDefaultSnapshot) {
+          cachedDefaultSnapshot = snapshot;
+        }
+        return snapshot;
+      }
+
+      async function fetchGroupsAndNfrDirectly() {
+        if (directGroupDataset) {
+          return directGroupDataset;
+        }
+        if (directGroupDatasetPromise) {
+          return directGroupDatasetPromise;
+        }
+
+        const client = getSupabaseClient();
+        if (!client) {
+          return null;
+        }
+
+        directGroupDatasetPromise = (async () => {
+          try {
+            const [groupsResp, nfrResp] = await Promise.all([
+              client.from('NAEI_global_t_Group').select('*'),
+              client.from('NAEI_global_t_NFRCode').select('*')
+            ]);
+
+            if (groupsResp.error) {
+              throw groupsResp.error;
+            }
+            if (nfrResp.error) {
+              throw nfrResp.error;
+            }
+
+            directGroupDataset = {
+              groups: groupsResp.data || [],
+              nfrCodes: nfrResp.data || []
+            };
+            return directGroupDataset;
+          } catch (error) {
+            console.warn('Direct group info fetch failed:', error);
+            return null;
+          } finally {
+            directGroupDatasetPromise = null;
+          }
+        })();
+
+        return directGroupDatasetPromise;
+      }
+
+      async function getActDataSnapshotDataset() {
+        const loader = resolveSharedDataLoader();
+        if (loader?.loadDefaultSnapshot) {
+          try {
+            const snapshot = await loader.loadDefaultSnapshot();
+            if (snapshot?.data) {
+              return snapshot.data;
+            }
+          } catch (error) {
+            console.warn('Shared loader default snapshot unavailable:', error);
+          }
+        }
+        const snapshot = await loadDefaultSnapshot();
+        if (snapshot?.data) {
+          return snapshot.data;
+        }
+        return snapshot || null;
+      }
+
+      function requestSharedDatasetBootstrap(reason = 'group-info') {
+        const loader = resolveSharedDataLoader();
+        if (!loader) {
+          return;
+        }
+        if (typeof loader.bootstrapFullDataset === 'function') {
+          loader.bootstrapFullDataset(reason).catch(error => {
+            console.warn('Shared dataset bootstrap failed (group-info):', error);
+          });
+          return;
+        }
+        if (typeof loader.loadSharedData === 'function') {
+          loader.loadSharedData().catch(error => {
+            console.warn('Shared dataset load failed (group-info):', error);
+          });
+        }
+      }
 
       if (typeof ResizeObserver === 'function' && contentEl) {
         contentResizeObserver = new ResizeObserver(() => scheduleHeightUpdate(24));
@@ -369,6 +539,26 @@
 
       function isFilterInputActive() {
         return filterInputActive;
+      }
+
+      function resolveSharedDataLoader() {
+        if (sharedLoaderRef) {
+          return sharedLoaderRef;
+        }
+        try {
+          if (window.SharedDataLoader) {
+            sharedLoaderRef = window.SharedDataLoader;
+            return sharedLoaderRef;
+          }
+          if (window.parent && window.parent !== window && window.parent.SharedDataLoader) {
+            sharedLoaderRef = window.parent.SharedDataLoader;
+            window.SharedDataLoader = sharedLoaderRef;
+            return sharedLoaderRef;
+          }
+        } catch (error) {
+          console.warn('Unable to access SharedDataLoader reference:', error);
+        }
+        return null;
       }
 
       function setStatus(message, persist = false) {
@@ -425,12 +615,55 @@
       }
 
       async function ensureSharedDataLoaded() {
+        const loader = resolveSharedDataLoader();
+        if (loader?.isDataLoaded?.()) {
+          try {
+            groupInfoDatasetSource = 'shared-cache';
+            return loader.getCachedData();
+          } catch (error) {
+            console.warn('Unable to read cached shared data:', error);
+          }
+        }
+
+        const directPayload = await fetchGroupsAndNfrDirectly();
+        if (directPayload?.groups?.length) {
+          groupInfoDatasetSource = 'direct-supabase';
+          return {
+            pollutants: [],
+            groups: directPayload.groups,
+            timeseries: [],
+            nfrCodes: directPayload.nfrCodes || []
+          };
+        }
+
+        if (!loader) {
+          console.warn('Shared data loader unavailable when preparing group info page.');
+          groupInfoDatasetSource = 'unavailable';
+          return null;
+        }
+
         try {
-          if (window.SharedDataLoader && !window.SharedDataLoader.isDataLoaded()) {
-            await window.SharedDataLoader.loadSharedData();
+          if (typeof loader.loadSharedData === 'function') {
+            const payload = await loader.loadSharedData();
+            if (payload) {
+              groupInfoDatasetSource = 'shared-loader';
+              return payload;
+            }
           }
         } catch (error) {
-          console.warn('Shared data loader unavailable when preparing group info page:', error);
+          console.warn('Shared data loader failed while preparing group info page:', error);
+        }
+
+        try {
+          const cached = loader.getCachedData();
+          if (cached) {
+            groupInfoDatasetSource = 'shared-cache-fallback';
+          }
+          return cached;
+        } catch (error) {
+          console.warn('Shared data cache unavailable after load attempt:', error);
+          groupInfoDatasetSource = 'unavailable';
+          return null;
         }
       }
 
@@ -442,39 +675,19 @@
         let dataset = null;
 
         try {
-          if (window.SharedDataLoader) {
-            if (!window.SharedDataLoader.isDataLoaded()) {
-              await window.SharedDataLoader.loadSharedData();
+          const loader = resolveSharedDataLoader();
+          if (loader) {
+            if (!loader.isDataLoaded?.()) {
+              await ensureSharedDataLoaded();
             }
-            dataset = window.SharedDataLoader.getCachedData();
+            dataset = loader.getCachedData();
           }
         } catch (error) {
           console.warn('Unable to access shared ActData dataset from cache:', error);
         }
 
         if (!dataset) {
-          const client = window.SupabaseConfig ? window.SupabaseConfig.initSupabaseClient() : null;
-          if (client) {
-            try {
-              const [pollutantsResp, groupsResp, timeseriesResp] = await Promise.all([
-                client.from('NAEI_global_Pollutants').select('id,pollutant'),
-                client.from('NAEI_global_t_Group').select('id,group_title'),
-                client.from('NAEI_2023ds_t_Group_Data').select('*')
-              ]);
-
-              if (!pollutantsResp?.error && !groupsResp?.error && !timeseriesResp?.error) {
-                dataset = {
-                  pollutants: pollutantsResp.data || [],
-                  groups: groupsResp.data || [],
-                  timeseries: timeseriesResp.data || []
-                };
-              } else {
-                console.warn('Failed to load fallback ActData dataset:', pollutantsResp?.error || groupsResp?.error || timeseriesResp?.error);
-              }
-            } catch (error) {
-              console.warn('Error while fetching fallback ActData dataset:', error);
-            }
-          }
+          dataset = await getActDataSnapshotDataset();
         }
 
         if (!dataset) {
@@ -482,7 +695,31 @@
           return actDataStatus;
         }
 
-        const { pollutants = [], groups = [], timeseries = [] } = dataset;
+        const pollutants = Array.isArray(dataset.pollutants)
+          ? dataset.pollutants
+          : Array.isArray(dataset?.data?.pollutants)
+            ? dataset.data.pollutants
+            : [];
+        const groups = Array.isArray(dataset.groups)
+          ? dataset.groups
+          : Array.isArray(dataset?.data?.groups)
+            ? dataset.data.groups
+            : [];
+        const timeseries = Array.isArray(dataset.timeseries)
+          ? dataset.timeseries
+          : Array.isArray(dataset.rows)
+            ? dataset.rows
+            : Array.isArray(dataset?.data?.timeseries)
+              ? dataset.data.timeseries
+              : Array.isArray(dataset?.data?.rows)
+                ? dataset.data.rows
+                : [];
+
+        if (!pollutants.length || !timeseries.length) {
+          actDataStatus.ready = true;
+          return actDataStatus;
+        }
+
         const actDataPollutant = pollutants.find(entry => typeof entry?.pollutant === 'string' && entry.pollutant.toLowerCase() === 'activity data');
 
         if (!actDataPollutant) {
@@ -969,7 +1206,7 @@
         contentEl.innerHTML = tableHtml;
 
         const tableEl = contentEl.querySelector('table');
-        attachCopyHandlers(tableEl, groupInfoState?.usedSupabase);
+        attachCopyHandlers(tableEl);
         scheduleHeightUpdate(60);
       }
 
@@ -1055,7 +1292,7 @@
         filterControlsInitialized = true;
       }
 
-      function attachCopyHandlers(tableEl, usedSupabase) {
+      function attachCopyHandlers(tableEl) {
         if (!tableEl) return;
 
         tableEl.addEventListener('click', event => {
@@ -1130,50 +1367,33 @@
         setStatus('Loading group information…', true);
         contentEl.textContent = 'Loading group information…';
 
-        await ensureSharedDataLoaded();
+        const dataset = await ensureSharedDataLoaded();
         await ensureActDataStatus();
 
         let groupRows = [];
         let nfrRows = [];
-        let usedSupabase = false;
 
         try {
-          if (window.SharedDataLoader && window.SharedDataLoader.isDataLoaded()) {
-            const cached = window.SharedDataLoader.getCachedData();
-            if (cached && Array.isArray(cached.groups) && cached.groups.length) {
-              groupRows = cached.groups.slice();
+          if (dataset && Array.isArray(dataset.groups) && dataset.groups.length) {
+            groupRows = dataset.groups.slice();
+          } else {
+            const loader = resolveSharedDataLoader();
+            if (loader && loader.isDataLoaded?.()) {
+              const cached = loader.getCachedData();
+              if (cached?.groups?.length) {
+                groupRows = cached.groups.slice();
+              }
+              if (cached?.nfrCodes?.length) {
+                nfrRows = cached.nfrCodes.slice();
+              }
             }
           }
         } catch (error) {
           console.warn('Unable to access cached group information:', error);
         }
 
-        try {
-          const client = window.SupabaseConfig ? window.SupabaseConfig.initSupabaseClient() : null;
-          if (client) {
-            const [groupResp, nfrResp] = await Promise.all([
-              client.from('NAEI_global_t_Group').select('id,group_title,source_name,activity_name,nfr_code'),
-              client.from('NAEI_global_t_NFRCode').select('nfr_code,description')
-            ]);
-
-            if (!groupResp?.error && Array.isArray(groupResp?.data) && groupResp.data.length) {
-              groupRows = groupResp.data;
-              usedSupabase = true;
-            } else if (groupResp?.error) {
-              console.warn('Supabase group info query failed:', groupResp.error);
-            }
-
-            if (!nfrResp?.error && Array.isArray(nfrResp?.data) && nfrResp.data.length) {
-              nfrRows = nfrResp.data;
-              usedSupabase = true;
-            } else if (nfrResp?.error) {
-              console.warn('Supabase NFR code query failed:', nfrResp.error);
-            }
-          } else {
-            console.warn('Supabase client unavailable when loading group info. Relying on cached data.');
-          }
-        } catch (error) {
-          console.warn('Error loading group information from Supabase:', error);
+        if (!nfrRows.length && dataset?.nfrCodes?.length) {
+          nfrRows = dataset.nfrCodes.slice();
         }
 
         if (!groupRows.length) {
@@ -1194,13 +1414,17 @@
 
         groupInfoState = {
           groups,
-          nfrMap,
-          usedSupabase
+          nfrMap
         };
 
         setupFilterControls();
         applyGroupFilters();
         setStatus('', true);
+        scheduleHeightUpdate(30);
+
+        if (groupInfoDatasetSource === 'direct-supabase') {
+          requestSharedDatasetBootstrap('group-info-direct');
+        }
       }
 
       document.addEventListener('DOMContentLoaded', () => {

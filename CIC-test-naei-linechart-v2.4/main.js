@@ -31,6 +31,10 @@ let googleChartsLoadPromise = null;
 let initialLoadComplete = false; // Track if initial chart load is done (prevent resize redraw)
 let initFailureNotified = false; // Ensure we only notify parent once on failure
 
+function hasGoogleCoreChartConstructors() {
+  return Boolean(window.google?.visualization?.DataTable && window.google?.visualization?.LineChart);
+}
+
 // Provide a minimal fallback palette if the shared Colors module fails to load.
 if (!window.Colors) {
   console.warn('Colors module not found in line chart – using fallback palette.');
@@ -199,41 +203,13 @@ function updateChartWrapperHeight(contextLabel = 'init') {
 
   window.__NAEI_LAST_CHART_HEIGHT = estimatedChartHeight;
 
-  if (lineDebugLoggingEnabled) {
-    console.log(
-      `📐 Line height estimate (${LINE_IS_EMBEDDED ? 'embed' : 'standalone'} ${contextLabel}): viewport=${viewportHeight}px footerReserve=${footerReserve}px chrome=${chromeBuffer}px estimate=${estimatedChartHeight}px`
-    );
-  }
-
   return estimatedChartHeight;
 }
 
 function logLineViewportHeight(contextLabel = 'resize') {
-  if (!lineDebugLoggingEnabled) {
-    return;
-  }
-
-  try {
-    const innerHeight = window.innerHeight || 0;
-    const outerHeight = window.outerHeight || 0;
-    const clientHeight = document.documentElement?.clientHeight || 0;
-    const visualViewportHeight = window.visualViewport?.height || null;
-    const bodyScrollHeight = document.body?.scrollHeight || 0;
-    const bodyOffsetHeight = document.body?.offsetHeight || 0;
-    const chartWrapper = document.querySelector('.chart-wrapper');
-    const chartDiv = document.getElementById('chart_div');
-    const wrapperHeight = chartWrapper ? Math.round(chartWrapper.getBoundingClientRect().height) : 'n/a';
-    const chartDivHeight = chartDiv ? Math.round(chartDiv.getBoundingClientRect().height) : 'n/a';
-
-    console.warn(
-      `📏 Line viewport (${contextLabel}): innerHeight=${innerHeight}px, clientHeight=${clientHeight}px, outerHeight=${outerHeight}px${visualViewportHeight ? `, visualViewport=${Math.round(visualViewportHeight)}px` : ''}, parentFooter=${lineParentFooterHeight}px, parentViewport=${lineParentViewportHeight}px`
-    );
-    console.warn(
-      `📦 Line layout (${contextLabel}): wrapper=${wrapperHeight}px, chartDiv=${chartDivHeight}px, bodyScroll=${bodyScrollHeight}px, bodyOffset=${bodyOffsetHeight}px`
-    );
-  } catch (error) {
-    lineDebugWarn('Unable to log line viewport metrics', error);
-  }
+  // Previously emitted detailed viewport diagnostics for every height update.
+  // These logs created too much noise even when debug=1, so the hook is now silent.
+  return;
 }
 
 function updateLineChartTitle(yearLabel, pollutantTitle) {
@@ -272,7 +248,7 @@ function syncLineChartHeight(contextLabel = 'update', { redraw = false } = {}) {
 }
 
 function loadGoogleChartsLibrary() {
-  if (googleChartsReady && window.google?.visualization?.DataTable) {
+  if (googleChartsReady && hasGoogleCoreChartConstructors()) {
     return Promise.resolve();
   }
 
@@ -303,7 +279,7 @@ function loadGoogleChartsLibrary() {
       if (settled) {
         return;
       }
-      if (!window.google?.visualization?.DataTable) {
+      if (!hasGoogleCoreChartConstructors()) {
         return; // Wait for visualization namespace to be ready
       }
       settled = true;
@@ -377,7 +353,6 @@ loadGoogleChartsLibrary().catch(error => {
     const build = 'v2.4-embed-gate-2025-11-04T20:26Z';
     window.__LINECHART_BUILD__ = build;
     document.documentElement.setAttribute('data-linechart-build', build);
-  console.log('Linechart build loaded: ' + build);
   } catch (e) { /* no-op */ }
 })();
 
@@ -697,28 +672,11 @@ function sendContentHeightToParent(force = false) {
     const measurement = measureLineContentHeight();
     const measuredHeight = Math.max(LINE_MIN_CHART_CANVAS_HEIGHT, measurement.height);
 
-    if (lineDebugLoggingEnabled) {
-      lineDebugWarn('📏 Line content height components', { ...measurement, measuredHeight });
-    }
-
     if (!force && lineLastSentHeight && Math.abs(measuredHeight - lineLastSentHeight) < LINE_MIN_HEIGHT_DELTA) {
-      if (lineDebugLoggingEnabled) {
-        console.log('↩️ Line height delta below threshold, skipping postMessage', {
-          measuredHeight,
-          lastSent: lineLastSentHeight
-        });
-      }
       return;
     }
 
     lineLastSentHeight = measuredHeight;
-
-    if (lineDebugLoggingEnabled) {
-      console.log('📤 Line contentHeight measurement', {
-        measuredHeight,
-        source: measurement.source
-      });
-    }
 
     window.parent.postMessage({
       type: 'contentHeight',
@@ -1401,10 +1359,10 @@ function updateUrlFromChartState() {
 
 
 function updateChart(){
-  if (!googleChartsReady || !window.google?.visualization?.DataTable) {
+  if (!googleChartsReady || !hasGoogleCoreChartConstructors()) {
     loadGoogleChartsLibrary()
       .then(() => {
-        if (googleChartsReady && window.google?.visualization?.DataTable) {
+        if (googleChartsReady && hasGoogleCoreChartConstructors()) {
           updateChart();
         }
       })
@@ -1655,21 +1613,6 @@ function updateChart(){
 
   if (Number.isFinite(effectiveWrapperHeight)) {
     availableHeight = Math.max(0, effectiveWrapperHeight - chartTopOffset - paddingBottom);
-  }
-
-  if (lineDebugLoggingEnabled) {
-    lineDebugWarn('📏 Line chart sizing resolution', {
-      wrapperHeight: effectiveWrapperHeight,
-      paddingBottom: Math.round(paddingBottom),
-      chartTopOffset: Math.round(chartTopOffset),
-      titleHeight,
-      legendHeight,
-      availableHeight: Number.isFinite(availableHeight) ? Math.round(availableHeight) : null,
-      requestedChartHeight: Math.round(requestedChartHeight),
-      appliedChartHeight,
-      wrapperExpanded: wrapperAdjustment.expanded,
-      wrapperRequiredHeight: wrapperAdjustment.requiredHeight || null
-    });
   }
 
   const yAxisTitle = pollutantTitle;
@@ -1930,14 +1873,13 @@ async function revealMainContent() {
                 
                 // Chart is rendered - send chartReady
                 // Height will be sent after overlay is hidden and layout is stable
-                console.log('Chart Ready');
                 window.parent.postMessage({
                   type: 'chartReady',
                   chart: 'line'
                 }, '*');
                 resolve();
-              }, 200);
-            }, 350);
+              }, 0);
+            }, 0);
           }
           tick();
         })();
@@ -2084,7 +2026,6 @@ function setupEventListeners() {
 
   if (lineLayoutHeightManager) {
     lineLayoutHeightManager.observeWrapper(() => {
-      console.log('📐 Line chart wrapper height changed – redrawing chart');
       window._pendingHeightUpdate = true;
       updateChart();
       setTimeout(() => sendContentHeightToParent(true), 150);
@@ -2221,7 +2162,7 @@ function notifyChartReady() {
           }
         });
       }
-    }, 300); // 300ms delay to ensure rendering is complete
+    }, 0); // testing immediate chart ready
   } catch (error) {
     console.error('Error in notifyChartReady:', error);
   }

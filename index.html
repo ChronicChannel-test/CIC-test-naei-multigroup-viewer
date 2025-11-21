@@ -449,6 +449,27 @@
 
 <body>
 
+  <script>
+    (function bootstrapIframeMessageQueue() {
+      const queue = [];
+      function enqueue(event) {
+        if (typeof window.__NAEI_processIframeMessage === 'function') {
+          try {
+            window.__NAEI_processIframeMessage(event);
+          } catch (error) {
+            console.warn('Queued iframe message failed:', error);
+          }
+        } else {
+          queue.push(event);
+        }
+      }
+
+      window.__NAEI_messageQueue = queue;
+      window.__NAEI_iframeMessageBridge = enqueue;
+      window.addEventListener('message', enqueue, false);
+    })();
+  </script>
+
   <!-- Full-screen loading overlay -->
   <div id="main-loading-overlay">
     <div class="main-spinner"></div>
@@ -566,8 +587,9 @@
   <div id="chart-group-info" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-group-info" aria-hidden="true">
       <iframe
         id="groupinfo-iframe"
-        class="chart-iframe"
-        src="group-info-embed.html"
+        class="chart-iframe lazy-iframe"
+        data-src="group-info-embed.html"
+        loading="lazy"
         frameborder="0"
         scrolling="no"
         style="height: 900px;"
@@ -578,8 +600,9 @@
   <div id="chart-user-guide" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-user-guide" aria-hidden="true">
       <iframe
         id="userguide-iframe"
-        class="chart-iframe"
-        src="user-guide-embed.html"
+        class="chart-iframe lazy-iframe"
+        data-src="user-guide-embed.html"
+        loading="lazy"
         frameborder="0"
         scrolling="no"
         style="height: 900px;"
@@ -590,8 +613,9 @@
   <div id="chart-resources" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-resources" aria-hidden="true">
       <iframe
         id="resources-iframe"
-        class="chart-iframe"
-        src="resources-embed.html"
+        class="chart-iframe lazy-iframe"
+        data-src="resources-embed.html"
+        loading="lazy"
         frameborder="0"
         scrolling="no"
         style="height: 900px;"
@@ -709,6 +733,23 @@
       bubble: false,
       line: false
     };
+    let sharedDataBootstrapLaunched = false;
+
+    function requestSharedDataBootstrap(reason = 'chart-ready') {
+      if (sharedDataBootstrapLaunched) {
+        return;
+      }
+      sharedDataBootstrapLaunched = true;
+      setTimeout(() => {
+        try {
+          window.SharedDataLoader?.loadSharedData?.().catch(error => {
+            console.warn('Background shared data load failed:', error);
+          });
+        } catch (error) {
+          console.warn('Unable to launch background shared data load:', error, 'reason:', reason);
+        }
+      }, 50);
+    }
 
     const iframeElements = {
       bubble: document.getElementById('bubblechart-iframe'),
@@ -1033,9 +1074,12 @@
         console.log('Loading chart interface for chart', chartId);
         
         // Preload shared data 
-        console.log('Preloading shared data...');
-        await window.SharedDataLoader.loadSharedData();
-        console.log('Shared data loaded successfully');
+        console.log('Priming default snapshot...');
+        if (window.SharedDataLoader?.loadDefaultSnapshot) {
+          window.SharedDataLoader.loadDefaultSnapshot().catch(error => {
+            console.warn('Default snapshot preload failed:', error);
+          });
+        }
         
         // Simple delay to let everything initialize
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -1281,7 +1325,26 @@
       chartContainer.style.height = 'auto';
       chartContainer.style.overflow = 'visible';
       chartContainer.setAttribute('aria-hidden', 'false');
+      loadLazyIframeForChart(normalizedId);
 
+    }
+
+    function loadLazyIframeForChart(chartId) {
+      const container = document.getElementById(`chart-${chartId}`);
+      if (!container) {
+        return;
+      }
+      const iframe = container.querySelector('iframe[data-src]');
+      if (!iframe) {
+        return;
+      }
+      const src = iframe.dataset.src;
+      if (!src) {
+        return;
+      }
+      iframe.src = src;
+      iframe.dataset.loaded = 'true';
+      iframe.removeAttribute('data-src');
     }
 
     function navigateChartByDelta(delta) {
@@ -1352,37 +1415,30 @@
     const lineIframe = iframeElements.line;
     if (lineIframe) {
       lineIframe.style.height = '1200px'; // Initial estimate
-      console.log('📏 Line chart iframe initial height: 1200px');
     }
 
     const bubbleIframe = iframeElements.bubble;
     if (bubbleIframe) {
       bubbleIframe.style.height = '1100px';
-      console.log('📏 Bubble chart iframe initial height: 1100px');
     }
 
     const groupInfoIframe = iframeElements['group-info'];
     if (groupInfoIframe) {
       groupInfoIframe.style.height = '1000px';
-      console.log('📏 Group info iframe initial height: 1000px');
     }
 
     const userGuideIframe = iframeElements['user-guide'];
     if (userGuideIframe) {
       userGuideIframe.style.height = '1000px';
-      console.log('📏 User guide iframe initial height: 1000px');
     }
 
     const resourcesIframe = iframeElements.resources;
     if (resourcesIframe) {
       resourcesIframe.style.height = '800px';
-      console.log('📏 Resources iframe initial height: 800px');
     }
     
-    // Set up message listener IMMEDIATELY (before DOM is ready)
-    console.log('🎯 Setting up message listener...');
-    window.addEventListener('message', function(event) {
-      console.log('🔥 Parent received message:', event.data);
+    // Defer iframe message processing until helper functions are available
+    function processIframeMessage(event) {
 
       if (event.data && event.data.type === 'requestChartNavigation') {
         const direction = event.data.direction === 'previous' ? -1 : 1;
@@ -1443,7 +1499,6 @@
 
       // Handle URL updates from iframes
       if (event.data && event.data.type === 'updateUrl') {
-        console.log('🔗 Updating URL to:', event.data.url);
         updateHistoryState('replaceState', event.data.url);
       }
 
@@ -1471,26 +1526,22 @@
         const keyLabel = typeof chartKey === 'string'
           ? chartKey.charAt(0).toUpperCase() + chartKey.slice(1)
           : 'Unknown';
-
-        console.log('📨 Chart ready message received');
-        console.log('🎯 Chart type:', chartKey);
         
         if (chartReadyState.hasOwnProperty(chartKey)) {
           chartReadyState[chartKey] = true;
-          console.log(`✅ ${keyLabel} chart is ready`);
         } else {
           debugWarn('⚠️ Unknown chart reported ready:', chartKey);
         }
+
+        requestSharedDataBootstrap(`chartReady:${chartKey}`);
 
         if (chartKey === 'bubble') {
           attemptBubbleTutorialAutoOpen();
         }
         
         if (areAllChartsReady()) {
-          console.log('✅ All charts ready - requesting heights before hiding overlay');
           Object.entries(iframeElements).forEach(([key, iframe]) => {
             if (iframe && iframe.contentWindow) {
-              console.log(`📐 Requesting height from ${key} chart iframe...`);
               iframe.contentWindow.postMessage({ type: 'requestHeight' }, '*');
             }
           });
@@ -1499,7 +1550,6 @@
             .filter(([, ready]) => !ready)
             .map(([key]) => key)
             .join(', ');
-          console.log(`⏳ Waiting for: ${pending}`);
         }
       }
       
@@ -1536,8 +1586,6 @@
 
           if (!Number.isFinite(reportedHeight) || reportedHeight <= 0) {
             debugWarn(`⚠️ Received invalid height (${event.data.height}) from ${chartKey}; using fallback ${safeHeight}px`);
-          } else {
-            console.log(`📏 Received content height from ${chartKey}: ${reportedHeight}px`);
           }
 
           iframe.style.height = finalHeight + 'px';
@@ -1549,7 +1597,6 @@
           heightsReceived[chartKey] = true;
           
           if (heightsReceived.bubble && heightsReceived.line && areAllChartsReady()) {
-            console.log('✅ Both chart heights received, layout stable - hiding overlay now');
             setTimeout(() => {
               window.hideLoadingOverlay();
             }, 50);
@@ -1559,7 +1606,6 @@
       
       // Debug messages from iframes
       if (event.data && event.data.type === 'debug') {
-        console.log('🐛 Debug message from iframe:', event.data.message);
       }
       
       // URL update messages from iframe
@@ -1587,7 +1633,6 @@
         chartStates[chartKey] = paramsArray;
 
         if (currentChart !== chartKey) {
-          console.log(`ℹ️ Stored state for inactive chart ${chartKey}; URL unchanged`);
           return;
         }
 
@@ -1596,14 +1641,24 @@
         const newUrl = `${basePath}?${newParams.join('&')}`;
 
         updateHistoryState('replaceState', newUrl);
-        console.log('🔗 URL updated:', newUrl);
       }
       
       // Line debug messages
       if (event.data && event.data.type === 'lineDebug') {
-        console.log('🐛 Line chart debug:', event.data.payload);
       }
-    });
+    }
+
+    window.__NAEI_processIframeMessage = processIframeMessage;
+    if (Array.isArray(window.__NAEI_messageQueue) && window.__NAEI_messageQueue.length) {
+      const pendingMessages = window.__NAEI_messageQueue.splice(0);
+      pendingMessages.forEach(event => {
+        try {
+          processIframeMessage(event);
+        } catch (error) {
+          console.warn('Deferred iframe message failed:', error);
+        }
+      });
+    }
     
     // Hide loading overlay function - make it global for iframe onload
     window.hideLoadingOverlay = function() {

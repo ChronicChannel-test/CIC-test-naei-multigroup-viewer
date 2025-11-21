@@ -3,6 +3,30 @@
  * Handles PNG export and share functionality for scatter charts
  */
 
+const exportLogger = (() => {
+  const logger = window.BubbleLogger;
+  if (logger) {
+    return {
+      log: logger.tagged ? logger.tagged('export') : (...args) => {
+        if (!logger.enabled) {
+          return;
+        }
+        logger.log('[export]', ...args);
+      },
+      warn: logger.warn ? (...args) => {
+        if (!logger.enabled) {
+          return;
+        }
+        logger.warn('[export]', ...args);
+      } : () => {}
+    };
+  }
+  return {
+    log: () => {},
+    warn: (...args) => console.warn('[bubble:export]', ...args)
+  };
+})();
+
 function sanitizeFilenameSegment(value) {
   return (value ?? '')
     .toString()
@@ -127,7 +151,7 @@ async function generateChartImage() {
             try {
               await document.fonts.load('400 60px "Tiresias Infofont"');
             } catch (fontErr) {
-              console.warn('Tiresias font failed to load before export; falling back to system font.', fontErr);
+              exportLogger.warn('Tiresias font failed to load before export; falling back to system font.', fontErr);
             }
           }
 
@@ -184,17 +208,7 @@ async function generateChartImage() {
           // Get the current visibility state from chart-renderer.js
           const visibility = window.seriesVisibility || [];
           
-          console.log('PNG Generation - Total legend items:', allItems.length);
-          console.log('PNG Generation - Visibility array:', visibility);
-          
-          // Filter items: include only if visible
-          const items = allItems.filter((item, index) => {
-            const isVisible = visibility[index] !== false; // true or undefined = visible
-            console.log(`Item ${index}: "${item.textContent.trim()}" - isVisible: ${isVisible}`);
-            return isVisible;
-          });
-          
-          console.log('PNG Generation - Filtered items count:', items.length);
+          const items = allItems.filter((item, index) => visibility[index] !== false);
 
           let legendY = padding + yearHeight + 155; // 100px baseline gap below pollutant title
           const legendRowHeight = 92; // Spacing tuned for enlarged legend text
@@ -205,7 +219,7 @@ async function generateChartImage() {
           items.forEach((it) => {
             const dot = it.querySelector('span');
             if (!dot) {
-              console.log('PNG Generation - Skipping item without dot:', it.textContent);
+              exportLogger.warn('PNG export skipped legend item without dot', it.textContent);
               return;
             }
             const text = it.textContent.trim();
@@ -222,7 +236,7 @@ async function generateChartImage() {
           });
           if (row.length) rowItems.push({ row, rowW });
 
-          console.log('PNG Generation - Row items created:', rowItems.length);
+          // Keep PNG generation quiet unless something unusual happens
 
           rowItems.forEach(({ row, rowW }) => {
             let x = (canvasWidth - rowW) / 2;
@@ -500,13 +514,13 @@ async function generateChartImage() {
               const logoSize = 360; // Enlarged CIC logo for exports
               ctx.drawImage(logo, canvasWidth - logoSize - 30, 30, logoSize, logoSize);
             } catch (e) {
-              console.warn('Logo failed to draw, continuing without logo:', e);
+              exportLogger.warn('Logo failed to draw, continuing without logo:', e);
             }
             finishGeneration();
           };
 
           logo.onerror = () => {
-            console.warn('Logo failed to load, continuing without logo');
+            exportLogger.warn('Logo failed to load, continuing without logo');
             finishGeneration();
           };
 

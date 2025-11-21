@@ -3,31 +3,12 @@
  * Handles UI initialization, user interactions, and coordination between modules
  */
 
-const bubbleUrlParams = new URLSearchParams(window.location.search || '');
-const bubbleDebugLoggingEnabled = ['debug', 'logs', 'debugLogs'].some(flag => bubbleUrlParams.has(flag));
-const bubbleDebugWarn = (...args) => {
-  if (bubbleDebugLoggingEnabled) {
-    console.warn(...args);
-  }
-};
-window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || bubbleDebugLoggingEnabled;
-
-if (!bubbleDebugLoggingEnabled) {
-  console.log = () => {};
-  console.info = () => {};
-  if (console.debug) {
-    console.debug = () => {};
-  }
-}
-
-console.log('main.js loaded');
-
 const isOperaBrowser = (() => {
   try {
     const ua = navigator.userAgent || '';
     return ua.includes('OPR/') || ua.includes('Opera');
   } catch (error) {
-    console.warn('Unable to detect Opera browser:', error);
+    // Unable to detect Opera browser; returning false
     return false;
   }
 })();
@@ -196,7 +177,6 @@ function applyCssFooterReserve(pixels) {
     const padded = safePixels + CSS_VISUAL_PADDING;
     document.documentElement?.style?.setProperty('--bubble-footer-height', `${padded}px`);
   } catch (error) {
-    bubbleDebugWarn('Unable to apply CSS footer reserve', error);
   }
 }
 
@@ -216,33 +196,12 @@ function applyCssViewportHeight(value) {
       document.documentElement?.style?.setProperty('--bubble-viewport-height', `${pixels}px`);
     }
   } catch (error) {
-    bubbleDebugWarn('Unable to apply CSS viewport height', error);
   }
 }
 
 applyCssViewportHeight('100vh');
 if (IS_EMBEDDED) {
   applyCssViewportHeight(`${parentViewportHeight}px`);
-}
-
-function logViewportHeight(contextLabel = 'resize') {
-  const innerHeight = window.innerHeight || 0;
-  const outerHeight = window.outerHeight || 0;
-  const clientHeight = document.documentElement?.clientHeight || 0;
-  const visualViewportHeight = window.visualViewport?.height || null;
-  const bodyScrollHeight = document.body?.scrollHeight || 0;
-  const bodyOffsetHeight = document.body?.offsetHeight || 0;
-  const chartWrapper = document.querySelector('.chart-wrapper');
-  const chartDiv = document.getElementById('chart_div');
-  const wrapperHeight = chartWrapper ? Math.round(chartWrapper.getBoundingClientRect().height) : 'n/a';
-  const chartDivHeight = chartDiv ? Math.round(chartDiv.getBoundingClientRect().height) : 'n/a';
-
-  console.warn(
-    `📏 Viewport (${contextLabel}): innerHeight=${innerHeight}px, clientHeight=${clientHeight}px, outerHeight=${outerHeight}px${visualViewportHeight ? `, visualViewport=${Math.round(visualViewportHeight)}px` : ''}, parentFooter=${parentFooterHeight}px, parentViewport=${parentViewportHeight}px`
-  );
-  console.warn(
-    `📦 Layout (${contextLabel}): wrapper=${wrapperHeight}px, chartDiv=${chartDivHeight}px, bodyScroll=${bodyScrollHeight}px, bodyOffset=${bodyOffsetHeight}px`
-  );
 }
 
 function getElementHeight(el) {
@@ -329,9 +288,6 @@ window.addEventListener('message', (event) => {
     }
 
     updateChartWrapperHeight('parent-viewport');
-    if (bubbleDebugLoggingEnabled) {
-      logViewportHeight('parent-viewport');
-    }
   }
 
   if (event.data.type === 'openBubbleTutorial') {
@@ -391,7 +347,7 @@ function setupParentNavigationForwarding(sourceLabel = 'bubble') {
       }, '*');
       event.preventDefault();
     } catch (error) {
-      bubbleDebugWarn('Unable to forward navigation request to parent', error);
+      // Parent may block navigation requests; ignore failures silently
     }
   };
 
@@ -421,7 +377,7 @@ function updateChartWrapperHeight(contextLabel = 'init') {
     : getStandaloneFooterHeight() + FOOTER_GAP;
 
   if (!viewportHeight) {
-    bubbleDebugWarn('Viewport height unavailable while updating chart wrapper height');
+    // Silently bail when viewport metrics are unavailable; repeated logging was noisy
     return;
   }
 
@@ -437,7 +393,6 @@ function updateChartWrapperHeight(contextLabel = 'init') {
       );
 
   window.__NAEI_LAST_CHART_HEIGHT = estimatedChartHeight;
-  bubbleDebugWarn(`CSS-managed height update (${contextLabel}): chart=${estimatedChartHeight}px (footerReserve=${footerReserve}px)`);
   return estimatedChartHeight;
 
   /*
@@ -447,7 +402,6 @@ function updateChartWrapperHeight(contextLabel = 'init') {
   const chartLegend = document.getElementById('customLegend');
 
   if (!chartWrapper || !chartDiv) {
-    bubbleDebugWarn('Cannot update chart wrapper height - element missing');
     return;
   }
 
@@ -490,7 +444,6 @@ function updateChartWrapperHeight(contextLabel = 'init') {
   chartDiv.style.flex = '0 0 auto';
   window.__NAEI_LAST_CHART_HEIGHT = chartRegionHeight;
 
-  console.warn(`📐 Wrapper sizing (${contextLabel}): viewport=${viewportHeight}px, wrapperTop=${wrapperTop}px, footerReserve=${footerReserve}px, chartRegion=${chartRegionHeight}px, wrapper=${wrapperHeight}px (title=${titleHeight}px, legend=${legendHeight}px)`);
   */
 }
 
@@ -500,17 +453,10 @@ window.updateChartWrapperHeight = updateChartWrapperHeight;
  * Initialize the application
  */
 async function init() {
-  console.log('init() function called');
-  console.log('Body classes at start:', document.body.className);
-  
   // Ensure loading class is set
   document.body.classList.add('loading');
-  console.log('Loading class added, body classes now:', document.body.className);
   updateChartWrapperHeight('init');
-  if (bubbleDebugLoggingEnabled) {
-    logViewportHeight('init');
-  }
-  
+
   try {
     // Loading overlay removed - data pre-loaded via shared loader
     document.getElementById('mainContent').setAttribute('aria-hidden', 'true');
@@ -539,13 +485,7 @@ async function init() {
       || window.supabaseModule.allGroups
       || [];
     window.allGroups = activeGroupsForSelectors;
-    console.log('Created window.allGroups with', window.allGroups.length, 'groups');
-    if (window.groupsWithoutActData && window.groupsWithoutActData.length) {
-      console.log('Groups hidden due to missing Activity Data:', window.groupsWithoutActData);
-      if (bubbleDebugLoggingEnabled) {
-        showNotification(`Hiding ${window.groupsWithoutActData.length} group(s) that lack Activity Data`, 'info');
-      }
-    }
+    
 
     // Create allGroupsList EXACTLY like linechart setupSelectors function
     const groups = window.supabaseModule.activeActDataGroups
@@ -560,7 +500,6 @@ async function init() {
         return a.localeCompare(b);
       });
     window.allGroupsList = groupNames;
-    console.log('Created allGroupsList with', groupNames.length, 'groups:', groupNames.slice(0, 5));
 
     // Setup UI
     setupYearSelector();
@@ -574,16 +513,15 @@ async function init() {
     await renderInitialView();
 
     // Finally, reveal the main content and draw the chart
-  await revealMainContent();
+    await revealMainContent();
 
     // Chart ready signal is now sent from revealMainContent after loading overlay fades
 
     // Track page load
     await window.supabaseModule.trackAnalytics('page_load', {
-  app: 'bubble_chart'
+      app: 'bubble_chart'
     });
 
-    console.log('Application initialized successfully');
   } catch (error) {
     console.error('Failed to initialize application:', error);
     showNotification('Failed to load data. Please refresh the page.', 'error');
@@ -594,22 +532,17 @@ async function init() {
  * Remove loading state
  */
 function removeLoadingState() {
-  console.log('removeLoadingState() called, body classes before:', document.body.className);
   // Loading overlay removed - just update body class
   document.body.classList.remove('loading');
-  console.log('Loading class removed, body classes now:', document.body.className);
-  console.log('Loading state removed (no overlay to hide)');
 }
 
 /**
  * Fallback function to show content directly
  */
 function showContentDirectly() {
-  console.log('showContentDirectly() called - using fallback method');
   const mainContent = document.getElementById('mainContent');
   
   if (mainContent) {
-    console.log('Showing main content directly...');
     mainContent.style.display = 'block';
     mainContent.removeAttribute('aria-hidden');
     mainContent.classList.add('loaded');
@@ -627,7 +560,6 @@ function showContentDirectly() {
       chartDiv.classList.add('visible');
     }
     
-    console.log('Content shown directly');
     notifyParentChartReady();
   } else {
     console.error('Could not find mainContent element');
@@ -638,7 +570,7 @@ function setupTutorialOverlay() {
   const overlay = document.getElementById('bubbleTutorialOverlay');
   const openBtn = document.getElementById('tutorialBtn');
   if (!overlay || !openBtn) {
-    bubbleDebugWarn('Tutorial overlay markup missing; skipping tutorial setup');
+    // Tutorial overlay markup missing; skipping tutorial setup
     return;
   }
   openBtn.setAttribute('aria-expanded', 'false');
@@ -674,7 +606,7 @@ function setupTutorialOverlay() {
         source
       }, '*');
     } catch (error) {
-      bubbleDebugWarn('Unable to notify parent about bubble tutorial state:', error);
+      // Parent may block tutorial state messages; nothing else to do
     }
   }
 
@@ -866,7 +798,7 @@ function setupTutorialOverlay() {
         window.scrollTo({ top: targetTop, behavior });
         resolve();
       } catch (error) {
-        bubbleDebugWarn('Unable to center tutorial overlay:', error);
+          // Failing to center overlay is non-critical; continue without logging
         resolve();
       }
     });
@@ -886,7 +818,7 @@ function setupTutorialOverlay() {
         frameEl.scrollIntoView({ block: 'center', behavior: prefersReducedMotion ? 'auto' : 'smooth' });
         setTimeout(() => resolve(true), prefersReducedMotion ? 0 : 30);
       } catch (error) {
-        bubbleDebugWarn('Unable to scroll parent via frameElement:', error);
+        // Parent frame may reject scroll requests; ignore failures
         resolve(false);
       }
     });
@@ -910,7 +842,7 @@ function setupTutorialOverlay() {
         try {
           window.parent.postMessage({ type: 'scrollToBubbleTutorial', requestId }, '*');
         } catch (error) {
-          bubbleDebugWarn('Unable to request parent scroll:', error);
+          // Parent scroll requests can fail in locked-down hosts
           window.removeEventListener('message', handleAck);
           resolve();
           return;
@@ -1104,17 +1036,11 @@ function sendContentHeightToParent(force = false) {
     const measurement = measureBubbleContentHeight();
     const measuredHeight = Math.max(MIN_CHART_CANVAS_HEIGHT, measurement.height);
 
-    if (bubbleDebugLoggingEnabled) {
-      bubbleDebugWarn('📏 Bubble content height components', { ...measurement, measuredHeight });
-    }
-
     if (!force && lastSentHeight && Math.abs(measuredHeight - lastSentHeight) < MIN_HEIGHT_DELTA) {
       return;
     }
 
     lastSentHeight = measuredHeight;
-
-    console.log('📐 Sending bubble chart height to parent:', measuredHeight + 'px');
 
     window.parent.postMessage({
       type: 'contentHeight',
@@ -1124,7 +1050,7 @@ function sendContentHeightToParent(force = false) {
 
     requestAnimationFrame(() => updateChartWrapperHeight('post-height-send'));
   } catch (error) {
-    console.warn('Unable to send bubble chart height to parent:', error);
+    // Suppress height-posting failures; parent will request updates if needed
   }
 }
 
@@ -1139,7 +1065,6 @@ function notifyParentChartReady() {
 
   try {
     if (window.parent && window.parent !== window) {
-      console.log('📤 Notifying parent that bubble chart is ready');
       window.parent.postMessage({
         type: 'chartReady',
         chart: 'bubble'
@@ -1148,7 +1073,7 @@ function notifyParentChartReady() {
       setTimeout(sendContentHeightToParent, 100);
     }
   } catch (error) {
-    console.warn('Unable to notify parent window:', error);
+    // Parent may be unavailable; no logging to keep console quiet
   }
 }
 
@@ -1156,12 +1081,10 @@ function notifyParentChartReady() {
  * Reveal main content (no loading overlay to manage)
  */
 async function revealMainContent() {
-  console.log('revealMainContent() called');
   return new Promise(resolve => {
     const mainContent = document.getElementById('mainContent');
     const loadingOverlay = document.getElementById('loadingOverlay');
 
-    console.log('mainContent element:', mainContent);
 
     if (!mainContent) {
       console.error('Missing mainContent element for reveal');
@@ -1171,12 +1094,10 @@ async function revealMainContent() {
 
     // Hide loading overlay
     if (loadingOverlay) {
-      console.log('Hiding loading overlay...');
       loadingOverlay.style.display = 'none';
     }
 
     // Make content visible
-    console.log('Making mainContent visible...');
     mainContent.style.display = 'block';
     mainContent.removeAttribute('aria-hidden');
     freezeWidthForOpera('#downloadBtn', {
@@ -1191,8 +1112,6 @@ async function revealMainContent() {
     });
     
     // Render the chart
-    console.log('Drawing chart...');
-    console.log('Pre-draw sanity:', { selectedYear, selectedPollutantId, groups: getSelectedGroups() });
     chartRenderingUnlocked = true;
     const pendingSkipFlag = pendingDrawRequest?.skipHeightUpdate || false;
     pendingDrawRequest = null;
@@ -1201,7 +1120,6 @@ async function revealMainContent() {
     
     // Wait for chart to render, then complete the loading process
     setTimeout(() => {
-      console.log('Bubble chart transition starting...');
       
       // Start fade in of main content
       requestAnimationFrame(() => {
@@ -1210,12 +1128,11 @@ async function revealMainContent() {
       
       // Complete after transition
       setTimeout(() => {
-        console.log('Bubble chart fully loaded');
         updateChartWrapperHeight('post-load');
         notifyParentChartReady();
         resolve();
-      }, 400);
-    }, 250); // Allow time for chart render
+      }, 0);
+    }, 0); // testing immediate chart ready
   });
 }
 
@@ -1232,24 +1149,19 @@ async function renderInitialView() {
     
     // Use a small timeout to allow the DOM to update with options
     setTimeout(() => {
-      console.log('renderInitialView: params=', params);
-      console.log('renderInitialView: pollutantSelect has', pollutantSelect.options.length, 'options');
       
       if (params.pollutantName) {
         const pollutant = window.supabaseModule.allPollutants.find(p => p.pollutant === params.pollutantName);
         if (pollutant) {
           selectedPollutantId = pollutant.id;
           pollutantSelect.value = String(pollutant.id);
-          console.log('Set pollutant from URL to', params.pollutantName, 'ID:', selectedPollutantId);
         }
       } else {
         // Default to PM2.5 if no pollutant is in the URL
         const pm25 = window.supabaseModule.allPollutants.find(p => p.pollutant === 'PM2.5');
-        console.log('Found PM2.5 pollutant:', pm25);
         if (pm25) {
           selectedPollutantId = pm25.id;
           pollutantSelect.value = String(pm25.id);
-          console.log('Set default pollutant to PM2.5, ID:', selectedPollutantId, 'dropdown value:', pollutantSelect.value);
         }
       }
 
@@ -1266,38 +1178,28 @@ async function renderInitialView() {
         initialComparisonFlags = [];
         // Add default groups if none are in the URL
       const allGroups = window.allGroupsList || [];
-        console.log('Adding default groups from', allGroups.length, 'available groups:', allGroups);
         
         // Find specific "Ecodesign Stove - Ready To Burn" group
         const ecodesignGroup = allGroups.find(g => 
           g === 'Ecodesign Stove - Ready To Burn'
         );
-        console.log('Found Ecodesign Stove - Ready To Burn group:', ecodesignGroup);
         
         // Find "Gas Boilers"  
         const gasBoilerGroup = allGroups.find(g => 
           g.toLowerCase().includes('gas boiler')
         );
-        console.log('Found Gas Boilers group:', gasBoilerGroup);
         
         // Always try to add both default groups
         if (ecodesignGroup) {
-          console.log('Adding Ecodesign Stove Ready To Burn group:', ecodesignGroup);
           addGroupSelector(ecodesignGroup, false);
-        } else {
-          bubbleDebugWarn('Could not find Ecodesign Stove - Ready To Burn group');
         }
         
         if (gasBoilerGroup) {
-          console.log('Adding Gas Boilers group:', gasBoilerGroup);
           addGroupSelector(gasBoilerGroup, false);
-        } else {
-          bubbleDebugWarn('Could not find Gas Boilers group');
         }
         
         // If we didn't find either specific group, add first 2 available groups
         if (!ecodesignGroup && !gasBoilerGroup && allGroups.length > 0) {
-          console.log('Adding fallback groups:', allGroups.slice(0, 2));
           addGroupSelector(allGroups[0], false);
           if (allGroups.length > 1) {
             addGroupSelector(allGroups[1], false);
@@ -1306,14 +1208,12 @@ async function renderInitialView() {
           // If we only found Gas Boilers, add first available group as well
           const firstGroup = allGroups[0];
           if (firstGroup !== gasBoilerGroup) {
-            console.log('Adding first group as fallback:', firstGroup);
             addGroupSelector(firstGroup, false);
           }
         } else if (ecodesignGroup && !gasBoilerGroup && allGroups.length > 1) {
           // If we only found Ecodesign, add second available group as well
           const secondGroup = allGroups.find(g => g !== ecodesignGroup);
           if (secondGroup) {
-            console.log('Adding second group as fallback:', secondGroup);
             addGroupSelector(secondGroup, false);
           }
         }
@@ -1337,7 +1237,6 @@ async function renderInitialView() {
         }
       }
       
-      console.log('Initial selectedYear:', selectedYear, 'available years:', availableYears);
       
       // Refresh group dropdowns and buttons after adding default groups
       refreshGroupDropdowns();
@@ -1358,15 +1257,12 @@ function parseUrlParameters() {
   try {
     if (window.parent && window.parent !== window && window.parent.location.search) {
       searchParams = window.parent.location.search;
-      console.log('Reading URL params from parent:', searchParams);
     } else {
       searchParams = window.location.search;
-      console.log('Reading URL params from own window:', searchParams);
     }
   } catch (e) {
     // Cross-origin restriction, use own window
     searchParams = window.location.search;
-    console.log('Cross-origin restriction, using own window params:', searchParams);
   }
   
   const params = new URLSearchParams(searchParams);
@@ -1374,7 +1270,6 @@ function parseUrlParameters() {
   // Check if this is the active chart - only parse params if chart=1 (bubble chart)
   const chartParam = params.get('chart');
   if (chartParam && chartParam !== '1') {
-    console.log('URL is for chart', chartParam, 'not chart 1 (bubble). Using defaults.');
     // Return empty params so defaults will be used
     return {
       pollutantName: null,
@@ -1419,7 +1314,6 @@ function parseUrlParameters() {
         const group = groups.find(g => g.id === id);
         if (group) {
           if (activeGroupIdSet.size && !activeGroupIdSet.has(group.id)) {
-            bubbleDebugWarn('Ignoring group without activity data for bubble chart:', group.group_title || `Group ${group.id}`);
             return;
           }
           groupNames.push(group.group_title);
@@ -1438,7 +1332,6 @@ function parseUrlParameters() {
       year = yearParam;
     } else if (Number.isInteger(yearParam)) {
       // Year provided but invalid - use most recent available
-      console.warn('Invalid year in URL: ' + yearParam + '. Using most recent year.');
       year = mostRecentYear;
     } else {
       // No year provided - use most recent
@@ -1501,14 +1394,11 @@ function setupPollutantSelector() {
 // Get selected groups from dropdown selectors (like linechart)
 function getSelectedGroups(){ 
   const selects = document.querySelectorAll('#groupContainer select');
-  console.log('getSelectedGroups: found', selects.length, 'select elements');
   
   const values = [...selects].map((s, i) => {
-    console.log(`Select ${i}: value="${s.value}", options=${s.options.length}`);
     return s.value;
   }).filter(Boolean);
   
-  console.log('getSelectedGroups returning:', values);
   return values;
 }
 
@@ -1569,7 +1459,7 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
         }
       }
     } catch (err) {
-      console.warn('Keyboard reorder failed', err);
+      // Keyboard reordering failed; leave current order unchanged
     }
   });
   
@@ -1586,8 +1476,6 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   }
   
   const allGroups = window.allGroupsList || [];
-  console.log('addGroupSelector: total groups available:', allGroups.length);
-  console.log('addGroupSelector: looking for groupName:', groupName);
 
   const selected = getSelectedGroups();
   allGroups.forEach(groupTitle => {
@@ -1596,16 +1484,12 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
     }
   });
   
-  console.log('addGroupSelector: options added, total options:', sel.options.length);
   
   if (groupName) {
-    console.log('addGroupSelector: setting value to:', groupName);
     sel.value = groupName;
-    console.log('addGroupSelector: value after setting:', sel.value);
     
     // Verify the option exists
     const optionExists = [...sel.options].some(opt => opt.value === groupName);
-    console.log('addGroupSelector: option exists for groupName:', optionExists);
   }
   sel.addEventListener('change', () => { 
     refreshGroupDropdowns(); 
@@ -1764,7 +1648,6 @@ function refreshButtons() {
 
 // Ensure checkboxes are only checked for two groups at once
 function refreshCheckboxes() {
-  console.log('📋 refreshCheckboxes called');
   const checkboxes = document.querySelectorAll('.comparison-checkbox');
   const checkedBoxes = Array.from(checkboxes).filter(checkbox => checkbox.checked);
 
@@ -1795,7 +1678,6 @@ function refreshCheckboxes() {
   });
   
   // Update the comparison statement based on checked boxes count
-  console.log(`📊 Checked boxes count: ${finalCheckedBoxes.length}`);
   drawChart();
 }
 
@@ -1832,7 +1714,6 @@ function setupGroupSelector() {
  */
 function updateChart() {
   // This will be called automatically when groups change
-  console.log('Chart update triggered');
 
   // Reset the color system to ensure consistent color assignments
   window.Colors.resetColorSystem();
@@ -1840,7 +1721,6 @@ function updateChart() {
   // Get selected groups and assign colors
   const selectedGroupNames = getSelectedGroups();
   const colors = selectedGroupNames.map(groupName => window.Colors.getColorForGroup(groupName));
-  console.log('Assigned colors for groups:', colors);
 
   // Redraw the chart to reflect the new selections
   drawChart();
@@ -1885,14 +1765,12 @@ function setupEventListeners() {
   // Resize handler – only redraw when width/height change beyond threshold to avoid loops
   lastKnownViewportWidth = window.innerWidth || lastKnownViewportWidth;
   window.addEventListener('resize', debounce(() => {
-    logViewportHeight('window-resize');
     updateChartWrapperHeight('window-resize');
     const currentWidth = window.innerWidth || 0;
     const currentHeight = window.innerHeight || 0;
     const widthDelta = Math.abs(currentWidth - lastKnownViewportWidth);
     const heightDelta = Math.abs(currentHeight - lastKnownViewportHeight);
     if (widthDelta < RESIZE_THRESHOLD && heightDelta < RESIZE_THRESHOLD) {
-      console.debug('📐 Minor resize detected; refreshing parent height only');
       if (!pendingHeightPokeTimer) {
         pendingHeightPokeTimer = setTimeout(() => {
           pendingHeightPokeTimer = null;
@@ -1904,7 +1782,6 @@ function setupEventListeners() {
 
     lastKnownViewportWidth = currentWidth;
     lastKnownViewportHeight = currentHeight;
-    console.log('📐 Width changed - redrawing chart');
     drawChart(true); // Pass skipHeightUpdate flag to prevent immediate update
     
     // After chart redraws and layout settles, check if height actually changed
@@ -1914,7 +1791,6 @@ function setupEventListeners() {
         document.body?.offsetHeight || 0
       );
       if (lastSentHeight && Math.abs(currentHeight - lastSentHeight) >= MIN_HEIGHT_DELTA) {
-        console.log('📐 Height changed after resize from', lastSentHeight, 'to', currentHeight, '- sending update');
         sendContentHeightToParent(true);
       }
     }, 200);
@@ -1922,7 +1798,6 @@ function setupEventListeners() {
 
   if (layoutHeightManager) {
     layoutHeightManager.observeWrapper(() => {
-      console.log('📐 Wrapper height changed - redrawing chart (helper)');
       drawChart(true);
       sendContentHeightToParent(true);
     });
@@ -1934,50 +1809,40 @@ function setupEventListeners() {
  * @param {boolean} skipHeightUpdate - If true, don't send height update to parent (for resize events)
  */
 function drawChart(skipHeightUpdate = false) {
-  console.log('drawChart() called', skipHeightUpdate ? '(skip height update)' : '');
   if (!chartRenderingUnlocked) {
     pendingDrawRequest = { skipHeightUpdate };
-    console.log('⏸️ drawChart deferred until main content is visible');
     return;
   }
   window.ChartRenderer.clearMessage();
 
   if (!selectedYear) {
-    console.warn('No year selected');
     window.ChartRenderer.showMessage('Please select a year', 'warning');
     return;
   }
 
   if (!selectedPollutantId) {
-    console.warn('No pollutant selected');
     window.ChartRenderer.showMessage('Please select a pollutant', 'warning');
     return;
   }
 
   // Get selected groups from dropdowns
   const selectedGroupNames = getSelectedGroups();
-  console.log('Selected group names:', selectedGroupNames);
   
   if (selectedGroupNames.length === 0) {
-    console.warn('No groups selected');
     window.ChartRenderer.showMessage('Please select at least one group', 'warning');
     return;
   }
 
   // Convert group names to IDs
   const allGroups = window.supabaseModule.allGroups || [];
-  console.log('All groups available:', allGroups.length);
   
   const selectedGroupIds = selectedGroupNames.map(name => {
     const group = allGroups.find(g => g.group_title === name);
-    console.log(`Looking for group "${name}":`, group ? 'found' : 'not found');
     return group ? group.id : null;
   }).filter(id => id !== null);
 
-  console.log('Selected group IDs:', selectedGroupIds);
 
   if (selectedGroupIds.length === 0) {
-    console.warn('No valid group IDs found');
     window.ChartRenderer.showMessage('Selected groups not found', 'warning');
     return;
   }
@@ -1991,13 +1856,6 @@ function drawChart(skipHeightUpdate = false) {
   // Reset colors for new chart
   window.Colors.resetColorSystem();
 
-  console.log('Calling ChartRenderer.drawBubbleChart with:', {
-    year: selectedYear,
-    pollutantId: selectedPollutantId,
-    groupIds: selectedGroupIds,
-    heightEstimate: latestEstimate
-  });
-
   // Draw chart
   window.ChartRenderer.drawBubbleChart(selectedYear, selectedPollutantId, selectedGroupIds);
 
@@ -2005,7 +1863,6 @@ function drawChart(skipHeightUpdate = false) {
   const checkedCheckboxes = document.querySelectorAll('.comparison-checkbox:checked');
   const checkedCount = checkedCheckboxes.length;
   
-  console.log(`🔍 Checked comparison checkboxes: ${checkedCount}`);
   
   if (checkedCount >= 2) {
     const dataPoints = window.supabaseModule.getScatterData(selectedYear, selectedPollutantId, selectedGroupIds);
@@ -2091,14 +1948,12 @@ function getGroupDisplayName(groupName) {
 }
 
 function updateComparisonStatement(statement) {
-  console.log('🔥 updateComparisonStatement called with:', statement);
   const comparisonDiv = ensureComparisonDivExists();
   if (comparisonDiv) {
     comparisonDiv.style.display = 'block'; // Make sure it's visible
     if (typeof statement === 'object' && statement.line1 && statement.line2) {
       // Responsive design using JavaScript-calculated sizes based on window width
       const windowWidth = window.innerWidth;
-      console.log('🔧 Window width in updateComparisonStatement:', windowWidth); // Debug info
       
       // Responsive scaling - optimized breakpoints
       let baseScale;
@@ -2123,10 +1978,6 @@ function updateComparisonStatement(statement) {
       const containerPadding = Math.floor(25 * baseScale);
       const containerHeight = Math.floor(140 * baseScale);
       const centerPadding = Math.floor(30 * baseScale);
-      
-      console.log('Calculated sizes:', {
-        triangleWidth, triangleHeight, triangleBorder, triangleTextSize, centerTextSize
-      }); // Debug info
       
       comparisonDiv.innerHTML = `
         <div style="background: #FEAE00 !important; background-image: none !important; padding: ${containerPadding}px; margin: 0 auto; border-radius: 25px; display: flex; justify-content: space-between; align-items: center; min-height: ${containerHeight}px; box-sizing: border-box; width: calc(100% - 140px); position: relative; border: none; box-shadow: none;">
@@ -2172,13 +2023,10 @@ function updateComparisonStatement(statement) {
  * Hide the comparison statement
  */
 function hideComparisonStatement() {
-  console.log('🚫 hideComparisonStatement called');
   const comparisonDiv = document.getElementById('comparisonDiv');
   if (comparisonDiv) {
-    console.log('✅ Found comparisonDiv, hiding it');
     comparisonDiv.style.display = 'none';
   } else {
-    console.log('❌ comparisonDiv not found');
   }
 }
 
@@ -2262,9 +2110,7 @@ function updateURL() {
           type: 'updateURL',
           params: params  // Send as array of raw strings
         }, '*');
-        console.log('📤 Sent URL update to parent:', params);
       } else {
-        console.log('🚫 Not active chart (chart=' + chartParam + '), not sending URL update');
       }
     } catch (e) {
       // Cross-origin restriction - send anyway (standalone mode)
@@ -2364,12 +2210,9 @@ window.addEventListener('message', (event) => {
 });
 
 // Initialize when DOM is ready
-console.log('Setting up init event listener, document.readyState:', document.readyState);
 if (document.readyState === 'loading') {
-  console.log('Document still loading, adding DOMContentLoaded listener');
   document.addEventListener('DOMContentLoaded', init);
 } else {
-  console.log('Document already loaded, calling init immediately');
   init();
 }
 
@@ -2380,22 +2223,18 @@ function alignComparisonHeader() {
   
   // Hide header if there are fewer than 2 groups
   const rows = document.querySelectorAll('.groupRow');
-  console.log('alignComparisonHeader: rows.length =', rows.length, 'checkboxes.length =', checkboxes.length);
   
   if (!header) {
-    console.log('alignComparisonHeader: header element not found');
     return;
   }
   
   if (rows.length < 2) {
-    console.log('alignComparisonHeader: hiding header (rows < 2)');
     header.style.display = 'none';
     return;
   }
   
   // Only show and position header if we have checkboxes to align with
   if (checkboxes.length > 0) {
-    console.log('alignComparisonHeader: showing and positioning header (rows >= 2, checkboxes exist)');
     header.style.display = 'block';
     
     const firstCheckbox = checkboxes[0];
@@ -2417,11 +2256,9 @@ function alignComparisonHeader() {
     const firstCheckboxRect = firstCheckbox.getBoundingClientRect();
     const topOffset = firstCheckboxRect.top - containerRect.top - 45; // Increased from 35px to 45px
     
-    console.log('alignComparisonHeader: positioning header at left:', leftOffset, 'top:', topOffset);
     header.style.left = leftOffset + 'px';
     header.style.top = topOffset + 'px';
   } else {
-    console.log('alignComparisonHeader: checkboxes not found yet, hiding header temporarily');
     header.style.display = 'none';
   }
 }

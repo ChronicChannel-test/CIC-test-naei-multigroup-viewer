@@ -12,6 +12,33 @@ let seriesVisibility = []; // Track which series are visible
 let useLogScale = false; // Track whether logarithmic scaling is being used
 window.seriesVisibility = seriesVisibility; // Expose for export.js
 const CHART_RENDERER_MIN_CANVAS_HEIGHT = 420;
+const chartLogger = (() => {
+  const logger = window.BubbleLogger;
+  if (logger?.tagged) {
+    return logger.tagged('chart');
+  }
+  if (logger?.log) {
+    return (...args) => {
+      if (!logger.enabled) {
+        return;
+      }
+      logger.log('[chart]', ...args);
+    };
+  }
+  return () => {};
+})();
+const chartLoggerWarn = (() => {
+  const logger = window.BubbleLogger;
+  if (logger?.warn) {
+    return (...args) => {
+      if (!logger.enabled) {
+        return;
+      }
+      logger.warn('[chart]', ...args);
+    };
+  }
+  return () => {};
+})();
 
 // Provide a minimal fallback palette when shared Colors module fails to load
 if (!window.Colors) {
@@ -164,10 +191,6 @@ function drawBubbleChart(year, pollutantId, groupIds) {
 
   // Get data points
   const dataPoints = window.supabaseModule.getScatterData(year, pollutantId, groupIds);
-  console.log('Chart renderer: got', dataPoints.length, 'data points');
-  if(dataPoints.length > 0) {
-    console.log('First data point:', dataPoints[0]);
-  }
   
   if (dataPoints.length === 0) {
     console.error('No data points returned!');
@@ -189,7 +212,6 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     return groupIndex >= 0 && seriesVisibility[groupIndex];
   });
 
-  console.log(`Filtered ${dataPoints.length} points to ${visibleDataPoints.length} visible points`);
 
   // Prepare Google DataTable for scatter chart with bubble-like styling
   const data = new google.visualization.DataTable();
@@ -199,7 +221,6 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   data.addColumn({type: 'string', role: 'style'});
 
   // Add data rows with emission factor calculation and sizing
-  console.log('Adding', visibleDataPoints.length, 'rows to bubble-style scatter chart data');
   
   // Determine conversion factor based on pollutant unit (BEFORE calculating EFs)
   const pollutantUnit = window.supabaseModule.getPollutantUnit(pollutantId);
@@ -222,7 +243,7 @@ function drawBubbleChart(year, pollutantId, groupIds) {
       break;
     default:
       conversionFactor = 1000000; // Default fallback
-      console.warn(`Unknown pollutant unit: ${pollutantUnit}, using default conversion`);
+      chartLoggerWarn(`Unknown pollutant unit: ${pollutantUnit}, using default conversion`);
   }
   
   // Calculate all EF values first to determine dynamic scale factor (use visible points only)
@@ -251,18 +272,18 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     // We'll map the full log range to our target radius range
     scaleFactor = (targetMaxRadius - targetMinRadius) / logRange;
     
-    console.log(`Using LOGARITHMIC scaling (ratio ${efRatio.toFixed(0)}:1). Range: ${minEF.toExponential(2)} to ${maxEF.toExponential(2)} g/GJ`);
-    console.log(`Log range: ${minLog.toFixed(2)} to ${maxLog.toFixed(2)}, logRange=${logRange.toFixed(2)}, scaleFactor=${scaleFactor.toFixed(2)}`);
+    // Logarithmic scaling is noteworthy, but keep output minimal
   } else {
     // Linear scale: bubble area ∝ EF
     scaleFactor = targetMaxRadius / Math.sqrt(maxEF);
-    const minRadiusLinear = scaleFactor * Math.sqrt(minEF);
+    let minRadiusLinear = scaleFactor * Math.sqrt(minEF);
     
     if (minRadiusLinear < targetMinRadius) {
       scaleFactor = targetMinRadius / Math.sqrt(minEF);
+      minRadiusLinear = targetMinRadius;
     }
     
-    console.log(`Using LINEAR scaling (ratio ${efRatio.toFixed(1)}:1). Range: ${minEF.toFixed(2)} to ${maxEF.toFixed(2)} g/GJ`);
+    // No debug log for routine linear scaling
   }  
   visibleDataPoints.forEach((point, index) => {
     const color = window.Colors.getColorForGroup(point.groupName);
@@ -293,11 +314,6 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     // Use calculated radius directly
     const normalizedRadius = radius;
 
-    // Debug logging for first few points
-    if (index < 3) {
-      console.log(`Point ${index}: ${point.groupName}, EF=${emissionFactor.toExponential(2)}, radius=${radius.toFixed(2)}`);
-    }
-
     // All EF values are converted to g/GJ
     // Use more decimal places for very small values
     const efDisplay = emissionFactor < 0.01 ? emissionFactor.toFixed(8) : emissionFactor.toFixed(2);
@@ -311,17 +327,12 @@ function drawBubbleChart(year, pollutantId, groupIds) {
     ]);
   });
   
-  console.log('Chart data rows added, now drawing chart...');
-
   // Chart options
   const pollutantName = window.supabaseModule.getPollutantName(pollutantId);
   // pollutantUnit already declared above
   const actDataId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
   const activityUnit = window.supabaseModule.getPollutantUnit(actDataId);
   
-  console.log('Chart renderer - Pollutant Name:', pollutantName);
-  console.log('Chart renderer - Pollutant Unit:', pollutantUnit);
-  console.log('Chart renderer - Activity Unit:', activityUnit);
   
   // Format title and axis labels for bubble chart
   const chartTitle = `${pollutantName} - ${pollutantUnit}`;
@@ -431,20 +442,6 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   const effectiveWrapperHeight = clampResult?.finalHeight
     || (wrapperRect ? Math.round(wrapperRect.height) : null);
 
-  if (window.__NAEI_DEBUG__) {
-    console.warn('📏 Bubble chart sizing resolution', {
-      wrapperHeight: effectiveWrapperHeight,
-      paddingBottom: Math.round(paddingBottom),
-      chartTopOffset: Math.round(chartTopOffset),
-      titleHeight,
-      legendHeight,
-      availableHeight: Number.isFinite(availableHeight) ? Math.round(availableHeight) : null,
-      requestedChartHeight: Math.round(requestedChartHeight),
-      appliedChartHeight,
-      wrapperExpanded: clampResult?.expanded || false,
-      wrapperRequiredHeight: clampResult?.requiredHeight || null
-    });
-  }
 
   // Prepare colors for each group (use visible data points only)
   const colors = [];
@@ -557,7 +554,6 @@ function drawBubbleChart(year, pollutantId, groupIds) {
 
     // Add listener for chart render completion (for loading management)
     google.visualization.events.addListener(chart, 'ready', () => {
-      console.log('Google Charts ready event fired!');
       if (window.chartRenderCallback) {
         window.chartRenderCallback();
         window.chartRenderCallback = null; // Clear callback after use
@@ -577,9 +573,8 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   
   try {
     chart.draw(data, currentOptions);
-    console.log('chart.draw() completed without error');
 
-  registerTooltipPositionHandlers(chart, data);
+    registerTooltipPositionHandlers(chart, data);
     
     // Add bubble size explanation text overlay at top of chart
     addBubbleExplanationOverlay();

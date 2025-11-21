@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2025-11-20T16:55:14.523Z",
+  "generatedAt": "2025-11-20T22:01:30.095Z",
   "source": "supabase",
   "defaults": {
     "lineChart": {
@@ -23,42 +23,624 @@
   "data": {
     "pollutants": [
       {
+        "id": 49,
+        "pollutant": "13-butadiene"
+      },
+      {
+        "id": 60,
+        "pollutant": "16PAH"
+      },
+      {
+        "id": 7,
+        "pollutant": "Acenaphthene"
+      },
+      {
+        "id": 8,
+        "pollutant": "Acenaphthylene"
+      },
+      {
         "id": 61,
-        "pollutant": "Activity Data",
-        "emission_unit": "TJ (net)",
-        "short_pollutant": "ActData"
+        "pollutant": "Activity Data"
+      },
+      {
+        "id": 50,
+        "pollutant": "Ammonia"
+      },
+      {
+        "id": 9,
+        "pollutant": "Anthracene"
+      },
+      {
+        "id": 32,
+        "pollutant": "Arsenic"
+      },
+      {
+        "id": 10,
+        "pollutant": "Benz[a]anthracene"
+      },
+      {
+        "id": 51,
+        "pollutant": "Benzene"
+      },
+      {
+        "id": 11,
+        "pollutant": "Benzo[a]pyrene"
+      },
+      {
+        "id": 12,
+        "pollutant": "Benzo[b]fluoranthene"
+      },
+      {
+        "id": 13,
+        "pollutant": "Benzo[ghi]perylene"
+      },
+      {
+        "id": 14,
+        "pollutant": "Benzo[k]fluoranthene"
+      },
+      {
+        "id": 33,
+        "pollutant": "Beryllium"
+      },
+      {
+        "id": 1,
+        "pollutant": "Black Carbon"
+      },
+      {
+        "id": 52,
+        "pollutant": "Black Smoke"
+      },
+      {
+        "id": 34,
+        "pollutant": "Cadmium"
+      },
+      {
+        "id": 35,
+        "pollutant": "Calcium"
+      },
+      {
+        "id": 62,
+        "pollutant": "Carbon Dioxide as Carbon"
+      },
+      {
+        "id": 53,
+        "pollutant": "Carbon Monoxide"
+      },
+      {
+        "id": 36,
+        "pollutant": "Chromium"
+      },
+      {
+        "id": 15,
+        "pollutant": "Chrysene"
+      },
+      {
+        "id": 37,
+        "pollutant": "Copper"
+      },
+      {
+        "id": 16,
+        "pollutant": "Decabromodiphenyl ether"
+      },
+      {
+        "id": 17,
+        "pollutant": "Dibenz[ah]anthracene"
+      },
+      {
+        "id": 18,
+        "pollutant": "Dioxins (PCDD/F)"
+      },
+      {
+        "id": 19,
+        "pollutant": "Fluoranthene"
+      },
+      {
+        "id": 20,
+        "pollutant": "Fluorene"
+      },
+      {
+        "id": 21,
+        "pollutant": "Hexachlorobenzene"
+      },
+      {
+        "id": 63,
+        "pollutant": "HFCs"
+      },
+      {
+        "id": 54,
+        "pollutant": "Hydrogen Chloride"
+      },
+      {
+        "id": 55,
+        "pollutant": "Hydrogen Fluoride"
+      },
+      {
+        "id": 22,
+        "pollutant": "Indeno[123-cd]pyrene"
+      },
+      {
+        "id": 38,
+        "pollutant": "Lead"
+      },
+      {
+        "id": 23,
+        "pollutant": "Lindane"
+      },
+      {
+        "id": 39,
+        "pollutant": "Magnesium"
+      },
+      {
+        "id": 40,
+        "pollutant": "Manganese"
+      },
+      {
+        "id": 41,
+        "pollutant": "Mercury"
+      },
+      {
+        "id": 56,
+        "pollutant": "Methane"
+      },
+      {
+        "id": 24,
+        "pollutant": "Naphthalene"
+      },
+      {
+        "id": 65,
+        "pollutant": "NF3"
+      },
+      {
+        "id": 42,
+        "pollutant": "Nickel"
+      },
+      {
+        "id": 57,
+        "pollutant": "Nitrogen Oxides as NO2"
+      },
+      {
+        "id": 66,
+        "pollutant": "Nitrous Oxide"
+      },
+      {
+        "id": 58,
+        "pollutant": "Non Methane VOC"
+      },
+      {
+        "id": 25,
+        "pollutant": "Octabromodiphenyl ether"
+      },
+      {
+        "id": 26,
+        "pollutant": "Pentabromodiphenyl Ether"
+      },
+      {
+        "id": 27,
+        "pollutant": "Pentachlorophenol"
+      },
+      {
+        "id": 67,
+        "pollutant": "PFCs"
+      },
+      {
+        "id": 28,
+        "pollutant": "Phenanthrene"
+      },
+      {
+        "id": 2,
+        "pollutant": "PM0.1"
+      },
+      {
+        "id": 3,
+        "pollutant": "PM1"
+      },
+      {
+        "id": 4,
+        "pollutant": "PM10"
       },
       {
         "id": 5,
         "pollutant": "PM2.5",
-        "emission_unit": "kilotonne",
-        "short_pollutant": "PM2-5"
+        "emission_unit": "kilotonne"
+      },
+      {
+        "id": 29,
+        "pollutant": "Polychlorinated biphenyls"
+      },
+      {
+        "id": 43,
+        "pollutant": "Potassium"
+      },
+      {
+        "id": 30,
+        "pollutant": "Pyrene"
+      },
+      {
+        "id": 44,
+        "pollutant": "Selenium"
+      },
+      {
+        "id": 31,
+        "pollutant": "Short Chain Chlorinated Paraffins (C10-13)"
+      },
+      {
+        "id": 45,
+        "pollutant": "Sodium"
+      },
+      {
+        "id": 59,
+        "pollutant": "Sulphur Dioxide"
+      },
+      {
+        "id": 68,
+        "pollutant": "Sulphur hexafluoride"
+      },
+      {
+        "id": 46,
+        "pollutant": "Tin"
+      },
+      {
+        "id": 69,
+        "pollutant": "Total GHGs in CO2 Eq."
+      },
+      {
+        "id": 6,
+        "pollutant": "TPM"
+      },
+      {
+        "id": 47,
+        "pollutant": "Vanadium"
+      },
+      {
+        "id": 48,
+        "pollutant": "Zinc"
       }
     ],
     "groups": [
       {
-        "id": 1,
-        "group_title": "All",
-        "short_group_title": "All",
-        "nfr_code": "NULL",
-        "source_name": "NULL",
-        "activity_name": "NULL"
+        "id": 2,
+        "group_title": "Advanced Stove - All fuels",
+        "has_activity_data": true
       },
       {
-        "id": 37,
-        "group_title": "Gas Boilers",
-        "short_group_title": "GasBoilers",
-        "nfr_code": "NULL",
-        "source_name": "Domestic Space Heater; Domestic Water Heater",
-        "activity_name": "Natural gas"
+        "id": 3,
+        "group_title": "Advanced Stove - All fuels excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 4,
+        "group_title": "Advanced Stove - All wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 67,
+        "group_title": "Advanced Stove - Dry wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 5,
+        "group_title": "Advanced Stove - Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 6,
+        "group_title": "Advanced Stove - Wood excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 1,
+        "group_title": "All",
+        "has_activity_data": true
+      },
+      {
+        "id": 55,
+        "group_title": "All Stoves - All fuels",
+        "has_activity_data": true
+      },
+      {
+        "id": 56,
+        "group_title": "All Stoves - All fuels excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 57,
+        "group_title": "All Stoves - All wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 58,
+        "group_title": "All Stoves - Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 59,
+        "group_title": "All Stoves - Wood excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 7,
+        "group_title": "Basic Stove - All fuels",
+        "has_activity_data": true
+      },
+      {
+        "id": 8,
+        "group_title": "Basic Stove - All fuels excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 9,
+        "group_title": "Basic Stove - All wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 68,
+        "group_title": "Basic Stove - Dry wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 10,
+        "group_title": "Basic Stove - Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 11,
+        "group_title": "Basic Stove - Wood excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 64,
+        "group_title": "Bonfire night",
+        "has_activity_data": false
+      },
+      {
+        "id": 12,
+        "group_title": "Cigarette smoking",
+        "has_activity_data": false
+      },
+      {
+        "id": 61,
+        "group_title": "Crematoria",
+        "has_activity_data": false
+      },
+      {
+        "id": 13,
+        "group_title": "Domestic Combustion - Residential",
+        "has_activity_data": true
+      },
+      {
+        "id": 14,
+        "group_title": "Domestic Outdoor - All",
+        "has_activity_data": true
+      },
+      {
+        "id": 15,
+        "group_title": "Domestic Outdoor - Charcoal",
+        "has_activity_data": true
+      },
+      {
+        "id": 16,
+        "group_title": "Domestic Outdoor - Coal",
+        "has_activity_data": true
+      },
+      {
+        "id": 17,
+        "group_title": "Ecodesign Stove - All fuels",
+        "has_activity_data": true
+      },
+      {
+        "id": 18,
+        "group_title": "Ecodesign Stove - All fuels excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 19,
+        "group_title": "Ecodesign Stove - All wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 65,
+        "group_title": "Ecodesign Stove - Dry wood",
+        "has_activity_data": true
       },
       {
         "id": 20,
         "group_title": "Ecodesign Stove - Ready To Burn",
-        "short_group_title": "EcoRtB",
-        "nfr_code": "NULL",
-        "source_name": "Domestic Closed Stove - EcoDesign",
-        "activity_name": "Wood - Dry; Wood - Seasoned; Wood Briquettes"
+        "has_activity_data": true
+      },
+      {
+        "id": 21,
+        "group_title": "Ecodesign Stove - Wood excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 22,
+        "group_title": "Fireplace - All fuels",
+        "has_activity_data": true
+      },
+      {
+        "id": 23,
+        "group_title": "Fireplace - All fuels excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 24,
+        "group_title": "Fireplace - All wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 66,
+        "group_title": "Fireplace - Dry wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 25,
+        "group_title": "Fireplace - Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 26,
+        "group_title": "Fireplace - Wood excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 27,
+        "group_title": "Fireplace & All Stoves - All fuels",
+        "has_activity_data": true
+      },
+      {
+        "id": 28,
+        "group_title": "Fireplace & All Stoves - All fuels excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 29,
+        "group_title": "Fireplace & All Stoves - All wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 30,
+        "group_title": "Fireplace & All Stoves - Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 31,
+        "group_title": "Fireplace & All Stoves - Wood excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 32,
+        "group_title": "Fireplace & Stoves excluding Ecodesign - All fuels",
+        "has_activity_data": true
+      },
+      {
+        "id": 33,
+        "group_title": "Fireplace & Stoves excluding Ecodesign - All fuels excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 34,
+        "group_title": "Fireplace & Stoves excluding Ecodesign - All wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 35,
+        "group_title": "Fireplace & Stoves excluding Ecodesign - Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 36,
+        "group_title": "Fireplace & Stoves excluding Ecodesign - Wood excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 37,
+        "group_title": "Gas Boilers",
+        "has_activity_data": true
+      },
+      {
+        "id": 38,
+        "group_title": "Power Stations - All fuels",
+        "has_activity_data": true
+      },
+      {
+        "id": 39,
+        "group_title": "Power Stations - All fuels excluding Natural gas",
+        "has_activity_data": true
+      },
+      {
+        "id": 62,
+        "group_title": "Power Stations - All fuels excluding Wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 40,
+        "group_title": "Power Stations - Natural gas",
+        "has_activity_data": true
+      },
+      {
+        "id": 41,
+        "group_title": "Power Stations - Wood",
+        "has_activity_data": false
+      },
+      {
+        "id": 63,
+        "group_title": "Residential Outdoor - All Appliances",
+        "has_activity_data": false
+      },
+      {
+        "id": 60,
+        "group_title": "Residential Outdoor - Appliance including chimineas, firepits etc",
+        "has_activity_data": true
+      },
+      {
+        "id": 42,
+        "group_title": "Road Transport - All - Exhausts Tyre & Brake Wear",
+        "has_activity_data": true
+      },
+      {
+        "id": 43,
+        "group_title": "Road Transport - Buses & Coaches Exhaust",
+        "has_activity_data": true
+      },
+      {
+        "id": 44,
+        "group_title": "Road Transport - Cars Exhaust",
+        "has_activity_data": true
+      },
+      {
+        "id": 45,
+        "group_title": "Road Transport - Exhausts Only",
+        "has_activity_data": true
+      },
+      {
+        "id": 46,
+        "group_title": "Road Transport - HGV Exhaust",
+        "has_activity_data": true
+      },
+      {
+        "id": 47,
+        "group_title": "Road Transport - LGV Exhaust",
+        "has_activity_data": true
+      },
+      {
+        "id": 48,
+        "group_title": "Road Transport - Mopeds and Motorcycles Exhaust",
+        "has_activity_data": true
+      },
+      {
+        "id": 49,
+        "group_title": "Road Transport - Tyre & Brake Wear",
+        "has_activity_data": false
+      },
+      {
+        "id": 50,
+        "group_title": "Upgraded Stove - All fuels",
+        "has_activity_data": true
+      },
+      {
+        "id": 51,
+        "group_title": "Upgraded Stove - All fuels excluding Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 52,
+        "group_title": "Upgraded Stove - All wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 69,
+        "group_title": "Upgraded Stove - Dry wood",
+        "has_activity_data": true
+      },
+      {
+        "id": 53,
+        "group_title": "Upgraded Stove - Ready To Burn",
+        "has_activity_data": true
+      },
+      {
+        "id": 54,
+        "group_title": "Upgraded Stove - Wood excluding Ready To Burn",
+        "has_activity_data": true
       }
     ],
     "timeseries": [
@@ -122,298 +704,27 @@
         "f2023": 66.9584446188094
       },
       {
-        "id": 61,
-        "pollutant_id": 61,
-        "group_id": 1,
-        "f1970": 10457932.2379994,
-        "f1971": 10035510.8727312,
-        "f1972": 9631563.22098975,
-        "f1973": 10152550.810916,
-        "f1974": 9325238.67309669,
-        "f1975": 9013399.78638786,
-        "f1976": 9242273.16920873,
-        "f1977": 9095573.6810269,
-        "f1978": 8954814.0472404,
-        "f1979": 9372126.99684851,
-        "f1980": 8737364.96655573,
-        "f1981": 8368772.26975311,
-        "f1982": 8191178.33205484,
-        "f1983": 8191178.33205484,
-        "f1984": 7400536.49484761,
-        "f1985": 8302360.09100368,
-        "f1986": 8691907.03966801,
-        "f1987": 8758941.69670297,
-        "f1988": 8787780.18151662,
-        "f1989": 8713113.12536369,
-        "f1990": 10174696.2893396,
-        "f1991": 10597447.0835908,
-        "f1992": 10452076.6883923,
-        "f1993": 10502142.4944236,
-        "f1994": 10415452.9230989,
-        "f1995": 10387706.8930801,
-        "f1996": 11054921.0336643,
-        "f1997": 10907286.7481772,
-        "f1998": 11022486.6583647,
-        "f1999": 10950826.2284339,
-        "f2000": 11122440.994266,
-        "f2001": 11166778.3071154,
-        "f2002": 10909860.5939063,
-        "f2003": 11127208.6482846,
-        "f2004": 11507244.6229281,
-        "f2005": 11385943.9473512,
-        "f2006": 11233973.3299917,
-        "f2007": 11083585.8218066,
-        "f2008": 11169113.7325204,
-        "f2009": 10305095.1688799,
-        "f2010": 10857810.1174562,
-        "f2011": 10003146.3701211,
-        "f2012": 10341832.9453413,
-        "f2013": 10201228.53627,
-        "f2014": 9314926.68060234,
-        "f2015": 9178715.58904913,
-        "f2016": 9075385.02279364,
-        "f2017": 8911944.67608243,
-        "f2018": 8900580.03229988,
-        "f2019": 8586448.10758056,
-        "f2020": 7743320.26087774,
-        "f2021": 8086232.63782691,
-        "f2022": 7906829.92323054,
-        "f2023": 7485304.18547047
-      },
-      {
         "id": 1070,
         "pollutant_id": 5,
         "group_id": 20,
-        "f1970": null,
-        "f1971": null,
-        "f1972": null,
-        "f1973": null,
-        "f1974": null,
-        "f1975": null,
-        "f1976": null,
-        "f1977": null,
-        "f1978": null,
-        "f1979": null,
-        "f1980": null,
-        "f1981": null,
-        "f1982": null,
-        "f1983": null,
-        "f1984": null,
-        "f1985": null,
-        "f1986": null,
-        "f1987": null,
-        "f1988": null,
-        "f1989": null,
-        "f1990": null,
-        "f1991": null,
-        "f1992": null,
-        "f1993": null,
-        "f1994": null,
-        "f1995": null,
-        "f1996": null,
-        "f1997": null,
-        "f1998": null,
-        "f1999": null,
-        "f2000": null,
-        "f2001": null,
-        "f2002": null,
-        "f2003": null,
-        "f2004": null,
-        "f2005": null,
-        "f2006": null,
-        "f2007": null,
-        "f2008": null,
-        "f2009": null,
-        "f2010": null,
-        "f2011": null,
-        "f2012": null,
-        "f2013": null,
-        "f2014": null,
-        "f2015": null,
-        "f2016": null,
-        "f2017": 0.0124738719261067,
-        "f2018": 0.0421072177598521,
-        "f2019": 0.0899379122118812,
-        "f2020": 0.169743272309024,
-        "f2021": 0.317695866150707,
-        "f2022": 0.497861141096897,
         "f2023": 0.674474743880626
       },
       {
         "id": 1118,
         "pollutant_id": 61,
         "group_id": 20,
-        "f1970": null,
-        "f1971": null,
-        "f1972": null,
-        "f1973": null,
-        "f1974": null,
-        "f1975": null,
-        "f1976": null,
-        "f1977": null,
-        "f1978": null,
-        "f1979": null,
-        "f1980": null,
-        "f1981": null,
-        "f1982": null,
-        "f1983": null,
-        "f1984": null,
-        "f1985": null,
-        "f1986": null,
-        "f1987": null,
-        "f1988": null,
-        "f1989": null,
-        "f1990": null,
-        "f1991": null,
-        "f1992": null,
-        "f1993": null,
-        "f1994": null,
-        "f1995": null,
-        "f1996": null,
-        "f1997": null,
-        "f1998": null,
-        "f1999": null,
-        "f2000": null,
-        "f2001": null,
-        "f2002": null,
-        "f2003": null,
-        "f2004": null,
-        "f2005": null,
-        "f2006": null,
-        "f2007": null,
-        "f2008": null,
-        "f2009": null,
-        "f2010": null,
-        "f2011": null,
-        "f2012": null,
-        "f2013": null,
-        "f2014": null,
-        "f2015": null,
-        "f2016": null,
-        "f2017": 172.56058039132,
-        "f2018": 582.501245671487,
-        "f2019": 1244.179707985,
-        "f2020": 1996.34393047452,
-        "f2021": 3294.84244398065,
-        "f2022": 4670.27652001873,
         "f2023": 6331.21462135507
       },
       {
         "id": 2029,
         "pollutant_id": 5,
         "group_id": 37,
-        "f1970": null,
-        "f1971": null,
-        "f1972": null,
-        "f1973": null,
-        "f1974": null,
-        "f1975": null,
-        "f1976": null,
-        "f1977": null,
-        "f1978": null,
-        "f1979": null,
-        "f1980": null,
-        "f1981": null,
-        "f1982": null,
-        "f1983": null,
-        "f1984": null,
-        "f1985": null,
-        "f1986": null,
-        "f1987": null,
-        "f1988": null,
-        "f1989": null,
-        "f1990": 0.621186109923838,
-        "f1991": 0.597648404802656,
-        "f1992": 0.545417503816122,
-        "f1993": 0.503503234728817,
-        "f1994": 0.459207096072106,
-        "f1995": 0.427281674451691,
-        "f1996": 0.430418306596364,
-        "f1997": 0.386833784346115,
-        "f1998": 0.370819042439169,
-        "f1999": 0.353223990599631,
-        "f2000": 0.346637423463352,
-        "f2001": 0.336537294136245,
-        "f2002": 0.324230624617109,
-        "f2003": 0.32131161273961,
-        "f2004": 0.319215603930632,
-        "f2005": 0.300869087987219,
-        "f2006": 0.283505903899446,
-        "f2007": 0.268090784280844,
-        "f2008": 0.265929061952168,
-        "f2009": 0.254962956162574,
-        "f2010": 0.278479820353302,
-        "f2011": 0.223271450884326,
-        "f2012": 0.243951681138812,
-        "f2013": 0.242403699954788,
-        "f2014": 0.1974134751893,
-        "f2015": 0.204526053719995,
-        "f2016": 0.205736708138381,
-        "f2017": 0.199333278989001,
-        "f2018": 0.202756073891328,
-        "f2019": 0.194523565369489,
-        "f2020": 0.198559037959105,
-        "f2021": 0.209712840668554,
-        "f2022": 0.169551654126992,
         "f2023": 0.154583189159025
       },
       {
         "id": 2052,
         "pollutant_id": 61,
         "group_id": 37,
-        "f1970": null,
-        "f1971": null,
-        "f1972": null,
-        "f1973": null,
-        "f1974": null,
-        "f1975": null,
-        "f1976": null,
-        "f1977": null,
-        "f1978": null,
-        "f1979": null,
-        "f1980": null,
-        "f1981": null,
-        "f1982": null,
-        "f1983": null,
-        "f1984": null,
-        "f1985": null,
-        "f1986": null,
-        "f1987": null,
-        "f1988": null,
-        "f1989": null,
-        "f1990": 945955.839221498,
-        "f1991": 1055895.03397505,
-        "f1992": 1044045.67471792,
-        "f1993": 1077306.21793613,
-        "f1994": 1043810.21564996,
-        "f1995": 1032173.54551907,
-        "f1996": 1194376.71089489,
-        "f1997": 1096062.26950403,
-        "f1998": 1129918.01897826,
-        "f1999": 1137129.96344875,
-        "f2000": 1175790.76296817,
-        "f2001": 1206883.69534417,
-        "f2002": 1197101.4665203,
-        "f2003": 1230095.00378195,
-        "f2004": 1262447.46246292,
-        "f2005": 1215472.92935967,
-        "f2006": 1166664.25770761,
-        "f2007": 1121239.8430125,
-        "f2008": 1143236.1272804,
-        "f2009": 1098501.15632272,
-        "f2010": 1243322.28183926,
-        "f2011": 979777.964405337,
-        "f2012": 1091109.7869849,
-        "f2013": 1093995.52595431,
-        "f2014": 899799.028204953,
-        "f2015": 943406.493992558,
-        "f2016": 958251.48284693,
-        "f2017": 938659.278740374,
-        "f2018": 960643.102388334,
-        "f2019": 927388.447612069,
-        "f2020": 951403.874667467,
-        "f2021": 1010796.5824383,
-        "f2022": 820954.581816982,
         "f2023": 751230.624272879
       }
     ],
@@ -528,6 +839,7 @@
       "2021",
       "2022",
       "2023"
-    ]
+    ],
+    "bubbleYear": 2023
   }
 }
