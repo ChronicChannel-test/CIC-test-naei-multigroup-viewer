@@ -68,6 +68,61 @@ if (!window.Colors) {
   };
 }
 
+function createDeferred() {
+  let resolveFn = null;
+  let settled = false;
+  const promise = new Promise(resolve => {
+    resolveFn = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve();
+    };
+  });
+  return {
+    promise,
+    resolve() {
+      if (resolveFn) {
+        resolveFn();
+        resolveFn = null;
+      }
+    }
+  };
+}
+
+let chartStabilityHandle = {
+  promise: Promise.resolve(),
+  resolve() {}
+};
+
+function beginChartStabilityCycle() {
+  chartStabilityHandle = createDeferred();
+  return chartStabilityHandle;
+}
+
+function waitForChartStability() {
+  return chartStabilityHandle?.promise || Promise.resolve();
+}
+
+function waitForChromeStability(targetElements = []) {
+  const fontPromise = document.fonts?.ready
+    ? document.fonts.ready.catch(() => {})
+    : Promise.resolve();
+
+  const imagePromises = targetElements
+    .filter(el => el && el.tagName === 'IMG' && el.complete === false)
+    .map(img => new Promise(resolve => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    }));
+
+  return Promise.all([fontPromise, ...imagePromises])
+    .then(() => new Promise(resolve => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    }));
+}
+
 function ensureGoogleChartsLoaded() {
   if (googleChartsReady && window.google?.visualization?.DataTable) {
     return Promise.resolve();
@@ -174,50 +229,46 @@ ensureGoogleChartsLoaded().catch(error => {
  * @param {number} pollutantId - Selected pollutant ID
  * @param {Array} groupIds - Array of selected group IDs
  */
-function drawBubbleChart(year, pollutantId, groupIds) {
-  if (!googleChartsReady || !window.google?.visualization?.DataTable) {
-    ensureGoogleChartsLoaded()
-      .then(() => {
-        if (googleChartsReady && window.google?.visualization?.DataTable) {
-          drawBubbleChart(year, pollutantId, groupIds);
-        }
-      })
-      .catch(error => {
-        console.error('Google Charts failed to load; bubble chart render aborted.', error);
-        window.ChartRenderer.showMessage('Unable to load the Google Charts library. Please refresh and try again.', 'error');
-      });
-    return;
-  }
+async function drawBubbleChart(year, pollutantId, groupIds) {
+  const stabilityHandle = beginChartStabilityCycle();
+  try {
+    if (!googleChartsReady || !window.google?.visualization?.DataTable) {
+      await ensureGoogleChartsLoaded();
+    }
 
-  // Get data points
-  const dataPoints = window.supabaseModule.getScatterData(year, pollutantId, groupIds);
-  
-  if (dataPoints.length === 0) {
-    console.error('No data points returned!');
-    showMessage('No data available for the selected year, pollutant, and groups.', 'error');
-    return;
-  }
+    if (!googleChartsReady || !window.google?.visualization?.DataTable) {
+      showMessage('Unable to load the Google Charts library. Please refresh and try again.', 'error');
+      return;
+    }
 
-  // Filter data points based on series visibility
-  // Ensure visibility array is correctly sized
-  if (seriesVisibility.length !== groupIds.length) {
-    seriesVisibility = Array(groupIds.length).fill(true);
-    window.seriesVisibility = seriesVisibility;
-  }
+    // Get data points
+    const dataPoints = window.supabaseModule.getScatterData(year, pollutantId, groupIds);
+    
+    if (dataPoints.length === 0) {
+      console.error('No data points returned!');
+      showMessage('No data available for the selected year, pollutant, and groups.', 'error');
+      return;
+    }
 
-  // Get unique group names to match with visibility array
-  const uniqueGroups = [...new Set(dataPoints.map(p => p.groupName))];
-  const visibleDataPoints = dataPoints.filter(point => {
-    const groupIndex = uniqueGroups.indexOf(point.groupName);
-    return groupIndex >= 0 && seriesVisibility[groupIndex];
-  });
+    // Filter data points based on series visibility
+    // Ensure visibility array is correctly sized
+    if (seriesVisibility.length !== groupIds.length) {
+      seriesVisibility = Array(groupIds.length).fill(true);
+      window.seriesVisibility = seriesVisibility;
+    }
 
+    // Get unique group names to match with visibility array
+    const uniqueGroups = [...new Set(dataPoints.map(p => p.groupName))];
+    const visibleDataPoints = dataPoints.filter(point => {
+      const groupIndex = uniqueGroups.indexOf(point.groupName);
+      return groupIndex >= 0 && seriesVisibility[groupIndex];
+    });
 
-  // Prepare Google DataTable for scatter chart with bubble-like styling
-  const data = new google.visualization.DataTable();
-  data.addColumn('number', 'Activity Data (TJ)');
-  data.addColumn('number', `${window.supabaseModule.getPollutantName(pollutantId)} (${window.supabaseModule.getPollutantUnit(pollutantId)})`);
-  data.addColumn({type: 'string', role: 'tooltip'});
+    // Prepare Google DataTable for scatter chart with bubble-like styling
+    const data = new google.visualization.DataTable();
+    data.addColumn('number', 'Activity Data (TJ)');
+    data.addColumn('number', `${window.supabaseModule.getPollutantName(pollutantId)} (${window.supabaseModule.getPollutantUnit(pollutantId)})`);
+    data.addColumn({type: 'string', role: 'tooltip'});
   data.addColumn({type: 'string', role: 'style'});
 
   // Add data rows with emission factor calculation and sizing
@@ -340,42 +391,43 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   const xAxisTitle = activityUnit ? `Activity Data - ${activityUnit}` : 'Activity Data - TJ';
 
   // Create a custom title element with two lines
-  const chartTitleElement = document.getElementById('chartTitle');
-  if (chartTitleElement) {
-    chartTitleElement.style.display = 'block';
-    chartTitleElement.style.textAlign = 'center';
-  chartTitleElement.style.marginBottom = '6px';
+    const chartTitleElement = document.getElementById('chartTitle');
+    if (chartTitleElement) {
+      chartTitleElement.style.display = 'block';
+      chartTitleElement.style.textAlign = 'center';
+      chartTitleElement.style.marginBottom = '6px';
 
-    // Add year as the first line
-    const yearElement = document.createElement('div');
-    yearElement.className = 'chart-title__year-range';
-    yearElement.textContent = `${year}`;
+      // Add year as the first line
+      const yearElement = document.createElement('div');
+      yearElement.className = 'chart-title__year-range';
+      yearElement.textContent = `${year}`;
 
-    // Add pollutant and emission unit as the second line
-    const pollutantElement = document.createElement('div');
-    pollutantElement.className = 'chart-title__pollutant';
-    pollutantElement.textContent = `${yAxisTitle}`;
+      // Add pollutant and emission unit as the second line
+      const pollutantElement = document.createElement('div');
+      pollutantElement.className = 'chart-title__pollutant';
+      pollutantElement.textContent = `${yAxisTitle}`;
 
-    // Clear previous content and append new elements
-    chartTitleElement.innerHTML = '';
-    chartTitleElement.appendChild(yearElement);
-    chartTitleElement.appendChild(pollutantElement);
-  }
+      // Clear previous content and append new elements
+      chartTitleElement.innerHTML = '';
+      chartTitleElement.appendChild(yearElement);
+      chartTitleElement.appendChild(pollutantElement);
+    }
 
-  // Set a fixed height for the chart container to prevent layout shifts (same as line chart)
-  const chartDiv = document.getElementById('chart_div');
-  if (!chartDiv) {
-    console.error('Missing #chart_div element');
-    showMessage('Chart container not found', 'error');
-    return;
-  }
+    // Set a fixed height for the chart container to prevent layout shifts (same as line chart)
+    const chartDiv = document.getElementById('chart_div');
+    if (!chartDiv) {
+      console.error('Missing #chart_div element');
+      showMessage('Chart container not found', 'error');
+      return;
+    }
 
-  // Build legend before sizing so its height is accounted for
-  createCustomLegend(chart, data, groupIds, dataPoints);
-  const chartTitleEl = document.getElementById('chartTitle');
-  const customLegendEl = document.getElementById('customLegend');
-  const titleHeight = chartTitleEl ? Math.round(chartTitleEl.getBoundingClientRect().height || 0) : 0;
-  const legendHeight = customLegendEl ? Math.round(customLegendEl.getBoundingClientRect().height || 0) : 0;
+    // Build legend before sizing so its height is accounted for
+    createCustomLegend(chart, data, groupIds, dataPoints);
+    const customLegendEl = document.getElementById('customLegend');
+    await waitForChromeStability([chartTitleElement, customLegendEl]);
+
+    const titleHeight = chartTitleElement ? Math.round(chartTitleElement.getBoundingClientRect().height || 0) : 0;
+    const legendHeight = customLegendEl ? Math.round(customLegendEl.getBoundingClientRect().height || 0) : 0;
   const layoutManager = window.__bubbleLayoutHeightManager;
   const preLegendEstimate = (() => {
     const pendingEstimate = window.__BUBBLE_PRE_LEGEND_ESTIMATE;
@@ -603,9 +655,15 @@ function drawBubbleChart(year, pollutantId, groupIds) {
   if (downloadCSVBtnEl) downloadCSVBtnEl.disabled = false;
   if (downloadXLSXBtnEl) downloadXLSXBtnEl.disabled = false;
 
-  clearMessage();
-  if (window.updateChartWrapperHeight) {
-    window.updateChartWrapperHeight('drawChart');
+    clearMessage();
+    if (window.updateChartWrapperHeight) {
+      window.updateChartWrapperHeight('drawChart');
+    }
+  } catch (error) {
+    console.error('Error rendering bubble chart:', error);
+    showMessage('Unable to render the chart right now. Please try again.', 'error');
+  } finally {
+    stabilityHandle.resolve();
   }
 }
 
@@ -896,5 +954,6 @@ window.ChartRenderer = {
   showMessage,
   clearMessage,
   getCurrentChartData,
-  getChartInstance
+  getChartInstance,
+  waitForStability: waitForChartStability
 };

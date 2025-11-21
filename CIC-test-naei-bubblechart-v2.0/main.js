@@ -1059,10 +1059,18 @@ function sendContentHeightToParent(force = false) {
 }
 
 
-function notifyParentChartReady() {
+async function notifyParentChartReady() {
   if (chartReadyNotified) {
     sendContentHeightToParent();
     return;
+  }
+
+  try {
+    if (typeof window.ChartRenderer?.waitForStability === 'function') {
+      await window.ChartRenderer.waitForStability();
+    }
+  } catch (error) {
+    console.warn('Bubble chart stability wait failed:', error);
   }
 
   chartReadyNotified = true;
@@ -1119,24 +1127,26 @@ async function revealMainContent() {
     chartRenderingUnlocked = true;
     const pendingSkipFlag = pendingDrawRequest?.skipHeightUpdate || false;
     pendingDrawRequest = null;
-    drawChart(pendingSkipFlag);
-    updateChartWrapperHeight('revealMainContent');
-    
-    // Wait for chart to render, then complete the loading process
-    setTimeout(() => {
-      
-      // Start fade in of main content
-      requestAnimationFrame(() => {
-        mainContent.classList.add('loaded');
-      });
-      
-      // Complete after transition
+
+    drawChart(pendingSkipFlag)
+      .catch(error => {
+        console.error('Initial bubble chart draw failed:', error);
+      })
+      .then(() => {
+      updateChartWrapperHeight('revealMainContent');
+
+      // Wait for chart to render, then complete the loading process
       setTimeout(() => {
-        updateChartWrapperHeight('post-load');
-        notifyParentChartReady();
-        resolve();
+        requestAnimationFrame(() => {
+          mainContent.classList.add('loaded');
+        });
+
+        setTimeout(() => {
+          updateChartWrapperHeight('post-load');
+          notifyParentChartReady().finally(resolve);
+        }, 16);
       }, 16);
-    }, 16);
+      });
   });
 }
 
@@ -1812,7 +1822,7 @@ function setupEventListeners() {
  * Draw the scatter chart
  * @param {boolean} skipHeightUpdate - If true, don't send height update to parent (for resize events)
  */
-function drawChart(skipHeightUpdate = false) {
+async function drawChart(skipHeightUpdate = false) {
   if (!chartRenderingUnlocked) {
     pendingDrawRequest = { skipHeightUpdate };
     return;
@@ -1861,7 +1871,12 @@ function drawChart(skipHeightUpdate = false) {
   window.Colors.resetColorSystem();
 
   // Draw chart
-  window.ChartRenderer.drawBubbleChart(selectedYear, selectedPollutantId, selectedGroupIds);
+  try {
+    await window.ChartRenderer.drawBubbleChart(selectedYear, selectedPollutantId, selectedGroupIds);
+  } catch (error) {
+    console.error('Bubble chart render failed:', error);
+    window.ChartRenderer.showMessage('Unable to render the chart right now. Please try again.', 'error');
+  }
 
   // Update the comparison statement based on checked comparison checkboxes
   const checkedCheckboxes = document.querySelectorAll('.comparison-checkbox:checked');

@@ -98,6 +98,58 @@ if (!window.Colors) {
   };
 }
 
+function waitForChromeStability(targetElements = []) {
+  const fontPromise = document.fonts?.ready
+    ? document.fonts.ready.catch(() => {})
+    : Promise.resolve();
+
+  const imagePromises = targetElements
+    .filter(el => el && el.tagName === 'IMG' && el.complete === false)
+    .map(img => new Promise(resolve => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    }));
+
+  return Promise.all([fontPromise, ...imagePromises])
+    .then(() => new Promise(resolve => {
+      requestAnimationFrame(() => requestAnimationFrame(resolve));
+    }));
+}
+
+function createLineStabilityHandle() {
+  let resolved = false;
+  let resolver = null;
+  const promise = new Promise(resolve => {
+    resolver = () => {
+      if (resolved) {
+        return;
+      }
+      resolved = true;
+      resolve();
+    };
+  });
+  return {
+    promise,
+    resolve() {
+      resolver?.();
+    }
+  };
+}
+
+let lineChartStabilityHandle = {
+  promise: Promise.resolve(),
+  resolve() {}
+};
+
+function beginLineChartStabilityCycle() {
+  lineChartStabilityHandle = createLineStabilityHandle();
+  return lineChartStabilityHandle;
+}
+
+function waitForLineChartStability() {
+  return lineChartStabilityHandle?.promise || Promise.resolve();
+}
+
 const LINE_MIN_CHART_CANVAS_HEIGHT = 420;
 const LINE_CHART_HEADER_BUFFER = 10;
 const LINE_FOOTER_GAP = 6;
@@ -1402,21 +1454,31 @@ function updateUrlFromChartState() {
 }
 
 
-function updateChart(){
+async function updateChart(){
   if (!googleChartsReady || !hasGoogleCoreChartConstructors()) {
-    loadGoogleChartsLibrary()
-      .then(() => {
-        if (googleChartsReady && hasGoogleCoreChartConstructors()) {
-          updateChart();
-        }
-      })
-      .catch(error => {
-        console.error('Google Charts failed to load; chart render aborted.', error);
-        showError('Unable to load the Google Charts library. Please refresh the page and try again.');
-      });
-    return;
+    try {
+      await loadGoogleChartsLibrary();
+    } catch (error) {
+      console.error('Google Charts failed to load; chart render aborted.', error);
+      showError('Unable to load the Google Charts library. Please refresh the page and try again.');
+      return;
+    }
+
+    if (!googleChartsReady || !hasGoogleCoreChartConstructors()) {
+      showError('Google Charts is unavailable. Please refresh and try again.');
+      return;
+    }
   }
 
+  let stabilityHandle = null;
+  const settleChartStability = () => {
+    if (stabilityHandle) {
+      stabilityHandle.resolve();
+      stabilityHandle = null;
+    }
+  };
+
+  try {
   const pollutant = document.getElementById('pollutantSelect').value;
   const startYear = +document.getElementById('startYear').value;
   const endYear = +document.getElementById('endYear').value;
@@ -1463,6 +1525,8 @@ function updateChart(){
 
   // guard against empty data
   if (chartRows.length === 0) return;
+
+  stabilityHandle = beginLineChartStabilityCycle();
 
   // --- Determine which groups actually have data ---
   const groupHasData = selectedGroups.map((g, i) => {
@@ -1558,6 +1622,7 @@ function updateChart(){
   const chartContainer = document.getElementById('chart_div');
   if (!chartContainer) {
     console.error('chart_div element not found when attempting to draw line chart');
+    settleChartStability();
     return;
   }
 
@@ -1600,15 +1665,17 @@ function updateChart(){
   });
   const yearLabel = startYear === endYear ? String(startYear) : `${startYear} - ${endYear}`;
   const pollutantTitle = unit ? `${pollutant} - ${unit}` : pollutant;
-  const { height: titleHeight } = updateLineChartTitle(yearLabel, pollutantTitle);
+  updateLineChartTitle(yearLabel, pollutantTitle);
+  const chartTitleEl = document.getElementById('chartTitle');
+  await waitForChromeStability([legendDiv, chartTitleEl]);
+  const titleHeight = chartTitleEl ? Math.round(chartTitleEl.getBoundingClientRect().height || 0) : 0;
   const chartRect = chartContainer.getBoundingClientRect();
   const wrapperElement = chartContainer.closest('.chart-wrapper');
   const wrapperRect = wrapperElement ? wrapperElement.getBoundingClientRect() : null;
   const wrapperStyles = wrapperElement ? window.getComputedStyle(wrapperElement) : null;
   const paddingBottom = wrapperStyles ? (parseFloat(wrapperStyles.paddingBottom) || 0) : 0;
   const chartTopOffset = wrapperRect ? Math.max(0, chartRect.top - wrapperRect.top) : 0;
-  const legendEl = document.getElementById('customLegend');
-  const legendHeight = legendEl ? Math.round(legendEl.getBoundingClientRect().height || 0) : 0;
+  const legendHeight = legendDiv ? Math.round(legendDiv.getBoundingClientRect().height || 0) : 0;
   const cachedHeight = Number.isFinite(preLegendEstimate) && preLegendEstimate > 0
     ? preLegendEstimate
     : (lineLayoutHeightManager?.getLastEstimatedHeight?.() ?? window.__NAEI_LAST_CHART_HEIGHT);
@@ -1729,32 +1796,38 @@ function updateChart(){
 
   // Delay slightly to let layout stabilize (prevents negative sizes and bouncing)
   setTimeout(() => {
-    chart.draw(dataTable, options);
-    // Only add visible class when parent is already visible to prevent flash
-    if (document.getElementById('mainContent').classList.contains('loaded')) {
-      chartContainer.classList.add('visible');
-      const wrapperEl = chartContainer.closest('.chart-wrapper');
-      if (wrapperEl) {
-        wrapperEl.classList.add('visible');
+    try {
+      chart.draw(dataTable, options);
+      // Only add visible class when parent is already visible to prevent flash
+      if (document.getElementById('mainContent').classList.contains('loaded')) {
+        chartContainer.classList.add('visible');
+        const wrapperEl = chartContainer.closest('.chart-wrapper');
+        if (wrapperEl) {
+          wrapperEl.classList.add('visible');
+        }
       }
-    }
-    
-    // After chart finishes drawing, update height if we're in a resize
-    if (window._pendingHeightUpdate) {
-      window._pendingHeightUpdate = false;
-      // Use requestAnimationFrame to ensure DOM has fully updated
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          sendContentHeightToParent();
-        }, 100);
-      });
-    } else {
-      // Always send height after drawing (for filter changes that may affect button container layout)
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          sendContentHeightToParent();
-        }, 100);
-      });
+
+      const scheduleHeightPost = () => {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            sendContentHeightToParent();
+            settleChartStability();
+          }, 100);
+        });
+      };
+
+      // After chart finishes drawing, update height if we're in a resize
+      if (window._pendingHeightUpdate) {
+        window._pendingHeightUpdate = false;
+        scheduleHeightPost();
+      } else {
+        // Always send height after drawing (for filter changes that may affect button container layout)
+        scheduleHeightPost();
+      }
+    } catch (error) {
+      console.error('Google Charts draw failed:', error);
+      showError('Unable to render the chart right now. Please try again.');
+      settleChartStability();
     }
   }, 100);
 
@@ -1764,6 +1837,11 @@ function updateChart(){
   // ensure controls reflect available choices
   refreshGroupDropdowns();
   refreshButtons();
+  } catch (error) {
+    console.error('Unable to update line chart:', error);
+    showError('Unable to render the chart right now. Please try again.');
+    settleChartStability();
+  }
 }
 
 // Track last window dimensions to detect real user resizes vs parent iframe height adjustments
@@ -1890,40 +1968,39 @@ async function revealMainContent() {
             }
           }
           function afterDraw(){
-            // Wait for chart to actually render in the DOM
-            setTimeout(() => {
-              // Make chart visible
-              const chartDiv = document.getElementById('chart_div');
-              if (chartDiv) {
-                chartDiv.classList.add('visible');
-                const wrapperEl = chartDiv.closest('.chart-wrapper');
-                if (wrapperEl) {
-                  wrapperEl.classList.add('visible');
-                }
-                updateChartWrapperHeight('chart-visible');
-              }
-
-              const loadingOverlay = document.getElementById('loadingOverlay');
-              if (loadingOverlay && !loadingOverlay.classList.contains('hidden')) {
-                loadingOverlay.classList.add('hidden');
-                setTimeout(() => {
-                  loadingOverlay.style.display = 'none';
-                }, 350);
-              }
-              // Wait longer to ensure Google Chart is fully painted and stable
+            waitForLineChartStability().then(() => {
               setTimeout(() => {
-                // Update URL with initial chart state
-                updateUrlFromChartState();
-                
-                // Chart is rendered - send chartReady
-                // Height will be sent after overlay is hidden and layout is stable
-                window.parent.postMessage({
-                  type: 'chartReady',
-                  chart: 'line'
-                }, '*');
-                resolve();
+                const chartDiv = document.getElementById('chart_div');
+                if (chartDiv) {
+                  chartDiv.classList.add('visible');
+                  const wrapperEl = chartDiv.closest('.chart-wrapper');
+                  if (wrapperEl) {
+                    wrapperEl.classList.add('visible');
+                  }
+                  updateChartWrapperHeight('chart-visible');
+                }
+
+                const loadingOverlay = document.getElementById('loadingOverlay');
+                if (loadingOverlay && !loadingOverlay.classList.contains('hidden')) {
+                  loadingOverlay.classList.add('hidden');
+                  setTimeout(() => {
+                    loadingOverlay.style.display = 'none';
+                  }, 350);
+                }
+
+                setTimeout(() => {
+                  updateUrlFromChartState();
+                  window.parent.postMessage({
+                    type: 'chartReady',
+                    chart: 'line'
+                  }, '*');
+                  resolve();
+                }, 16);
               }, 16);
-            }, 16);
+            }).catch(error => {
+              console.error('Line chart stability wait failed:', error);
+              resolve();
+            });
           }
           tick();
         })();
