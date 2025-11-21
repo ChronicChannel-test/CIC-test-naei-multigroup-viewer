@@ -7,6 +7,26 @@
   <link rel="apple-touch-icon" href="../SharedResources/images/favicon.png">
   <link rel="preload" as="image" href="../SharedResources/images/No-Entry-Icon-200x200.svg">
   <link rel="preload" as="image" href="../SharedResources/images/Green-Square-Button-White-Plus-Add-200x200.svg">
+  <script>
+    (function prewarmLineIcons() {
+      const icons = [
+        '../SharedResources/images/No-Entry-Icon-200x200.svg',
+        '../SharedResources/images/Green-Square-Button-White-Plus-Add-200x200.svg'
+      ];
+      const cache = window.__preloadedIconImages = window.__preloadedIconImages || [];
+      icons.forEach(src => {
+        try {
+          const img = new Image();
+          img.decoding = 'async';
+          img.loading = 'eager';
+          img.src = src;
+          cache.push(img);
+        } catch (error) {
+          console.warn('Line icon prewarm failed:', src, error);
+        }
+      });
+    })();
+  </script>
 
   <!-- Social preview / link preview meta tags -->
   <meta name="description" content="NAEI Pollution Line Chart">
