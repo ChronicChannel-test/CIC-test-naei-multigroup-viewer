@@ -24,7 +24,19 @@ function getLineSearchParams() {
     // Ignore cross-origin errors; fallback to local search
   }
 
-  window.__lineSupabaseCachedSearchParams = new URLSearchParams(search || '');
+  const params = new URLSearchParams(search || '');
+
+  try {
+    const chartParam = params.get('chart');
+    if (chartParam && chartParam !== '2') {
+      const overrideKeys = ['pollutant','pollutant_id','pollutantId','group','group_id','groupIds','group_ids','dataset','start_year','end_year','year'];
+      overrideKeys.forEach(key => params.delete(key));
+    }
+  } catch (error) {
+    // Ignore parse errors and fall back to whatever params already contain
+  }
+
+  window.__lineSupabaseCachedSearchParams = params;
   return window.__lineSupabaseCachedSearchParams;
 }
 
