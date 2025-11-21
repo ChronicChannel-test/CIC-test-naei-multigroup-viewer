@@ -1160,6 +1160,24 @@ class PDFLinkService {
           mode: params.get("pagemode")
         });
       }
+      if (params.has("spread")) {
+        const spread = params.get("spread")?.toLowerCase();
+        let spreadMode = null;
+        switch (spread) {
+          case "none":
+            spreadMode = SpreadMode.NONE;
+            break;
+          case "odd":
+            spreadMode = SpreadMode.ODD;
+            break;
+          case "even":
+            spreadMode = SpreadMode.EVEN;
+            break;
+        }
+        if (spreadMode !== null && this.pdfViewer) {
+          this.pdfViewer.spreadMode = spreadMode;
+        }
+      }
       if (params.has("nameddest")) {
         this.goToDestination(params.get("nameddest"));
       }

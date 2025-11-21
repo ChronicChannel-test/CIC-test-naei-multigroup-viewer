@@ -866,7 +866,7 @@
     function broadcastViewportMetrics(targetKeys) {
       const keys = Array.isArray(targetKeys)
         ? targetKeys
-        : (targetKeys ? [targetKeys] : ['bubble', 'line']);
+        : (targetKeys ? [targetKeys] : ['bubble', 'line', 'user-guide']);
 
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
       if (viewportHeight) {
@@ -892,13 +892,15 @@
     });
     window.addEventListener('resize', () => {
       getParentFooterHeight();
-      const iframe = iframeElements.bubble;
-      if (iframe && iframe.contentWindow) {
-        iframe.contentWindow.postMessage({
-          type: 'parentFooterHeight',
-          value: cachedParentFooterHeight
-        }, '*');
-      }
+      ['bubble', 'user-guide'].forEach(key => {
+        const iframe = iframeElements[key];
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            type: 'parentFooterHeight',
+            value: cachedParentFooterHeight
+          }, '*');
+        }
+      });
     });
 
     window.addEventListener('load', () => {
@@ -1468,7 +1470,7 @@
     
     // Simple loading overlay control - MESSAGE BASED APPROACH
     let overlayHidden = false;
-    const heightsReceived = { bubble: false, line: false };
+    const heightsReceived = { bubble: false, line: false, 'user-guide': false };
     
     // Set initial reasonable height estimate
     const lineIframe = iframeElements.line;
@@ -1561,6 +1563,13 @@
         updateHistoryState('replaceState', event.data.url);
       }
 
+      if (event.data && event.data.type === 'requestParentViewportMetrics') {
+        const chartKey = event.data.chart;
+        getParentFooterHeight();
+        broadcastViewportMetrics(chartKey);
+        return;
+      }
+
       if (event.data && event.data.type === 'bubbleTutorialState') {
         if (event.data.state === 'opened') {
           bubbleTutorialControl.openRequestSent = true;
@@ -1648,7 +1657,7 @@
           }
 
           iframe.style.height = finalHeight + 'px';
-          if (chartKey === 'bubble' || chartKey === 'line') {
+          if (chartKey === 'bubble' || chartKey === 'line' || chartKey === 'user-guide') {
             getParentFooterHeight();
             broadcastViewportMetrics(chartKey);
           }
