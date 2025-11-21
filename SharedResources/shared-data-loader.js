@@ -23,8 +23,22 @@ const sharedDataInfoLog = (() => {
 })();
 const sharedDataNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
-// Global data cache
-window.SharedDataCache = window.SharedDataCache || {
+function resolveExistingSharedCache() {
+  if (window.SharedDataCache) {
+    return window.SharedDataCache;
+  }
+  try {
+    if (window.parent && window.parent !== window && window.parent.SharedDataCache) {
+      return window.parent.SharedDataCache;
+    }
+  } catch (error) {
+    // Access to parent may be blocked; ignore and proceed with local cache
+  }
+  return null;
+}
+
+// Global data cache (mirrors parent cache when available)
+window.SharedDataCache = resolveExistingSharedCache() || {
   isLoaded: false,
   isLoading: false,
   fullBootstrapPromise: null,

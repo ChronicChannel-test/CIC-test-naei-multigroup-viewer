@@ -1131,8 +1131,8 @@ async function revealMainContent() {
         updateChartWrapperHeight('post-load');
         notifyParentChartReady();
         resolve();
-      }, 0);
-    }, 0); // testing immediate chart ready
+      }, 16);
+    }, 16);
   });
 }
 

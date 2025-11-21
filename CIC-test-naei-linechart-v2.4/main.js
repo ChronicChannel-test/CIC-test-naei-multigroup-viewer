@@ -1878,8 +1878,8 @@ async function revealMainContent() {
                   chart: 'line'
                 }, '*');
                 resolve();
-              }, 0);
-            }, 0);
+              }, 16);
+            }, 16);
           }
           tick();
         })();
@@ -2162,7 +2162,7 @@ function notifyChartReady() {
           }
         });
       }
-    }, 0); // testing immediate chart ready
+    }, 16);
   } catch (error) {
     console.error('Error in notifyChartReady:', error);
   }
