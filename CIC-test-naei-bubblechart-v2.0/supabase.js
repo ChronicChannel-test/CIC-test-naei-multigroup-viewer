@@ -86,15 +86,17 @@ let actDataPollutantId = null;
 
 const ACTIVITY_POLLUTANT_NAME = 'Activity Data';
 const DEFAULT_BUBBLE_POLLUTANT_NAME = 'PM2.5';
+const DEFAULT_BUBBLE_POLLUTANT_ID = 5;
 const DEFAULT_BUBBLE_GROUP_TITLES = [
   'Ecodesign Stove - Ready To Burn',
   'Gas Boilers'
 ];
+const DEFAULT_BUBBLE_GROUP_IDS = [20, 37];
 const DEFAULT_BUBBLE_YEAR = 2023;
 let hasFullDataset = false;
 let latestDatasetSource = null;
 const hydrationListeners = new Set();
-const urlOverrideParams = ['pollutant','pollutantId','group','groupId','groupIds','activityGroup','actGroup','dataset','year'];
+const urlOverrideParams = ['pollutant','pollutantId','group','groupId','groupIds','group_ids','activityGroup','actGroup','dataset','year'];
 let groupMetadataCache = null;
 let groupMetadataPromise = null;
 let sharedLoaderReference = null;
@@ -102,8 +104,139 @@ let bubbleInitialDatasetInfo = null;
 let bubbleFullDatasetPromise = null;
 let fullDatasetToastShown = false;
 
+function sortNumericList(values = []) {
+  return values.slice().sort((a, b) => a - b);
+}
+
+function matchesNumericSet(values = [], defaults = []) {
+  if (!values.length || !defaults.length) {
+    return false;
+  }
+  const normalizedValues = sortNumericList(values);
+  const normalizedDefaults = sortNumericList(defaults);
+  if (normalizedValues.length !== normalizedDefaults.length) {
+    return false;
+  }
+  return normalizedValues.every((value, index) => value === normalizedDefaults[index]);
+}
+
+function normalizeNames(list = []) {
+  return list
+    .map(item => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
+    .filter(Boolean)
+    .sort();
+}
+
+function matchesNameSet(values = [], defaults = []) {
+  if (!values.length || !defaults.length) {
+    return false;
+  }
+  const normalizedValues = normalizeNames(values);
+  const normalizedDefaults = normalizeNames(defaults);
+  if (normalizedValues.length !== normalizedDefaults.length) {
+    return false;
+  }
+  return normalizedValues.every((value, index) => value === normalizedDefaults[index]);
+}
+
+function isDefaultBubbleSelection() {
+  const overrideExclusiveParams = ['dataset', 'activityGroup', 'actGroup'];
+  if (overrideExclusiveParams.some(param => supabaseUrlParams.has(param))) {
+    return false;
+  }
+
+  const pollutantIds = parseIdList(
+    supabaseUrlParams.get('pollutant_id')
+    || supabaseUrlParams.get('pollutantId')
+  );
+  const pollutantNames = parseNameList(
+    supabaseUrlParams.get('pollutant')
+  );
+  const groupIds = parseIdList(
+    supabaseUrlParams.get('group_ids')
+    || supabaseUrlParams.get('groupIds')
+    || supabaseUrlParams.get('groupId')
+  );
+  const groupNames = parseNameList(
+    supabaseUrlParams.get('groups')
+    || supabaseUrlParams.get('group')
+  );
+
+  const pollutantIdsDefault = !pollutantIds.length
+    || matchesNumericSet(pollutantIds, [DEFAULT_BUBBLE_POLLUTANT_ID]);
+  const pollutantNamesDefault = !pollutantNames.length
+    || matchesNameSet(pollutantNames, [DEFAULT_BUBBLE_POLLUTANT_NAME]);
+  const groupIdsDefault = !groupIds.length
+    || matchesNumericSet(groupIds, DEFAULT_BUBBLE_GROUP_IDS);
+  const groupNamesDefault = !groupNames.length
+    || matchesNameSet(groupNames, DEFAULT_BUBBLE_GROUP_TITLES);
+  const yearParam = supabaseUrlParams.get('year');
+  const yearDefault = !yearParam || Number(yearParam) === DEFAULT_BUBBLE_YEAR;
+
+  return (
+    pollutantIdsDefault
+    && pollutantNamesDefault
+    && groupIdsDefault
+    && groupNamesDefault
+    && yearDefault
+  );
+}
+
 function hasUrlOverrides() {
-  return urlOverrideParams.some(param => supabaseUrlParams.has(param));
+  if (!urlOverrideParams.some(param => supabaseUrlParams.has(param))) {
+    return false;
+  }
+  return !isDefaultBubbleSelection();
+}
+
+function mergeRecordCollections(primary = [], secondary = [], keyResolver) {
+  const resolver = typeof keyResolver === 'function'
+    ? keyResolver
+    : (item) => {
+        if (!item || typeof item !== 'object') {
+          return null;
+        }
+        if (item.id != null) {
+          return item.id;
+        }
+        return keyResolver && item[keyResolver] ? item[keyResolver] : null;
+      };
+  const merged = new Map();
+
+  const ingest = (collection, preferExisting) => {
+    collection.forEach(entry => {
+      if (!entry || typeof entry !== 'object') {
+        return;
+      }
+      const key = resolver(entry);
+      if (key === null || key === undefined) {
+        return;
+      }
+      if (merged.has(key) && !preferExisting) {
+        return;
+      }
+      merged.set(key, entry);
+    });
+  };
+
+  ingest(primary, true);
+  ingest(secondary, false);
+
+  return Array.from(merged.values());
+}
+
+async function loadDefaultSelectorMetadata(sharedLoader) {
+  const loader = sharedLoader || window.SharedDataLoader;
+  if (!loader?.loadDefaultSnapshot) {
+    return null;
+  }
+  try {
+    const snapshot = await loader.loadDefaultSnapshot();
+    return snapshot?.data || null;
+  } catch (error) {
+    supabaseDebugWarn('Unable to load default selector metadata:', error.message || error);
+    return null;
+  }
 }
 
 function parseIdList(value) {
@@ -459,6 +592,46 @@ async function loadData(options = {}) {
           groups: groups.length,
           rows: rows.length
         });
+      }
+    }
+
+    if (latestDatasetSource === 'hero') {
+      const selectorMetadata = await loadDefaultSelectorMetadata(sharedLoader);
+      if (selectorMetadata) {
+        const metadataPollutants = Array.isArray(selectorMetadata.pollutants)
+          ? selectorMetadata.pollutants
+          : [];
+        const metadataGroups = Array.isArray(selectorMetadata.groups)
+          ? selectorMetadata.groups
+          : [];
+
+        if (metadataPollutants.length) {
+          pollutants = mergeRecordCollections(
+            pollutants,
+            metadataPollutants,
+            record => {
+              if (record?.id != null) {
+                return record.id;
+              }
+              const name = record?.pollutant || record?.Pollutant || '';
+              return name ? name.toLowerCase() : null;
+            }
+          );
+        }
+
+        if (metadataGroups.length) {
+          groups = mergeRecordCollections(
+            groups,
+            metadataGroups,
+            record => {
+              if (record?.id != null) {
+                return record.id;
+              }
+              const title = record?.group_title || record?.group_name || '';
+              return title ? title.toLowerCase() : null;
+            }
+          );
+        }
       }
     }
 

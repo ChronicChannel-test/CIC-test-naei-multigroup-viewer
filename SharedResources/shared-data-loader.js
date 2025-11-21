@@ -237,33 +237,72 @@ async function loadHeroDataset(options = {}) {
 
   const heroPromise = (async () => {
     const client = getSupabaseClient();
-    const pollutantQuery = client.from('NAEI_global_Pollutants').select('*');
-    let pollutantResp;
-    if (normalized.pollutantIds.length) {
-      pollutantResp = await pollutantQuery.in('id', normalized.pollutantIds);
-    } else {
-      pollutantResp = await pollutantQuery.in('pollutant', normalized.pollutantNames);
-    }
-    if (pollutantResp.error) throw pollutantResp.error;
 
-    const groupQuery = client.from('NAEI_global_t_Group').select('*');
-    let groupResp;
-    if (normalized.groupIds.length) {
-      groupResp = await groupQuery.in('id', normalized.groupIds);
-    } else {
-      groupResp = await groupQuery.in('group_title', normalized.groupNames);
-    }
-    if (groupResp.error) throw groupResp.error;
+    const runLookup = async ({ table, idColumn, idValues = [], nameColumn, nameValues = [] }) => {
+      const queries = [];
+      if (idValues.length) {
+        queries.push(
+          client
+            .from(table)
+            .select('*')
+            .in(idColumn, idValues)
+        );
+      }
+      if (nameValues.length) {
+        queries.push(
+          client
+            .from(table)
+            .select('*')
+            .in(nameColumn, nameValues)
+        );
+      }
+
+      if (!queries.length) {
+        throw new Error(`Hero dataset lookup for ${table} lacked identifiers`);
+      }
+
+      const results = await Promise.all(queries);
+      const rowsById = new Map();
+      results.forEach(response => {
+        if (response.error) {
+          throw response.error;
+        }
+        (response.data || []).forEach(row => {
+          const key = Number.isFinite(row.id) ? row.id : row[idColumn] || row[nameColumn];
+          if (key === undefined || key === null || rowsById.has(key)) {
+            return;
+          }
+          rowsById.set(key, row);
+        });
+      });
+      return Array.from(rowsById.values());
+    };
+
+    const pollutantRows = await runLookup({
+      table: 'NAEI_global_Pollutants',
+      idColumn: 'id',
+      idValues: normalized.pollutantIds,
+      nameColumn: 'pollutant',
+      nameValues: normalized.pollutantNames
+    });
+
+    const groupRows = await runLookup({
+      table: 'NAEI_global_t_Group',
+      idColumn: 'id',
+      idValues: normalized.groupIds,
+      nameColumn: 'group_title',
+      nameValues: normalized.groupNames
+    });
 
     const pollutantIdSet = new Set(normalized.pollutantIds);
-    (pollutantResp.data || []).forEach(row => {
+    pollutantRows.forEach(row => {
       if (Number.isFinite(row.id)) {
         pollutantIdSet.add(row.id);
       }
     });
 
     const groupIdSet = new Set(normalized.groupIds);
-    (groupResp.data || []).forEach(row => {
+    groupRows.forEach(row => {
       if (Number.isFinite(row.id)) {
         groupIdSet.add(row.id);
       }
@@ -281,8 +320,8 @@ async function loadHeroDataset(options = {}) {
     if (timeseriesResp.error) throw timeseriesResp.error;
 
     const payload = {
-      pollutants: pollutantResp.data || [],
-      groups: groupResp.data || [],
+      pollutants: pollutantRows,
+      groups: groupRows,
       timeseries: timeseriesResp.data || [],
       metadata: {
         pollutantIds: Array.from(pollutantIdSet),

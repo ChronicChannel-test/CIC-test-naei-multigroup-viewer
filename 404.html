@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>NAEI Multi-Group Pollutant Viewer v3.0 Shared</title>
+  <title>UK Air Pollution/Emissions Data Explorer</title>
   <link rel="icon" type="image/png" sizes="64x64" href="SharedResources/images/favicon.png">
   <link rel="apple-touch-icon" href="SharedResources/images/favicon.png">
 
@@ -10,7 +10,7 @@
   <meta name="description" content="NAEI Data Viewer - Interactive charts for UK emissions data">
   <!-- Open Graph (Facebook, LinkedIn, Slack, etc.) -->
   <meta property="og:type" content="website">
-  <meta property="og:title" content="NAEI Data Viewer">
+  <meta property="og:title" content="UK Air Pollution/Emissions Data Explorer">
   <meta property="og:description" content="Interactive charts for analyzing UK National Atmospheric Emissions Inventory data">
   <meta property="og:url" content="https://github.com/Chronic-Illness-Channel/naei-multigroup-viewer">
   <meta property="og:image" content="SharedResources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
@@ -19,7 +19,7 @@
 
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="NAEI Data Viewer">
+  <meta name="twitter:title" content="UK Air Pollution/Emissions Data Explorer">
   <meta name="twitter:description" content="Interactive charts for UK emissions data">
   <meta name="twitter:image" content="SharedResources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
   <meta name="twitter:site" content="@Chronic_Channel">
@@ -247,6 +247,37 @@
       width: 295px;
     }
 
+    .page-title {
+      line-height: 1.2;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 7px;
+      padding-right: 130px;
+    }
+
+    .page-title-word {
+      display: inline-flex;
+      white-space: nowrap;
+    }
+
+    .page-title-word--chunk {
+      gap: 7px;
+    }
+
+    @media (max-width: 620px) {
+      .page-title {
+        padding-right: 0;
+      }
+    }
+
+    nav[role="tablist"] button:focus,
+    nav[role="tablist"] button:focus-visible,
+    nav[role="tablist"] button:focus-within {
+      outline: none;
+      box-shadow: none;
+    }
+
     @supports (-webkit-appearance: none) {
       .kofi-button .kofi-text {
         font-size: 16px;
@@ -405,7 +436,13 @@
       <div class="flex items-center justify-between h-16">
         <div class="flex items-center">
           <div>
-            <h1 class="text-3xl font-bold text-gray-900">UK Air Pollution and Emissions Data Explorer</h1>
+            <h1 class="text-3xl font-bold text-gray-900 page-title">
+              <span class="page-title-word">UK Air</span>
+              <span class="page-title-word">Pollution/Emissions<wbr></span>
+              <span class="page-title-word page-title-word--chunk">
+                <span>Data Explorer</span>
+              </span>
+            </h1>
             <p class="text-sm text-gray-500">Interactive charts using UK Government data</p>
           </div>
         </div>

@@ -477,6 +477,10 @@ async function init() {
     // Load data using supabaseModule
     await window.supabaseModule.loadData();
 
+    if (window.supabaseModule.latestDatasetSource === 'hero') {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
     // Create window data stores EXACTLY like linechart v2.3
     window.allPollutants = window.supabaseModule.allPollutants;
     window.allGroupsRaw = window.supabaseModule.allGroups;

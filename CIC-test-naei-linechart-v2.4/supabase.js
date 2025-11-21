@@ -63,7 +63,11 @@ let pollutantsData = []; // Store raw pollutant data for ID lookups
 let groupsData = []; // Store raw group data for ID lookups
 
 const LINE_DEFAULT_POLLUTANT_NAME = 'PM2.5';
+const LINE_DEFAULT_POLLUTANT_ID = 5;
 const LINE_DEFAULT_GROUP_TITLES = ['All'];
+const LINE_DEFAULT_GROUP_IDS = [1];
+const LINE_DEFAULT_START_YEAR = 1970;
+const LINE_DEFAULT_END_YEAR = 2023;
 const lineUrlOverrideParams = ['pollutant','pollutant_id','pollutantId','group','group_id','groupIds','group_ids','dataset','start_year','end_year','year'];
 let lineHasFullDataset = false;
 let lineDatasetSource = null;
@@ -145,8 +149,144 @@ function getGroupShortTitle(identifier) {
   return record.group_title || record.group_name || null;
 }
 
+function lineSortNumericList(values = []) {
+  return values.slice().sort((a, b) => a - b);
+}
+
+function lineMatchesNumericSet(values = [], defaults = []) {
+  if (!values.length || !defaults.length) {
+    return false;
+  }
+  const normalizedValues = lineSortNumericList(values);
+  const normalizedDefaults = lineSortNumericList(defaults);
+  if (normalizedValues.length !== normalizedDefaults.length) {
+    return false;
+  }
+  return normalizedValues.every((value, index) => value === normalizedDefaults[index]);
+}
+
+function lineNormalizeNames(list = []) {
+  return list
+    .map(item => (typeof item === 'string' ? item.trim().toLowerCase() : ''))
+    .filter(Boolean)
+    .sort();
+}
+
+function lineMatchesNameSet(values = [], defaults = []) {
+  if (!values.length || !defaults.length) {
+    return false;
+  }
+  const normalizedValues = lineNormalizeNames(values);
+  const normalizedDefaults = lineNormalizeNames(defaults);
+  if (normalizedValues.length !== normalizedDefaults.length) {
+    return false;
+  }
+  return normalizedValues.every((value, index) => value === normalizedDefaults[index]);
+}
+
+function lineUsesDefaultSelection() {
+  if (lineSupabaseUrlParams.has('dataset')) {
+    return false;
+  }
+
+  const pollutantIds = parseLineIdList(
+    lineSupabaseUrlParams.get('pollutant_id')
+    || lineSupabaseUrlParams.get('pollutantId')
+  );
+  const pollutantNames = parseLineNameList(lineSupabaseUrlParams.get('pollutant'));
+  const groupIds = parseLineIdList(
+    lineSupabaseUrlParams.get('group_ids')
+    || lineSupabaseUrlParams.get('groupIds')
+    || lineSupabaseUrlParams.get('group_id')
+  );
+  const groupNames = parseLineNameList(
+    lineSupabaseUrlParams.get('group')
+    || lineSupabaseUrlParams.get('groups')
+  );
+
+  const pollutantIdsDefault = !pollutantIds.length
+    || lineMatchesNumericSet(pollutantIds, [LINE_DEFAULT_POLLUTANT_ID]);
+  const pollutantNamesDefault = !pollutantNames.length
+    || lineMatchesNameSet(pollutantNames, [LINE_DEFAULT_POLLUTANT_NAME]);
+  const groupIdsDefault = !groupIds.length
+    || lineMatchesNumericSet(groupIds, LINE_DEFAULT_GROUP_IDS);
+  const groupNamesDefault = !groupNames.length
+    || lineMatchesNameSet(groupNames, LINE_DEFAULT_GROUP_TITLES);
+
+  const startYearParam = lineSupabaseUrlParams.get('start_year');
+  const endYearParam = lineSupabaseUrlParams.get('end_year');
+  const singleYearParam = lineSupabaseUrlParams.get('year');
+  const startYearDefault = !startYearParam || Number(startYearParam) === LINE_DEFAULT_START_YEAR;
+  const endYearDefault = !endYearParam || Number(endYearParam) === LINE_DEFAULT_END_YEAR;
+  const singleYearDefault = !singleYearParam;
+
+  return (
+    pollutantIdsDefault
+    && pollutantNamesDefault
+    && groupIdsDefault
+    && groupNamesDefault
+    && startYearDefault
+    && endYearDefault
+    && singleYearDefault
+  );
+}
+
 function lineHasUrlOverrides() {
-  return lineUrlOverrideParams.some(param => lineSupabaseUrlParams.has(param));
+  if (!lineUrlOverrideParams.some(param => lineSupabaseUrlParams.has(param))) {
+    return false;
+  }
+  return !lineUsesDefaultSelection();
+}
+
+function lineMergeRecordCollections(primary = [], secondary = [], resolver) {
+  const resolveKey = typeof resolver === 'function'
+    ? resolver
+    : (entry) => {
+        if (!entry || typeof entry !== 'object') {
+          return null;
+        }
+        if (entry.id != null) {
+          return entry.id;
+        }
+        return null;
+      };
+
+  const merged = new Map();
+
+  const ingest = (collection, preferExisting) => {
+    collection.forEach(record => {
+      if (!record || typeof record !== 'object') {
+        return;
+      }
+      const key = resolveKey(record);
+      if (key === null || key === undefined) {
+        return;
+      }
+      if (merged.has(key) && !preferExisting) {
+        return;
+      }
+      merged.set(key, record);
+    });
+  };
+
+  ingest(primary, true);
+  ingest(secondary, false);
+
+  return Array.from(merged.values());
+}
+
+async function loadLineDefaultSelectorMetadata(sharedLoader) {
+  const loader = sharedLoader || window.SharedDataLoader;
+  if (!loader?.loadDefaultSnapshot) {
+    return null;
+  }
+  try {
+    const snapshot = await loader.loadDefaultSnapshot();
+    return snapshot?.data || null;
+  } catch (error) {
+    lineSupabaseWarnLog('Unable to load default selector metadata', error.message || error);
+    return null;
+  }
 }
 
 function parseLineIdList(value) {
@@ -502,6 +642,46 @@ async function loadData() {
         rows: rows.length
       });
       scheduleLineFullDataset(sharedLoader, 'hero');
+    }
+  }
+
+  if (datasetSource === 'hero') {
+    const selectorMetadata = await loadLineDefaultSelectorMetadata(sharedLoader);
+    if (selectorMetadata) {
+      const metadataPollutants = Array.isArray(selectorMetadata.pollutants)
+        ? selectorMetadata.pollutants
+        : [];
+      const metadataGroups = Array.isArray(selectorMetadata.groups)
+        ? selectorMetadata.groups
+        : [];
+
+      if (metadataPollutants.length) {
+        pollutants = lineMergeRecordCollections(
+          pollutants,
+          metadataPollutants,
+          record => {
+            if (record?.id != null) {
+              return record.id;
+            }
+            const name = record?.pollutant || record?.Pollutant || '';
+            return name ? name.toLowerCase() : null;
+          }
+        );
+      }
+
+      if (metadataGroups.length) {
+        groups = lineMergeRecordCollections(
+          groups,
+          metadataGroups,
+          record => {
+            if (record?.id != null) {
+              return record.id;
+            }
+            const title = record?.group_title || record?.group_name || '';
+            return title ? title.toLowerCase() : null;
+          }
+        );
+      }
     }
   }
 

@@ -247,36 +247,13 @@
       width: 295px;
     }
 
-    .chart-tab-nav {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      justify-content: flex-start;
-      align-items: center;
-      padding-right: 130px;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    .chart-tab-nav > button {
-      flex: 0 0 auto;
-      min-width: 190px;
-      max-width: 240px;
-      white-space: nowrap;
-    }
-
-    @media (max-width: 620px) {
-      .chart-tab-nav {
-        padding-right: 0;
-      }
-    }
-
     .header-bar {
       min-height: 4rem;
       height: auto;
       flex-wrap: wrap;
       row-gap: 4px;
       align-items: flex-start;
+      padding-top: 6px;
     }
 
     .page-title {
@@ -301,6 +278,13 @@
       .page-title {
         padding-right: 0;
       }
+    }
+
+    nav[role="tablist"] button:focus,
+    nav[role="tablist"] button:focus-visible,
+    nav[role="tablist"] button:focus-within {
+      outline: none;
+      box-shadow: none;
     }
 
     @supports (-webkit-appearance: none) {
@@ -513,12 +497,10 @@
         <div class="flex items-center">
           <div>
             <h1 class="text-3xl font-bold text-gray-900 page-title">
-              <span class="page-title-word">UK</span>
-              <span class="page-title-word">Air</span>
-              <span class="page-title-word">Pollution/Emissions</span>
+              <span class="page-title-word">UK Air</span>
+              <span class="page-title-word">Pollution/Emissions<wbr></span>
               <span class="page-title-word page-title-word--chunk">
-                <span>Data</span>
-                <span>Explorer</span>
+                <span>Data Explorer</span>
               </span>
             </h1>
             <p class="text-sm text-gray-500">Interactive Charts using UK Government Data</p>
@@ -533,7 +515,7 @@
     <div class="bg-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="border-b border-gray-200">
-          <nav class="-mb-px flex flex-wrap items-center gap-6 chart-tab-nav" role="tablist" aria-label="Chart views">
+          <nav class="-mb-px flex flex-wrap items-center gap-6" role="tablist" aria-label="Chart views">
             <button type="button" id="tab-1" data-chart="1" onclick="switchChart('1')" role="tab" aria-controls="chart-1" aria-selected="true" tabindex="0" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Bubble-Chart-Icon4.png" alt="Bubble chart icon" class="w-auto" style="height: 37px;">
               <span>Bubble Chart</span>
@@ -922,6 +904,7 @@
     window.addEventListener('load', () => {
       getParentFooterHeight();
       broadcastViewportMetrics();
+      prepaintSupplementalCharts();
     });
 
     if (debugLoggingEnabled) {
@@ -1343,8 +1326,72 @@
         return;
       }
       iframe.src = src;
+      try {
+        iframe.loading = 'eager';
+      } catch (error) {
+        /* noop */
+      }
       iframe.dataset.loaded = 'true';
       iframe.removeAttribute('data-src');
+    }
+
+    const PREPAINT_CHARTS = ['group-info', 'user-guide', 'resources'];
+
+    function prepaintHiddenChart(chartId) {
+      const container = document.getElementById(`chart-${chartId}`);
+      if (!container || container.dataset.prepainted === 'true') {
+        return;
+      }
+
+      const iframe = container.querySelector('iframe');
+      if (!iframe) {
+        return;
+      }
+
+      loadLazyIframeForChart(chartId);
+
+      const previousState = {
+        visibility: container.style.visibility,
+        height: container.style.height,
+        overflow: container.style.overflow,
+        ariaHidden: container.getAttribute('aria-hidden')
+      };
+
+      container.style.visibility = 'visible';
+      container.style.height = 'auto';
+      container.style.overflow = 'visible';
+      container.style.opacity = '0';
+      container.style.pointerEvents = 'none';
+      container.setAttribute('aria-hidden', 'true');
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (container.getAttribute('aria-hidden') === 'false') {
+            container.style.opacity = '';
+            container.style.pointerEvents = '';
+            container.dataset.prepainted = 'true';
+            return;
+          }
+
+          container.style.visibility = previousState.visibility || 'hidden';
+          container.style.height = previousState.height || '0';
+          container.style.overflow = previousState.overflow || 'hidden';
+          container.style.opacity = '';
+          container.style.pointerEvents = '';
+
+          if (previousState.ariaHidden !== null && previousState.ariaHidden !== undefined) {
+            container.setAttribute('aria-hidden', previousState.ariaHidden);
+          } else {
+            container.removeAttribute('aria-hidden');
+          }
+
+          container.dataset.prepainted = 'true';
+        });
+      });
+    }
+
+    function prepaintSupplementalCharts() {
+      PREPAINT_CHARTS.forEach(prepaintHiddenChart);
     }
 
     function navigateChartByDelta(delta) {
