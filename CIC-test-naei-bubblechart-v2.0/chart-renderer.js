@@ -634,10 +634,20 @@ function createCustomLegend(chart, data, groupIds, dataPoints) {
     window.seriesVisibility = seriesVisibility; // Update window reference
   }
 
-  // Get unique group names
-  const uniqueGroups = [...new Set(dataPoints.map(p => p.groupName))];
+  const pointsByGroupId = new Map();
+  dataPoints.forEach(point => {
+    if (!pointsByGroupId.has(point.groupId)) {
+      pointsByGroupId.set(point.groupId, point);
+    }
+  });
 
-  uniqueGroups.forEach((groupName, index) => {
+  groupIds.forEach((groupId, index) => {
+    const pointForGroup = pointsByGroupId.get(groupId);
+    const groupName = pointForGroup?.groupName
+      || (typeof window.supabaseModule?.getGroupName === 'function'
+        ? window.supabaseModule.getGroupName(groupId)
+        : `Group ${groupId}`);
+    const hasData = Boolean(pointForGroup);
     const legendItem = document.createElement('span');
     legendItem.style.display = 'inline-flex';
     legendItem.style.alignItems = 'center';
@@ -654,43 +664,50 @@ function createCustomLegend(chart, data, groupIds, dataPoints) {
     colorCircle.style.borderRadius = '50%';
     colorCircle.style.marginRight = '8px';
 
-    const label = document.createTextNode(groupName);
+    const displayName = hasData ? groupName : `${groupName} (No data available)`;
+    const label = document.createTextNode(displayName);
 
     legendItem.appendChild(colorCircle);
     legendItem.appendChild(label);
 
     const updateLegendAppearance = (isVisible) => {
-      legendItem.style.opacity = isVisible ? '1' : '0.4';
-      legendItem.style.color = isVisible ? '#000' : '#888';
-      colorCircle.style.backgroundColor = isVisible ? baseColor : '#cccccc';
+      const isActive = hasData && isVisible;
+      legendItem.style.opacity = isActive ? '1' : '0.4';
+      legendItem.style.color = isActive ? '#000' : '#666';
+      legendItem.style.cursor = hasData ? 'pointer' : 'default';
+      colorCircle.style.backgroundColor = baseColor;
+
+      if (!hasData) {
+        legendItem.title = 'No data available';
+      } else {
+        legendItem.removeAttribute('title');
+      }
     };
 
     updateLegendAppearance(seriesVisibility[index]);
 
-    // Add click handler to toggle visibility
-    legendItem.addEventListener('click', () => {
-      seriesVisibility[index] = !seriesVisibility[index];
-      window.seriesVisibility = seriesVisibility; // Update window reference
-      
-      // Update legend appearance immediately
-      updateLegendAppearance(seriesVisibility[index]);
-      
-      // Prevent all-series-hidden state (re-enable if user hides last one)
-      if (!seriesVisibility.some(Boolean)) {
-        seriesVisibility[index] = true;
-        updateLegendAppearance(true);
-      }
-      
-      // Redraw chart with updated visibility
-      const currentData = window.ChartRenderer.getCurrentChartData();
-      if (currentData) {
-        window.ChartRenderer.drawBubbleChart(
-          currentData.year,
-          currentData.pollutantId,
-          currentData.groupIds
-        );
-      }
-    });
+    if (hasData) {
+      legendItem.addEventListener('click', () => {
+        seriesVisibility[index] = !seriesVisibility[index];
+        window.seriesVisibility = seriesVisibility; // Update window reference
+        
+        updateLegendAppearance(seriesVisibility[index]);
+        
+        if (!seriesVisibility.some(Boolean)) {
+          seriesVisibility[index] = true;
+          updateLegendAppearance(true);
+        }
+        
+        const currentData = window.ChartRenderer.getCurrentChartData();
+        if (currentData) {
+          window.ChartRenderer.drawBubbleChart(
+            currentData.year,
+            currentData.pollutantId,
+            currentData.groupIds
+          );
+        }
+      });
+    }
 
     legendContainer.appendChild(legendItem);
   });
