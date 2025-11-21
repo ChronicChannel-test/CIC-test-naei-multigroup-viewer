@@ -123,8 +123,12 @@ function waitForChromeStability(targetElements = []) {
     }));
 }
 
+function hasGoogleChartsCore() {
+  return Boolean(window.google?.visualization?.DataTable && window.google?.visualization?.ScatterChart);
+}
+
 function ensureGoogleChartsLoaded() {
-  if (googleChartsReady && window.google?.visualization?.DataTable) {
+  if (googleChartsReady && hasGoogleChartsCore()) {
     return Promise.resolve();
   }
 
@@ -155,7 +159,7 @@ function ensureGoogleChartsLoaded() {
       if (settled) {
         return;
       }
-      if (!window.google?.visualization?.DataTable) {
+      if (!hasGoogleChartsCore()) {
         return;
       }
       settled = true;
@@ -232,11 +236,11 @@ ensureGoogleChartsLoaded().catch(error => {
 async function drawBubbleChart(year, pollutantId, groupIds) {
   const stabilityHandle = beginChartStabilityCycle();
   try {
-    if (!googleChartsReady || !window.google?.visualization?.DataTable) {
+    if (!googleChartsReady || !hasGoogleChartsCore()) {
       await ensureGoogleChartsLoaded();
     }
 
-    if (!googleChartsReady || !window.google?.visualization?.DataTable) {
+    if (!googleChartsReady || !hasGoogleChartsCore()) {
       showMessage('Unable to load the Google Charts library. Please refresh and try again.', 'error');
       return;
     }
