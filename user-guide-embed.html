@@ -100,8 +100,8 @@
       </div>
 
       <div class="user-guide-downloads" role="group" aria-label="User guide downloads">
-        <a id="downloadUserGuide" class="user-guide-download" href="SharedResources/docs/User-Guide-Pollution-Emissions-Data-Explorer-v0.6.pdf" download target="_blank" rel="noopener">Download User Guide PDF</a>
-        <a id="downloadTutorial" class="user-guide-download" href="SharedResources/docs/Bubble-Chart-Tutorial-v3.pdf" download target="_blank" rel="noopener">Download Bubble Chart Tutorial</a>
+        <a id="downloadUserGuide" class="user-guide-download" href="SharedResources/docs/User-Guide-Pollution-Emissions-Data-Explorer-v0.6.pdf" download target="_blank" rel="noopener">Download User Guide</a>
+        <a id="downloadTutorial" class="user-guide-download" href="SharedResources/docs/Bubble-Chart-Tutorial-v1.pdf" download target="_blank" rel="noopener">Download Bubble Chart Tutorial</a>
       </div>
 
       <div class="chart-wrapper user-guide-wrapper" role="region" aria-label="User guide PDF viewer">
@@ -158,11 +158,11 @@
           const viewerUrl = new URL(pdfjsViewerPath, window.location.href);
           viewerUrl.searchParams.set('disablePreferences', 'true');
           viewerUrl.searchParams.set('file', absolutePdfUrl);
-          viewerUrl.hash = 'page=1&zoom=page-fit&spread=odd&view=spread';
+          viewerUrl.hash = 'page=1&zoom=page-fit&spread=odd&scroll=page&view=spread';
           return viewerUrl.href;
         } catch (error) {
           console.warn('Unable to construct viewer URL, falling back to relative path', error);
-          return `${pdfjsViewerPath}?disablePreferences=true&file=${encodeURIComponent(absolutePdfUrl)}#page=1&zoom=page-fit&spread=odd&view=spread`;
+          return `${pdfjsViewerPath}?disablePreferences=true&file=${encodeURIComponent(absolutePdfUrl)}#page=1&zoom=page-fit&spread=odd&scroll=page&view=spread`;
         }
       }
 

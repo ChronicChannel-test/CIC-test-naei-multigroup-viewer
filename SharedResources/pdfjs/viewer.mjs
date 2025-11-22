@@ -1178,6 +1178,27 @@ class PDFLinkService {
           this.pdfViewer.spreadMode = spreadMode;
         }
       }
+      if (params.has("scroll")) {
+        const scroll = params.get("scroll")?.toLowerCase();
+        let scrollMode = null;
+        switch (scroll) {
+          case "vertical":
+            scrollMode = ScrollMode.VERTICAL;
+            break;
+          case "horizontal":
+            scrollMode = ScrollMode.HORIZONTAL;
+            break;
+          case "wrapped":
+            scrollMode = ScrollMode.WRAPPED;
+            break;
+          case "page":
+            scrollMode = ScrollMode.PAGE;
+            break;
+        }
+        if (scrollMode !== null && this.pdfViewer) {
+          this.pdfViewer.scrollMode = scrollMode;
+        }
+      }
       if (params.has("nameddest")) {
         this.goToDestination(params.get("nameddest"));
       }
@@ -13113,6 +13134,69 @@ const PDFViewerApplication = {
   _isCtrlKeyDown: false,
   _caretBrowsing: null,
   _isScrolling: false,
+  _applyInitialViewerModesFromHash() {
+    if (!this.initialBookmark) {
+      return;
+    }
+    const params = parseQueryString(this.initialBookmark);
+    const spread = params.get("spread")?.toLowerCase() ?? null;
+    if (spread) {
+      const spreadMap = {
+        none: SpreadMode.NONE,
+        odd: SpreadMode.ODD,
+        even: SpreadMode.EVEN
+      };
+      const spreadMode = spreadMap[spread];
+      if (typeof spreadMode === "number") {
+        AppOptions.set("spreadModeOnLoad", spreadMode);
+      }
+    }
+    const scroll = params.get("scroll")?.toLowerCase() ?? null;
+    if (scroll) {
+      const scrollMap = {
+        vertical: ScrollMode.VERTICAL,
+        horizontal: ScrollMode.HORIZONTAL,
+        wrapped: ScrollMode.WRAPPED,
+        page: ScrollMode.PAGE
+      };
+      const scrollMode = scrollMap[scroll];
+      if (typeof scrollMode === "number") {
+        AppOptions.set("scrollModeOnLoad", scrollMode);
+      }
+    }
+  },
+  _setupExternalMessaging() {
+    window.addEventListener("message", event => {
+      const payload = event?.data;
+      if (!payload || payload.type !== "userGuideNavigate") {
+        return;
+      }
+      const {
+        action
+      } = payload;
+      switch (action) {
+        case "next":
+        case "nextSpread":
+          this.pdfViewer?.nextPage();
+          break;
+        case "previous":
+        case "prev":
+        case "previousSpread":
+          this.pdfViewer?.previousPage();
+          break;
+        case "first":
+          this.page = 1;
+          break;
+        case "last":
+          if (this.pagesCount) {
+            this.page = this.pagesCount;
+          }
+          break;
+      }
+    }, {
+      signal: this._globalAbortController.signal
+    });
+  },
   async initialize(appConfig) {
     this.appConfig = appConfig;
     try {
@@ -13120,6 +13204,7 @@ const PDFViewerApplication = {
     } catch (ex) {
       console.error(`initialize: "${ex.message}".`);
     }
+    this._applyInitialViewerModesFromHash();
     if (AppOptions.get("pdfBugEnabled")) {
       await this._parseHashParams();
     }
@@ -13142,6 +13227,7 @@ const PDFViewerApplication = {
       AppOptions.set("externalLinkTarget", LinkTarget.TOP);
     }
     await this._initializeViewerComponents();
+    this._setupExternalMessaging();
     this.bindEvents();
     this.bindWindowEvents();
     this._initializedCapability.settled = true;

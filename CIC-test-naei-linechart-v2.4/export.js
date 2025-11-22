@@ -567,7 +567,7 @@ async function generateChartImage() {
 
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      img.onload = () => {
+      img.onload = async () => {
         try {
           const unit = window.pollutantUnits[pollutant] || "";
           const startYearValue = document.getElementById('startYear')?.value || '';
@@ -577,24 +577,213 @@ async function generateChartImage() {
             : (startYearValue || endYearValue || '');
           const pollutantTitle = unit ? `${pollutant} - ${unit}` : pollutant;
           const padding = 50; 
-          const yearTopOffset = padding + 90;
           const yearHeight = yearLabel ? 152 : 0;
           const titleHeight = 162;
-          const footerHeight = 190;
-
-          // --- 2. Measure the custom HTML legend to determine its height ---
-          const legendClone = document.getElementById('customLegend').cloneNode(true);
-          legendClone.style.position = 'absolute';
-          legendClone.style.visibility = 'hidden';
-          legendClone.style.width = (chartWidth - (padding * 2)) + 'px';
-          document.body.appendChild(legendClone);
-          const legendHeight = legendClone.offsetHeight + 30;
-          document.body.removeChild(legendClone);
+          const headerText = 'UK Air Pollution/Emissions';
+          const baseChartWidth = chartContainer?.offsetWidth || chartWidth;
+          const logicalCanvasWidth = baseChartWidth + padding * 2;
+          const isNarrowExport = logicalCanvasWidth < 768;
+          const canvasWidth = chartWidth + padding * 2;
+          const loadImageElement = (src) => new Promise((resolve, reject) => {
+            const image = new Image();
+            image.crossOrigin = 'anonymous';
+            image.onload = () => resolve(image);
+            image.onerror = (err) => reject(err);
+            image.src = src;
+          });
 
           // --- 3. Set up the final canvas dimensions ---
+          const measureCanvas = document.createElement('canvas');
+          const measureCtx = measureCanvas.getContext('2d');
+          const buildHeaderMetrics = width => {
+            const headerFontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            const maxWidth = Math.max(300, width - 200);
+            let fontSize = 90;
+            const minFontSize = 60;
+            let font = `700 ${fontSize}px ${headerFontFamily}`;
+            measureCtx.font = font;
+            while (measureCtx.measureText(headerText).width > maxWidth && fontSize > minFontSize) {
+              fontSize -= 2;
+              font = `700 ${fontSize}px ${headerFontFamily}`;
+              measureCtx.font = font;
+            }
+            const lineHeight = fontSize + 40;
+            return {
+              font,
+              fontSize,
+              height: lineHeight
+            };
+          };
+          const buildFooterLayout = width => {
+            const compactFooter = width < 768;
+            const footerFontSize = compactFooter ? 42 : 52;
+            const lineHeight = compactFooter ? 50 : 60;
+            const footerFontFamily = '"Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            const footerFont = `${footerFontSize}px ${footerFontFamily}`;
+            const footerFontBold = `600 ${footerFontSize}px ${footerFontFamily}`;
+            const maxLineWidth = width - 80;
+            const topPadding = lineHeight;
+            measureCtx.textAlign = 'left';
+            const licenseSegments = [
+              '© Crown 2025 copyright Defra & DESNZ',
+              'via naei.energysecurity.gov.uk',
+              'licensed under the Open Government Licence (OGL).'
+            ];
+            const licenseLines = [];
+            let currentLine = '';
+            measureCtx.font = footerFont;
+            licenseSegments.forEach(segment => {
+              const candidate = currentLine ? `${currentLine} ${segment}` : segment;
+              if (measureCtx.measureText(candidate).width <= maxLineWidth) {
+                currentLine = candidate;
+              } else {
+                if (currentLine) {
+                  licenseLines.push(currentLine);
+                }
+                currentLine = segment;
+              }
+            });
+            if (currentLine) {
+              licenseLines.push(currentLine);
+            }
+            const licenseHeight = licenseLines.length * lineHeight;
+
+            const contactSegments = [
+              { label: 'Website: ', value: 'chronicillnesschannel.co.uk/data-explorer' },
+              { label: 'YouTube: ', value: 'youtube.com/@ChronicIllnessChannel' },
+              { label: 'Contact: ', value: 'info@chronicillnesschannel.co.uk' }
+            ];
+            const segmentSpacing = 40;
+            const measuredSegments = contactSegments.map(segment => {
+              measureCtx.font = footerFontBold;
+              const labelWidth = measureCtx.measureText(segment.label).width;
+              measureCtx.font = footerFont;
+              const valueWidth = measureCtx.measureText(segment.value).width;
+              return {
+                ...segment,
+                labelWidth,
+                valueWidth,
+                totalWidth: labelWidth + valueWidth
+              };
+            });
+            const computeLineWidth = indices => indices.reduce((sum, idx, position) => {
+              const spacing = position > 0 ? segmentSpacing : 0;
+              return sum + measuredSegments[idx].totalWidth + spacing;
+            }, 0);
+            const layouts = [
+              [[0, 1, 2]],
+              [[0, 1], [2]],
+              [[0], [1, 2]],
+              [[0], [1], [2]]
+            ];
+            const contactLines = (layouts.find(lines =>
+              lines.every(indices => computeLineWidth(indices) <= maxLineWidth)
+            ) || layouts[layouts.length - 1]).map(indices => ({
+              indices,
+              width: computeLineWidth(indices)
+            }));
+            const contactHeight = contactLines.length * lineHeight;
+            const contactSpacingHeight = contactLines.length ? 20 : 0;
+            const totalHeight = topPadding + licenseHeight + contactSpacingHeight + contactHeight;
+            const contactSegmentWidth = measuredSegments[2]?.totalWidth || measuredSegments[measuredSegments.length - 1]?.totalWidth || 0;
+            return {
+              lineHeight,
+              footerFont,
+              footerFontBold,
+              licenseLines,
+              contactLines,
+              measuredSegments,
+              segmentSpacing,
+              totalHeight,
+              contactSegmentWidth
+            };
+          };
+
+          const buildLegendLayout = width => {
+            const legendDiv = document.getElementById('customLegend');
+            if (!legendDiv) {
+              return { rows: [], totalHeight: 0, rowHeight: 92 };
+            }
+            const allItems = [...legendDiv.children].filter(el => el.tagName === 'SPAN');
+            const visibility = window.seriesVisibility || [];
+            const rows = [];
+            let row = [];
+            let rowW = 0;
+            const legendRowHeight = 92;
+            const maxW = width - padding * 2;
+            measureCtx.font = '600 70px system-ui, sans-serif';
+
+            allItems.forEach((item, index) => {
+              const dot = item.querySelector('span');
+              if (!dot) {
+                return;
+              }
+              const text = item.textContent.trim();
+              const hasNoData = text.includes('(No data available)');
+              const isVisible = visibility[index] !== false;
+              if (!isVisible && !hasNoData) {
+                return;
+              }
+              const textWidth = measureCtx.measureText(text).width;
+              const entryWidth = textWidth + 138;
+              if (rowW + entryWidth > maxW && row.length) {
+                rows.push({ entries: row, width: rowW });
+                row = [];
+                rowW = 0;
+              }
+              row.push({
+                dotColor: dot.style.backgroundColor,
+                text,
+                faded: hasNoData,
+                textWidth
+              });
+              rowW += entryWidth;
+            });
+
+            if (row.length) {
+              rows.push({ entries: row, width: rowW });
+            }
+
+            return {
+              rows,
+              totalHeight: rows.length * legendRowHeight,
+              rowHeight: legendRowHeight
+            };
+          };
+
+          const headerMetrics = buildHeaderMetrics(canvasWidth);
+          const footerLayout = buildFooterLayout(canvasWidth);
+          const legendLayout = buildLegendLayout(canvasWidth);
+          const legendSpacing = legendLayout.rows.length ? 30 : 0;
+          const legendHeight = legendLayout.totalHeight + legendSpacing;
+
+          let bannerConfig = null;
+          if (isNarrowExport) {
+            try {
+              const bannerImage = await loadImageElement('../SharedResources/images/CIC-Banner-alpha.svg');
+              const targetWidth = Math.min(
+                Math.max(footerLayout.contactSegmentWidth || 0, 200),
+                canvasWidth - 160
+              );
+              if (targetWidth > 0) {
+                const scaledHeight = Math.round((targetWidth / bannerImage.naturalWidth) * bannerImage.naturalHeight);
+                bannerConfig = {
+                  image: bannerImage,
+                  width: targetWidth,
+                  height: scaledHeight,
+                  spacingTop: 30,
+                  spacingBottom: 0
+                };
+              }
+            } catch (err) {
+              console.warn('CIC banner failed to load for narrow export', err);
+            }
+          }
+
+          const bannerExtraHeight = bannerConfig ? bannerConfig.spacingTop + bannerConfig.height + bannerConfig.spacingBottom : 0;
+
           const canvas = document.createElement('canvas');
-          const canvasWidth = chartWidth + padding * 2;
-          const canvasHeight = yearHeight + titleHeight + legendHeight + chartHeight + footerHeight + padding * 2;
+          const canvasHeight = headerMetrics.height + yearHeight + titleHeight + legendHeight + chartHeight + footerLayout.totalHeight + bannerExtraHeight + padding * 2;
           canvas.width = canvasWidth;
           canvas.height = canvasHeight;
           const ctx = canvas.getContext('2d');
@@ -608,63 +797,25 @@ async function generateChartImage() {
           ctx.fillStyle = '#000000';
           ctx.textAlign = 'center';
 
+          ctx.font = headerMetrics.font;
+          const headerBaseline = padding + headerMetrics.fontSize;
+          ctx.fillText(headerText, canvasWidth / 2, headerBaseline);
+
+          const yearTopOffset = padding + headerMetrics.height + 90;
+
           if (yearLabel) {
             ctx.font = 'bold 120px system-ui, sans-serif';
             ctx.fillText(yearLabel, canvasWidth / 2, yearTopOffset);
           }
 
           ctx.font = 'bold 95px system-ui, sans-serif';
-          ctx.fillText(pollutantTitle, canvasWidth / 2, padding + yearHeight + 55);
+          ctx.fillText(pollutantTitle, canvasWidth / 2, padding + headerMetrics.height + yearHeight + 55);
 
           // Custom Legend - Larger Font and Dots
-          // Filter legend items: exclude disabled series, but keep "No data available" ones
-          const legendDiv = document.getElementById('customLegend');
-          // Get only direct child spans (the legend items), not nested spans (the dots)
-          const allItems = [...legendDiv.children].filter(el => el.tagName === 'SPAN');
-          
-          // Get the current visibility state from main.js
-          const visibility = window.seriesVisibility || [];
-          
-          console.log('PNG Generation - Total legend items:', allItems.length);
-          console.log('PNG Generation - Visibility array:', visibility);
-          
-          // Filter items: include if visible OR if it has no data (keep for reference)
-          const items = allItems.filter((item, index) => {
-            const hasNoData = item.textContent.includes('(No data available)');
-            const isVisible = visibility[index] !== false; // true or undefined = visible
-            console.log(`Item ${index}: "${item.textContent.trim()}" - hasNoData: ${hasNoData}, isVisible: ${isVisible}, include: ${isVisible || hasNoData}`);
-            return isVisible || hasNoData;
-          });
-          
-          console.log('PNG Generation - Filtered items count:', items.length);
-          
-          let legendY = padding + yearHeight + 155;
-          const legendRowHeight = 92;
-          const maxW = canvasWidth - padding * 2;
-          const rowItems = [];
-          let row = [], rowW = 0;
-
-          items.forEach((it) => {
-            const dot = it.querySelector('span');
-            if (!dot) return;
-            const text = it.textContent.trim();
-            ctx.font = '600 70px system-ui, sans-serif';
-            const textW = ctx.measureText(text).width;
-            const w = textW + 138;
-            if (rowW + w > maxW && row.length) {
-              rowItems.push({ row, rowW });
-              row = [];
-              rowW = 0;
-            }
-            row.push({ dotColor: dot.style.backgroundColor, text });
-            rowW += w;
-          });
-          if (row.length) rowItems.push({ row, rowW });
-
-          rowItems.forEach(({ row, rowW }) => {
-            let x = (canvasWidth - rowW) / 2;
-            row.forEach(({ dotColor, text }) => {
-              const faded = text.includes('(No data available)');
+          let legendY = padding + headerMetrics.height + yearHeight + 155;
+          legendLayout.rows.forEach(({ entries, width }) => {
+            let x = (canvasWidth - width) / 2;
+            entries.forEach(({ dotColor, text, faded, textWidth }) => {
               ctx.globalAlpha = faded ? 0.5 : 1.0;
               ctx.beginPath();
               ctx.arc(x + 30, legendY - 27, 30, 0, 2 * Math.PI);
@@ -675,89 +826,96 @@ async function generateChartImage() {
               ctx.textAlign = 'left';
               ctx.fillText(text, x + 88, legendY);
               ctx.globalAlpha = 1.0;
-              x += ctx.measureText(text).width + 138;
+              const advance = (typeof textWidth === 'number' ? textWidth : ctx.measureText(text).width) + 138;
+              x += advance;
             });
-            legendY += legendRowHeight;
+            legendY += legendLayout.rowHeight;
           });
 
           // Chart Image
-          const chartY = padding + yearHeight + titleHeight + legendHeight + 20;
+          const chartY = padding + headerMetrics.height + yearHeight + titleHeight + legendHeight + 20;
           ctx.drawImage(img, padding, chartY, chartWidth, chartHeight);
 
-          // --- 5. Draw Logo and Footer, then resolve ---
-          const logo = new Image();
-          logo.crossOrigin = 'anonymous';
-          logo.src = '../SharedResources/images/CIC-Square-Border-Words-Alpha.svg';
-
+          // --- 5. Draw Branding, Footer, then resolve ---
           const finishGeneration = () => {
-            ctx.font = '52px system-ui, sans-serif';
+            const {
+              lineHeight,
+              footerFont,
+              footerFontBold,
+              licenseLines,
+              contactLines,
+              measuredSegments,
+              segmentSpacing
+            } = footerLayout;
+            let footerY = chartY + chartHeight + lineHeight;
+
             ctx.fillStyle = '#555';
             ctx.textAlign = 'center';
-            
-            // Check if footer needs to wrap
-            const fullFooterText = "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk licensed under the Open Government Licence (OGL).";
-            const footerTextWidth = ctx.measureText(fullFooterText).width;
-            
-            let footerY = chartY + chartHeight + 60;
-            
-            if (footerTextWidth > canvasWidth - 40) {
-              // Wrap: split after "gov.uk"
-              const footerLine1 = "© Crown 2025 copyright Defra & DESNZ via naei.energysecurity.gov.uk";
-              const footerLine2 = "licensed under the Open Government Licence (OGL).";
-              ctx.fillText(footerLine1, canvasWidth / 2, footerY);
-              ctx.fillText(footerLine2, canvasWidth / 2, footerY + 60);
-              footerY += 60; // Adjust for wrapped line
-            } else {
-              // Single line
-              ctx.fillText(fullFooterText, canvasWidth / 2, footerY);
+            ctx.font = footerFont;
+
+            licenseLines.forEach((line, index) => {
+              ctx.fillText(line, canvasWidth / 2, footerY + index * lineHeight);
+            });
+            footerY += licenseLines.length * lineHeight;
+
+            if (contactLines.length) {
+              footerY += 20;
+              ctx.textAlign = 'left';
+              contactLines.forEach(({ indices, width }, lineIndex) => {
+                let lineX = (canvasWidth - width) / 2;
+                indices.forEach((segmentIndex, idx) => {
+                  const segment = measuredSegments[segmentIndex];
+                  if (idx > 0) {
+                    lineX += segmentSpacing;
+                  }
+                  ctx.font = footerFontBold;
+                  ctx.fillText(segment.label, lineX, footerY);
+                  lineX += segment.labelWidth;
+                  ctx.font = footerFont;
+                  ctx.fillText(segment.value, lineX, footerY);
+                  lineX += segment.valueWidth;
+                });
+                if (lineIndex < contactLines.length - 1) {
+                  footerY += lineHeight;
+                }
+              });
             }
 
-            const channelY = footerY + 60;
-            const boldText = "Youtube: "; // Reverted text to 'Youtube:'
-            const normalText = "youtube.com/@chronicillnesschannel";
-            
-            ctx.font = 'bold 52px system-ui, sans-serif';
-            const boldWidth = ctx.measureText(boldText).width;
-            ctx.font = '52px system-ui, sans-serif';
-            const normalWidth = ctx.measureText(normalText).width;
-            const totalWidth = boldWidth + normalWidth;
-            
-            // Check if channel text fits on one line
-            if (totalWidth > canvasWidth - 40) {
-              // Wrap: put URL on separate line
-              ctx.textAlign = 'center';
-              ctx.font = 'bold 52px system-ui, sans-serif';
-              ctx.fillText(boldText.trim(), canvasWidth / 2, channelY);
-              ctx.font = '52px system-ui, sans-serif';
-              ctx.fillText(normalText, canvasWidth / 2, channelY + 60);
-            } else {
-              // Single line
-              const startX = (canvasWidth - totalWidth) / 2;
-              ctx.textAlign = 'left';
-              ctx.font = 'bold 52px system-ui, sans-serif';
-              ctx.fillText(boldText, startX, channelY);
-              ctx.font = '52px system-ui, sans-serif';
-              ctx.fillText(normalText, startX + boldWidth, channelY);
+            if (bannerConfig) {
+              footerY += bannerConfig.spacingTop;
+              const bannerX = (canvasWidth - bannerConfig.width) / 2;
+              try {
+                ctx.drawImage(bannerConfig.image, bannerX, footerY, bannerConfig.width, bannerConfig.height);
+              } catch (err) {
+                console.warn('Failed to draw CIC banner', err);
+              }
+              footerY += bannerConfig.height + bannerConfig.spacingBottom;
             }
-            
+
             const dataURL = canvas.toDataURL('image/png');
             resolve(dataURL);
           };
 
-          logo.onload = () => {
-            try {
-              const logoSize = 360; // Enlarged CIC logo for exports
-              ctx.drawImage(logo, canvasWidth - logoSize - 30, 30, logoSize, logoSize);
-            } catch (e) {
-              console.warn('Logo failed to draw, continuing without logo:', e);
-            }
+          if (isNarrowExport) {
             finishGeneration();
-          };
-
-          logo.onerror = () => {
-            console.warn('Logo failed to load, continuing without logo');
-            finishGeneration();
-          };
+          } else {
+            const logo = new Image();
+            logo.crossOrigin = 'anonymous';
+            logo.onload = () => {
+              try {
+                const logoSize = 360; // Enlarged CIC logo for exports
+                ctx.drawImage(logo, canvasWidth - logoSize - 30, 30, logoSize, logoSize);
+              } catch (e) {
+                console.warn('Logo failed to draw, continuing without logo:', e);
+              }
+              finishGeneration();
+            };
+            logo.onerror = () => {
+              console.warn('Logo failed to load, continuing without logo');
+              finishGeneration();
+            };
+            logo.src = '../SharedResources/images/CIC-Square-Border-Words-Alpha.svg';
+          }
 
         } catch (error) {
           reject(error);

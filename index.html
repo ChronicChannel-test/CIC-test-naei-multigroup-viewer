@@ -606,14 +606,15 @@
 
     <!-- Footer (inside chart-interface so it fades in with the chart) -->
   <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" id="mainFooter" style="margin-top: 0; opacity: 1;">
-      <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via
+      <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ<span class="footer-break" aria-hidden="true"> </span> via
       <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
       <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
       <br>
-      <strong>YouTube:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">www.youtube.com/@ChronicIllnessChannel</a>
+      <strong>YouTube:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">www.youtube.com/@ChronicIllnessChannel</a><span class="footer-break" aria-hidden="true"> </span>
+    <strong>Contact:</strong> <a  href="mailto:info@chronicillnesschannel.co.uk" target="_blank" rel="noopener" class="text-blue-600hover:text-blue-800">info@chronicillnesschannel.co.uk</a>
       <br>
       <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-        Explorer Version: v3.1 CIC-testdb (Line: v2.4, Bubble: v2.0) • Build: 2025.11.20
+        Explorer Version: v3.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.11.22
       </span>
     </footer>
   </div> <!-- End chart-interface -->
@@ -637,6 +638,18 @@
     @media (max-width: 900px) {
       .footer-copyright {
         display: block;
+      }
+    }
+
+    .footer-break {
+      display: inline;
+    }
+
+    @media (max-width: 768px) {
+      .footer-break {
+        display: block;
+        width: 100%;
+        height: 0;
       }
     }
   </style>
