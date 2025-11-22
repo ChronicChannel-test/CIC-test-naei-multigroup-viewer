@@ -282,62 +282,129 @@ async function generateChartImage() {
             };
           };
 
-          const buildLegendLayout = width => {
+          const buildLegendLayout = (width, chartData) => {
+            const fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            const emptyLayout = {
+              rows: [],
+              totalHeight: 0,
+              rowHeight: 92,
+              font: '600 70px system-ui, sans-serif'
+            };
             const legendDiv = document.getElementById('customLegend');
-            if (!legendDiv) {
-              return { rows: [], totalHeight: 0, rowHeight: 92 };
-            }
-            const allItems = [...legendDiv.children].filter(el => el.tagName === 'SPAN');
             const visibility = window.seriesVisibility || [];
+            const domItems = legendDiv
+              ? [...legendDiv.children].filter(el => el.tagName === 'SPAN').map((item, index) => {
+                  const dot = item.querySelector('span');
+                  if (!dot) {
+                    return null;
+                  }
+                  if (visibility[index] === false) {
+                    return null;
+                  }
+                  return {
+                    text: item.textContent.trim(),
+                    dotColor: dot.style.backgroundColor,
+                    faded: item.textContent.includes('(No data available)')
+                  };
+                }).filter(Boolean)
+              : [];
+
+            let sourceItems = domItems;
+
+            if (!sourceItems.length && chartData) {
+              const groupOrder = Array.isArray(chartData.groupIds) && chartData.groupIds.length
+                ? chartData.groupIds
+                : [...new Set((chartData.dataPoints || []).map(point => point.groupId))];
+              const pointsByGroup = new Map((chartData.dataPoints || []).map(point => [point.groupId, point]));
+              sourceItems = groupOrder.map(groupId => {
+                const point = pointsByGroup.get(groupId);
+                const groupName = point?.groupName
+                  || (typeof window.supabaseModule?.getGroupName === 'function'
+                    ? window.supabaseModule.getGroupName(groupId)
+                    : `Group ${groupId}`);
+                const hasData = Boolean(point);
+                const dotColor = typeof window.Colors?.getColorForGroup === 'function'
+                  ? window.Colors.getColorForGroup(groupName)
+                  : '#000000';
+                return {
+                  text: hasData ? groupName : `${groupName} (No data available)`,
+                  dotColor,
+                  faded: !hasData
+                };
+              });
+            }
+
+            if (!sourceItems.length) {
+              return emptyLayout;
+            }
+
             const rows = [];
             let row = [];
             let rowW = 0;
-            const legendRowHeight = 92;
+            const baseFontSize = 70;
+            const minFontSize = 40;
+            const rowPadding = 22;
+            const entryPadding = 138;
             const maxW = width - padding * 2;
-            measureCtx.font = '600 70px system-ui, sans-serif';
+            const measureText = size => {
+              measureCtx.font = `600 ${size}px ${fontFamily}`;
+              return text => measureCtx.measureText(text).width;
+            };
+            const buildEntries = size => {
+              const measure = measureText(size);
+              let maxEntryWidth = 0;
+              const entries = sourceItems.map(item => {
+                const textWidth = measure(item.text);
+                const entryWidth = textWidth + entryPadding;
+                maxEntryWidth = Math.max(maxEntryWidth, entryWidth);
+                return {
+                  ...item,
+                  textWidth,
+                  entryWidth
+                };
+              });
+              return { entries, maxEntryWidth };
+            };
 
-            allItems.forEach((item, index) => {
-              if (visibility[index] === false) {
-                return;
+            let legendFontSize = baseFontSize;
+            let { entries, maxEntryWidth } = buildEntries(legendFontSize);
+            const maxAllowedEntryWidth = Math.max(maxW, 0);
+            if (maxAllowedEntryWidth > 0 && maxEntryWidth > maxAllowedEntryWidth) {
+              const ratio = maxAllowedEntryWidth / maxEntryWidth;
+              const adjustedSize = Math.max(minFontSize, Math.floor(legendFontSize * ratio));
+              if (adjustedSize < legendFontSize) {
+                legendFontSize = adjustedSize;
+                ({ entries, maxEntryWidth } = buildEntries(legendFontSize));
               }
-              const dot = item.querySelector('span');
-              if (!dot) {
-                exportLogger.warn('PNG export skipped legend item without dot', item.textContent);
-                return;
-              }
-              const text = item.textContent.trim();
-              const textWidth = measureCtx.measureText(text).width;
-              const entryWidth = textWidth + 138;
-              if (rowW + entryWidth > maxW && row.length) {
+            }
+
+            entries.forEach(entry => {
+              if (rowW + entry.entryWidth > maxW && row.length) {
                 rows.push({ entries: row, width: rowW });
                 row = [];
                 rowW = 0;
               }
-              row.push({
-                dotColor: dot.style.backgroundColor,
-                text,
-                textWidth
-              });
-              rowW += entryWidth;
+              row.push(entry);
+              rowW += entry.entryWidth;
             });
-
             if (row.length) {
               rows.push({ entries: row, width: rowW });
             }
 
+            const legendRowHeight = Math.round(legendFontSize + rowPadding);
             return {
               rows,
               totalHeight: rows.length * legendRowHeight,
-              rowHeight: legendRowHeight
+              rowHeight: legendRowHeight,
+              font: `600 ${legendFontSize}px ${fontFamily}`
             };
           };
 
           const headerMetrics = buildHeaderMetrics(canvasWidth);
           const footerLayout = buildFooterLayout(canvasWidth);
-          const legendLayout = buildLegendLayout(canvasWidth);
-          const efTextOffset = 43;
+          const legendLayout = buildLegendLayout(canvasWidth, chartData);
           const efTextLineHeight = 70;
-          const legendSpacing = legendLayout.rows.length ? efTextOffset + efTextLineHeight : 0;
+          const legendSpacing = legendLayout.rows.length ? efTextLineHeight * 2 : 0;
           const legendHeight = legendLayout.totalHeight + legendSpacing;
 
           let bannerConfig = null;
@@ -399,17 +466,16 @@ async function generateChartImage() {
           let legendY = padding + headerMetrics.height + yearHeight + 155; // 100px baseline gap below pollutant title
           legendLayout.rows.forEach(({ entries, width }) => {
             let x = (canvasWidth - width) / 2;
-            entries.forEach(({ dotColor, text, textWidth }) => {
+            entries.forEach(({ dotColor, text, entryWidth }) => {
               ctx.beginPath();
               ctx.arc(x + 30, legendY - 27, 30, 0, 2 * Math.PI); // Larger dots to match font
               ctx.fillStyle = dotColor;
               ctx.fill();
-              ctx.font = '600 70px system-ui, sans-serif'; // Dramatically enlarged legend font
+              ctx.font = legendLayout.font;
               ctx.fillStyle = '#000000';
               ctx.textAlign = 'left';
               ctx.fillText(text, x + 88, legendY);
-              const advance = (typeof textWidth === 'number' ? textWidth : ctx.measureText(text).width) + 138;
-              x += advance;
+              x += entryWidth;
             });
             legendY += legendLayout.rowHeight;
           });
@@ -457,17 +523,35 @@ async function generateChartImage() {
           const useLogScale = efRatio > 1000;
 
           // EF explanation text - place below legend (not on chart)
-          const efTextY = legendY + 43; // Offset to match larger legend spacing
-          ctx.font = '58px system-ui, sans-serif'; // Scales with updated legend/title sizes
+          const efTextY = legendY + 20; // Offset below legend block
+          ctx.font = '58px system-ui, sans-serif';
           ctx.fillStyle = '#555555';
           ctx.textAlign = 'center';
-          
-          // Update text based on scaling type
-          if (useLogScale) {
-            ctx.fillText('Bubble size proportional to log₁₀(Emission Factor) — logarithmic scale used due to wide EF range', canvasWidth / 2, efTextY);
-          } else {
-            ctx.fillText('Bubble size proportional to Emission Factor (area-scaled, radius = √EF)', canvasWidth / 2, efTextY);
+          const efText = useLogScale
+            ? 'Bubble size proportional to log₁₀(Emission Factor) — logarithmic scale used due to wide EF range'
+            : 'Bubble size proportional to Emission Factor (area-scaled, radius = √EF)';
+          const maxEfWidth = canvasWidth - padding * 2;
+          const words = efText.split(' ');
+          const lines = [];
+          let currentLine = '';
+          words.forEach(word => {
+            const testLine = currentLine ? `${currentLine} ${word}` : word;
+            if (ctx.measureText(testLine).width <= maxEfWidth) {
+              currentLine = testLine;
+            } else {
+              if (currentLine) {
+                lines.push(currentLine);
+              }
+              currentLine = word;
+            }
+          });
+          if (currentLine) {
+            lines.push(currentLine);
           }
+          lines.forEach((line, index) => {
+            ctx.fillText(line, canvasWidth / 2, efTextY + index * efTextLineHeight);
+          });
+          legendY = efTextY + lines.length * efTextLineHeight;
 
           // Chart Image - with precise clipping on top and right only (no borders there)
           const chartY = padding + headerMetrics.height + yearHeight + titleHeight + legendHeight + 20; // Tight gap before chart

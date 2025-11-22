@@ -702,52 +702,102 @@ async function generateChartImage() {
           const buildLegendLayout = width => {
             const legendDiv = document.getElementById('customLegend');
             if (!legendDiv) {
-              return { rows: [], totalHeight: 0, rowHeight: 92 };
+              return {
+                rows: [],
+                totalHeight: 0,
+                rowHeight: 92,
+                font: '600 70px system-ui, sans-serif'
+              };
             }
             const allItems = [...legendDiv.children].filter(el => el.tagName === 'SPAN');
             const visibility = window.seriesVisibility || [];
-            const rows = [];
-            let row = [];
-            let rowW = 0;
-            const legendRowHeight = 92;
-            const maxW = width - padding * 2;
-            measureCtx.font = '600 70px system-ui, sans-serif';
-
-            allItems.forEach((item, index) => {
-              const dot = item.querySelector('span');
-              if (!dot) {
-                return;
-              }
+            const filteredItems = allItems.reduce((acc, item, index) => {
               const text = item.textContent.trim();
               const hasNoData = text.includes('(No data available)');
               const isVisible = visibility[index] !== false;
-              if (!isVisible && !hasNoData) {
-                return;
+              if (isVisible || hasNoData) {
+                const dot = item.querySelector('span');
+                if (dot) {
+                  acc.push({
+                    text,
+                    dotColor: dot.style.backgroundColor,
+                    faded: hasNoData
+                  });
+                }
               }
-              const textWidth = measureCtx.measureText(text).width;
-              const entryWidth = textWidth + 138;
-              if (rowW + entryWidth > maxW && row.length) {
+              return acc;
+            }, []);
+
+            if (!filteredItems.length) {
+              return {
+                rows: [],
+                totalHeight: 0,
+                rowHeight: 92,
+                font: '600 70px system-ui, sans-serif'
+              };
+            }
+
+            const rows = [];
+            let row = [];
+            let rowW = 0;
+            const baseFontSize = 70;
+            const minFontSize = 40;
+            const fontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            const legendRowPadding = 22;
+            const entryBasePadding = 138;
+            const maxW = width - padding * 2;
+            const measureText = size => {
+              measureCtx.font = `600 ${size}px ${fontFamily}`;
+              return text => measureCtx.measureText(text).width;
+            };
+
+            const buildEntries = size => {
+              const measure = measureText(size);
+              let maxEntryWidth = 0;
+              const entries = filteredItems.map(item => {
+                const textWidth = measure(item.text);
+                const entryWidth = textWidth + entryBasePadding;
+                maxEntryWidth = Math.max(maxEntryWidth, entryWidth);
+                return {
+                  ...item,
+                  textWidth,
+                  entryWidth
+                };
+              });
+              return { entries, maxEntryWidth };
+            };
+
+            let legendFontSize = baseFontSize;
+            let { entries, maxEntryWidth } = buildEntries(legendFontSize);
+            const maxAllowedEntryWidth = Math.max(maxW, 0);
+            if (maxAllowedEntryWidth > 0 && maxEntryWidth > maxAllowedEntryWidth) {
+              const ratio = maxAllowedEntryWidth / maxEntryWidth;
+              const adjustedSize = Math.max(minFontSize, Math.floor(legendFontSize * ratio));
+              if (adjustedSize < legendFontSize) {
+                legendFontSize = adjustedSize;
+                ({ entries, maxEntryWidth } = buildEntries(legendFontSize));
+              }
+            }
+
+            entries.forEach(entry => {
+              if (rowW + entry.entryWidth > maxW && row.length) {
                 rows.push({ entries: row, width: rowW });
                 row = [];
                 rowW = 0;
               }
-              row.push({
-                dotColor: dot.style.backgroundColor,
-                text,
-                faded: hasNoData,
-                textWidth
-              });
-              rowW += entryWidth;
+              row.push(entry);
+              rowW += entry.entryWidth;
             });
-
             if (row.length) {
               rows.push({ entries: row, width: rowW });
             }
 
+            const legendRowHeight = Math.round(legendFontSize + legendRowPadding);
             return {
               rows,
               totalHeight: rows.length * legendRowHeight,
-              rowHeight: legendRowHeight
+              rowHeight: legendRowHeight,
+              font: `600 ${legendFontSize}px ${fontFamily}`
             };
           };
 
@@ -815,19 +865,18 @@ async function generateChartImage() {
           let legendY = padding + headerMetrics.height + yearHeight + 155;
           legendLayout.rows.forEach(({ entries, width }) => {
             let x = (canvasWidth - width) / 2;
-            entries.forEach(({ dotColor, text, faded, textWidth }) => {
+            entries.forEach(({ dotColor, text, faded, entryWidth }) => {
               ctx.globalAlpha = faded ? 0.5 : 1.0;
               ctx.beginPath();
               ctx.arc(x + 30, legendY - 27, 30, 0, 2 * Math.PI);
               ctx.fillStyle = dotColor;
               ctx.fill();
-              ctx.font = '600 70px system-ui, sans-serif';
+              ctx.font = legendLayout.font;
               ctx.fillStyle = '#000000';
               ctx.textAlign = 'left';
               ctx.fillText(text, x + 88, legendY);
               ctx.globalAlpha = 1.0;
-              const advance = (typeof textWidth === 'number' ? textWidth : ctx.measureText(text).width) + 138;
-              x += advance;
+              x += entryWidth;
             });
             legendY += legendLayout.rowHeight;
           });

@@ -552,6 +552,22 @@ async function loadData(options = {}) {
     let pollutants = [];
     let groups = [];
     let rows = [];
+    let metadataPollutants = [];
+    let metadataGroups = [];
+
+    let selectorMetadata = null;
+    let selectorMetadataLoaded = false;
+    const ensureSelectorMetadata = async () => {
+      if (selectorMetadataLoaded) {
+        return selectorMetadata;
+      }
+      selectorMetadata = await loadDefaultSelectorMetadata(sharedLoader);
+      if (!selectorMetadata && window.SharedDataCache?.snapshotData) {
+        selectorMetadata = window.SharedDataCache.snapshotData;
+      }
+      selectorMetadataLoaded = true;
+      return selectorMetadata;
+    };
 
     const haveData = () => pollutants.length && groups.length && rows.length;
 
@@ -652,20 +668,20 @@ async function loadData(options = {}) {
       }
     }
 
-    if (latestDatasetSource === 'hero') {
-      const selectorMetadata = await loadDefaultSelectorMetadata(sharedLoader);
+    if (!hasFullDataset) {
+      const selectorMetadata = await ensureSelectorMetadata();
       if (selectorMetadata) {
-        const metadataPollutants = Array.isArray(selectorMetadata.pollutants)
+        metadataPollutants = Array.isArray(selectorMetadata.pollutants)
           ? selectorMetadata.pollutants
-          : [];
-        const metadataGroups = Array.isArray(selectorMetadata.groups)
+          : metadataPollutants;
+        metadataGroups = Array.isArray(selectorMetadata.groups)
           ? selectorMetadata.groups
-          : [];
+          : metadataGroups;
 
         if (metadataPollutants.length) {
           pollutants = mergeRecordCollections(
-            pollutants,
             metadataPollutants,
+            pollutants,
             record => {
               if (record?.id != null) {
                 return record.id;
@@ -678,8 +694,8 @@ async function loadData(options = {}) {
 
         if (metadataGroups.length) {
           groups = mergeRecordCollections(
-            groups,
             metadataGroups,
+            groups,
             record => {
               if (record?.id != null) {
                 return record.id;
@@ -690,10 +706,16 @@ async function loadData(options = {}) {
           );
         }
       }
+      bubbleDataInfoLog('Applied selector metadata for bubble dropdowns', {
+        metadataPollutants: metadataPollutants.length,
+        metadataGroups: metadataGroups.length,
+        groupsAfterMerge: groups.length
+      });
     }
 
     const dataset = applyDataset({ pollutants, groups, rows }, {
-      enforceActivityDataFilter: hasFullDataset
+      enforceActivityDataFilter: hasFullDataset,
+      activityMetadata: !hasFullDataset && metadataGroups.length ? metadataGroups : null
     });
 
     if (!hasFullDataset) {
@@ -879,7 +901,10 @@ function getGroupShortTitle(identifier) {
 }
 
 function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {}) {
-  const { enforceActivityDataFilter = true } = options || {};
+  const {
+    enforceActivityDataFilter = true,
+    activityMetadata = null
+  } = options || {};
   window.allPollutantsData = pollutants;
   window.allGroupsData = groups;
 
@@ -932,6 +957,34 @@ function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {})
   activeActDataGroupIds = [];
   inactiveActDataGroupIds = [];
 
+  const metadataEntries = Array.isArray(activityMetadata)
+    ? activityMetadata.filter(entry => entry && Number.isFinite(entry.id))
+    : [];
+  const metadataById = metadataEntries.length
+    ? new Map(metadataEntries.map(entry => [entry.id, entry]))
+    : null;
+
+  const metadataHasActivity = (entry) => {
+    if (!entry) {
+      return true;
+    }
+    const rawFlag = entry.hasActivityData ?? entry.has_activity_data;
+    if (rawFlag === undefined || rawFlag === null) {
+      return true;
+    }
+    if (typeof rawFlag === 'string') {
+      const normalized = rawFlag.trim().toLowerCase();
+      if (normalized === 'false' || normalized === '0' || normalized === 'no') {
+        return false;
+      }
+      if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+        return true;
+      }
+      return true;
+    }
+    return Boolean(rawFlag);
+  };
+
   if (enforceActivityDataFilter && actDataPollutantId && globalHeaders.length > 0) {
     const actDataRowsByGroup = new Map();
     globalRows.forEach(row => {
@@ -966,6 +1019,20 @@ function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {})
 
     if (activeActDataGroups.length === 0 && groups.length > 0) {
       supabaseDebugWarn('No groups reported Activity Data; reverting to full group list.');
+      activeActDataGroups = [...groups];
+      activeActDataGroupIds = activeActDataGroups.map(g => g.id);
+      inactiveActDataGroupIds = [];
+    }
+  } else if (!enforceActivityDataFilter && metadataById) {
+    const groupsWithActData = groups.filter(group => metadataHasActivity(metadataById.get(group.id)));
+    if (groupsWithActData.length) {
+      activeActDataGroups = groupsWithActData;
+      activeActDataGroupIds = activeActDataGroups.map(g => g.id);
+      const activeIdSet = new Set(activeActDataGroupIds);
+      inactiveActDataGroupIds = groups
+        .filter(group => !activeIdSet.has(group.id))
+        .map(group => group.id);
+    } else {
       activeActDataGroups = [...groups];
       activeActDataGroupIds = activeActDataGroups.map(g => g.id);
       inactiveActDataGroupIds = [];
