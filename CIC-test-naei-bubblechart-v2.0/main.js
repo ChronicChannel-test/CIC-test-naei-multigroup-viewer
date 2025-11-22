@@ -449,6 +449,153 @@ function updateChartWrapperHeight(contextLabel = 'init') {
 
 window.updateChartWrapperHeight = updateChartWrapperHeight;
 
+const SELECTOR_SNAPSHOT_PATHS = [
+  'SharedResources/default-chart-data.json',
+  '../SharedResources/default-chart-data.json',
+  '../../SharedResources/default-chart-data.json'
+];
+let selectorOptionsPromise = null;
+
+function dedupeByKey(collection = [], resolver = () => null) {
+  const seen = new Set();
+  const results = [];
+  collection.forEach(item => {
+    const key = resolver(item);
+    if (!key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    results.push(item);
+  });
+  return results;
+}
+
+function sortGroupTitles(a = '', b = '') {
+  const aName = a.toLowerCase();
+  const bName = b.toLowerCase();
+  if (aName === 'all') return -1;
+  if (bName === 'all') return 1;
+  return a.localeCompare(b);
+}
+
+async function fetchSelectorSnapshotFallback() {
+  for (const candidate of SELECTOR_SNAPSHOT_PATHS) {
+    try {
+      const response = await fetch(candidate, { cache: 'no-store' });
+      if (!response.ok) {
+        continue;
+      }
+      const snapshot = await response.json();
+      return snapshot?.data || snapshot || null;
+    } catch (error) {
+      console.warn('Selector snapshot fetch failed for', candidate, error);
+    }
+  }
+  return null;
+}
+
+async function loadSelectorSnapshotData() {
+  if (window.SharedDataLoader?.loadDefaultSnapshot) {
+    try {
+      const snapshot = await window.SharedDataLoader.loadDefaultSnapshot();
+      if (snapshot?.data) {
+        return snapshot.data;
+      }
+    } catch (error) {
+      console.warn('SharedDataLoader snapshot unavailable for selectors:', error);
+    }
+  }
+
+  if (window.SharedDataCache?.snapshotData) {
+    return window.SharedDataCache.snapshotData;
+  }
+
+  return await fetchSelectorSnapshotFallback();
+}
+
+function normalizeSelectorOptions(snapshotData) {
+  const rawPollutants = Array.isArray(snapshotData?.pollutants)
+    ? snapshotData.pollutants
+    : [];
+  const rawGroups = Array.isArray(snapshotData?.groups)
+    ? snapshotData.groups
+    : [];
+
+  const pollutants = dedupeByKey(
+    rawPollutants
+      .map(item => ({
+        id: item?.id,
+        pollutant: item?.pollutant || item?.name || item?.label || ''
+      }))
+      .filter(item => item.id != null && item.pollutant),
+    item => `${item.id}-${item.pollutant.toLowerCase()}`
+  ).sort((a, b) => a.pollutant.localeCompare(b.pollutant));
+
+  const groups = dedupeByKey(
+    rawGroups
+      .map(item => ({
+        id: item?.id,
+        group_title: item?.group_title || item?.group_name || item?.title || '',
+        has_activity_data: item?.has_activity_data !== false
+      }))
+      .filter(item => item.id != null && item.group_title && item.has_activity_data),
+    item => item.group_title.toLowerCase()
+  ).sort((a, b) => sortGroupTitles(a.group_title, b.group_title));
+
+  return {
+    pollutants,
+    groups,
+    groupNames: groups.map(group => group.group_title)
+  };
+}
+
+async function ensureBubbleSelectorOptions() {
+  if (window.__bubbleSelectorOptions?.pollutants?.length) {
+    return window.__bubbleSelectorOptions;
+  }
+
+  if (!selectorOptionsPromise) {
+    selectorOptionsPromise = (async () => {
+      const snapshotData = await loadSelectorSnapshotData();
+      if (!snapshotData) {
+        console.warn('Bubble selector metadata unavailable; falling back to Supabase data');
+        return {
+          pollutants: [],
+          groups: [],
+          groupNames: []
+        };
+      }
+      const normalized = normalizeSelectorOptions(snapshotData);
+      return normalized;
+    })().catch(error => {
+      selectorOptionsPromise = null;
+      console.error('Failed to prepare bubble selector metadata:', error);
+      throw error;
+    });
+  }
+
+  const options = await selectorOptionsPromise;
+  if (options && !window.__bubbleSelectorOptions) {
+    window.__bubbleSelectorOptions = options;
+  }
+  return options;
+}
+
+function applySelectorOptionsToGlobals(selectorOptions) {
+  if (!selectorOptions) {
+    return;
+  }
+
+  window.__bubbleSelectorOptions = selectorOptions;
+  const { groups, groupNames } = selectorOptions;
+  if (Array.isArray(groups) && groups.length) {
+    window.allGroups = groups.slice();
+    window.allGroupsList = (Array.isArray(groupNames) && groupNames.length)
+      ? groupNames.slice()
+      : groups.map(group => group.group_title).sort(sortGroupTitles);
+  }
+}
+
 /**
  * Initialize the application
  */
@@ -474,6 +621,8 @@ async function init() {
       throw new Error('supabaseModule not available after waiting');
     }
 
+    const selectorOptionsPromise = ensureBubbleSelectorOptions();
+
     // Load data using supabaseModule
     await window.supabaseModule.loadData();
 
@@ -484,26 +633,34 @@ async function init() {
     // Create window data stores EXACTLY like linechart v2.3
     window.allPollutants = window.supabaseModule.allPollutants;
     window.allGroupsRaw = window.supabaseModule.allGroups;
-    const activeGroupsForSelectors = window.supabaseModule.activeActDataGroups
-      || window.supabaseModule.activeGroups
-      || window.supabaseModule.allGroups
-      || [];
-    window.allGroups = activeGroupsForSelectors;
-    
-
-    // Create allGroupsList EXACTLY like linechart setupSelectors function
-    const groups = window.supabaseModule.activeActDataGroups
-      || window.supabaseModule.activeGroups
-      || window.supabaseModule.allGroups
-      || [];
-    const groupNames = [...new Set(groups.map(g => g.group_title))]
-      .filter(Boolean)
-      .sort((a, b) => {
-        if (a.toLowerCase() === 'all') return -1;
-        if (b.toLowerCase() === 'all') return 1;
-        return a.localeCompare(b);
+    const selectorOptions = await selectorOptionsPromise
+      .catch(error => {
+        console.error('Falling back to Supabase selectors after snapshot failure:', error);
+        return null;
       });
-    window.allGroupsList = groupNames;
+    applySelectorOptionsToGlobals(selectorOptions);
+
+    if (!Array.isArray(window.allGroupsList) || !window.allGroupsList.length) {
+      const activeGroupsForSelectors = window.supabaseModule.activeActDataGroups
+        || window.supabaseModule.activeGroups
+        || window.supabaseModule.allGroups
+        || [];
+      window.allGroups = activeGroupsForSelectors;
+
+      // Create allGroupsList EXACTLY like linechart setupSelectors function
+      const groups = window.supabaseModule.activeActDataGroups
+        || window.supabaseModule.activeGroups
+        || window.supabaseModule.allGroups
+        || [];
+      const groupNames = [...new Set(groups.map(g => g.group_title))]
+        .filter(Boolean)
+        .sort((a, b) => {
+          if (a.toLowerCase() === 'all') return -1;
+          if (b.toLowerCase() === 'all') return 1;
+          return a.localeCompare(b);
+        });
+      window.allGroupsList = groupNames;
+    }
 
     // Setup UI
     setupYearSelector();
@@ -1390,8 +1547,12 @@ function setupYearSelector() {
  */
 function setupPollutantSelector() {
   const actDataId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
-  const pollutants = window.supabaseModule.allPollutants
-    .filter(p => p.id !== actDataId) // Exclude Activity Data
+  const selectorPollutants = window.__bubbleSelectorOptions?.pollutants;
+  const pollutantOptions = Array.isArray(selectorPollutants) && selectorPollutants.length
+    ? selectorPollutants
+    : window.supabaseModule.allPollutants || [];
+  const pollutants = pollutantOptions
+    .filter(p => p.id !== actDataId && p.pollutant)
     .sort((a, b) => a.pollutant.localeCompare(b.pollutant));
   
   const select = document.getElementById('pollutantSelect');
@@ -1527,14 +1688,9 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
 
 // Refresh group dropdown options (like linechart)
 function refreshGroupDropdowns() {
-  const allGroups = window.supabaseModule.activeActDataGroups
-    || window.supabaseModule.activeGroups
-    || window.supabaseModule.allGroups
-    || [];
-  const allGroupNames = allGroups
-    .map(g => g.group_title)
+  const allGroupNames = (window.allGroupsList || [])
     .filter(Boolean)
-    .sort();
+    .sort((a, b) => sortGroupTitles(a, b));
   const selected = getSelectedGroups();
   
   document.querySelectorAll('#groupContainer select').forEach(select => {
