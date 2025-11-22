@@ -7,25 +7,22 @@
   <link rel="apple-touch-icon" href="../SharedResources/images/favicon.png">
   <link rel="preload" as="image" href="../SharedResources/images/No-Entry-Icon-200x200.svg">
   <link rel="preload" as="image" href="../SharedResources/images/Green-Square-Button-White-Plus-Add-200x200.svg">
+  <link rel="preload" as="image" href="../SharedResources/images/download-icon1-alpha.svg">
+  <link rel="preload" as="image" href="../SharedResources/images/csv_icon_mjh_12-11v3-alpha-200x199.svg">
+  <link rel="preload" as="image" href="../SharedResources/images/Microsoft_Office_Excel_2019–2025.svg">
+  <link rel="preload" as="image" href="../SharedResources/images/chain-link-icon-grey.svg">
+  <link rel="preload" as="image" href="../SharedResources/images/Green-button-play-white-triangle-200x200.svg">
+  <script src="../SharedResources/icon-preload.js"></script>
   <script>
-    (function prewarmBubbleIcons() {
-      const icons = [
-        '../SharedResources/images/No-Entry-Icon-200x200.svg',
-        '../SharedResources/images/Green-Square-Button-White-Plus-Add-200x200.svg'
-      ];
-      const cache = window.__preloadedIconImages = window.__preloadedIconImages || [];
-      icons.forEach(src => {
-        try {
-          const img = new Image();
-          img.decoding = 'async';
-          img.loading = 'eager';
-          img.src = src;
-          cache.push(img);
-        } catch (error) {
-          console.warn('Bubble icon prewarm failed:', src, error);
-        }
-      });
-    })();
+    preloadChartIcons([
+      '../SharedResources/images/No-Entry-Icon-200x200.svg',
+      '../SharedResources/images/Green-Square-Button-White-Plus-Add-200x200.svg',
+      '../SharedResources/images/download-icon1-alpha.svg',
+      '../SharedResources/images/csv_icon_mjh_12-11v3-alpha-200x199.svg',
+      '../SharedResources/images/Microsoft_Office_Excel_2019–2025.svg',
+      '../SharedResources/images/chain-link-icon-grey.svg',
+      '../SharedResources/images/Green-button-play-white-triangle-200x200.svg'
+    ]);
   </script>
 
   <!-- Social preview / link preview meta tags -->
