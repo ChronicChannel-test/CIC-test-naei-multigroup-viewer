@@ -425,8 +425,9 @@
       min-height: 0;
     }
 
-    #chart-interface > footer {
+    #mainFooter {
       margin-top: auto;
+      flex-shrink: 0;
     }
   </style>
 </head>
@@ -604,7 +605,10 @@
         title="NAEI Resources"></iframe>
     </div>
 
-    <!-- Footer (inside chart-interface so it fades in with the chart) -->
+  </div> <!-- End chart-interface -->
+  </div> <!-- End page-stack -->
+
+  <!-- Footer (now outside chart-interface to keep spacing consistent across tall embeds) -->
   <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" id="mainFooter" style="margin-top: 0; opacity: 1;">
       <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ<span class="footer-break" aria-hidden="true"> </span> via
       <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
@@ -617,8 +621,6 @@
         Explorer Version: v3.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.11.22
       </span>
     </footer>
-  </div> <!-- End chart-interface -->
-  </div> <!-- End page-stack -->
 
   <style>
     .chart-iframe {
@@ -1653,7 +1655,7 @@
             const containerVisible = container && container.getAttribute('aria-hidden') === 'false';
             if (containerVisible) {
               const iframeRect = iframe.getBoundingClientRect();
-              const footerEl = document.querySelector('#chart-interface > footer');
+              const footerEl = document.getElementById('mainFooter');
               const footerRect = footerEl ? footerEl.getBoundingClientRect() : null;
               const footerStyles = footerEl ? window.getComputedStyle(footerEl) : null;
               const footerMargins = footerStyles
