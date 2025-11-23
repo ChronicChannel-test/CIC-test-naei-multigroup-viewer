@@ -628,6 +628,42 @@ function scheduleLineFullDataset(sharedLoader, reason = 'manual') {
   return triggerLineFullDatasetBootstrap(sharedLoader, reason);
 }
 
+function waitForFirstDatasetCandidate(promises = [], logError = () => {}) {
+  const activePromises = promises.filter(Boolean);
+  if (!activePromises.length) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise(resolve => {
+    let settled = false;
+    let pending = activePromises.length;
+
+    const maybeResolve = value => {
+      if (settled) {
+        return;
+      }
+      if (value) {
+        settled = true;
+        resolve(value);
+        return;
+      }
+      pending -= 1;
+      if (!settled && pending <= 0) {
+        resolve(null);
+      }
+    };
+
+    activePromises.forEach(promise => {
+      Promise.resolve(promise)
+        .then(maybeResolve)
+        .catch(error => {
+          logError(error);
+          maybeResolve(null);
+        });
+    });
+  });
+}
+
 /**
  * Load all data from Supabase (using shared data loader)
  */
@@ -658,9 +694,65 @@ async function loadData() {
     rows = cachedData.timeseries;
     datasetIsFull = true;
     datasetSource = 'cache';
-  } else if (snapshotPromise) {
-    const snapshot = await snapshotPromise;
-    if (snapshot?.data) {
+  } else if (sharedLoader) {
+    const raceCandidates = [];
+
+    const bootstrapPromise = triggerLineFullDatasetBootstrap(sharedLoader, 'initial-race');
+    raceCandidates.push(
+      bootstrapPromise
+        .then(payload => {
+          if (payload?.pollutants?.length || payload?.timeseries?.length) {
+            return { source: 'supabase', payload };
+          }
+          return null;
+        })
+        .catch(error => {
+          lineSupabaseInfoLog('Supabase bootstrap race candidate failed', {
+            message: error?.message || String(error)
+          });
+          return null;
+        })
+    );
+
+    if (snapshotPromise) {
+      raceCandidates.push(
+        snapshotPromise
+          .then(snapshot => {
+            if (snapshot?.data) {
+              return { source: 'snapshot', snapshot };
+            }
+            return null;
+          })
+          .catch(error => {
+            lineSupabaseInfoLog('Default snapshot race candidate failed', {
+              message: error?.message || String(error)
+            });
+            return null;
+          })
+      );
+    }
+
+    const initialResult = await waitForFirstDatasetCandidate(raceCandidates, error => {
+      lineSupabaseInfoLog('Initial dataset candidate rejected', {
+        message: error?.message || String(error)
+      });
+    });
+
+    if (initialResult?.source === 'supabase') {
+      const payload = initialResult.payload || {};
+      pollutants = payload.pollutants || [];
+      groups = payload.groups || [];
+      rows = payload.timeseries || payload.rows || payload.data || [];
+      datasetIsFull = true;
+      datasetSource = 'shared-bootstrap';
+      lineHasFullDataset = true;
+      lineSupabaseInfoLog('Line chart fulfilled via initial Supabase bootstrap', {
+        pollutants: pollutants.length,
+        groups: groups.length,
+        rows: rows.length
+      });
+    } else if (initialResult?.source === 'snapshot') {
+      const snapshot = initialResult.snapshot;
       pollutants = snapshot.data.pollutants || [];
       groups = snapshot.data.groups || [];
       rows = snapshot.data.timeseries || snapshot.data.rows || snapshot.data.data || [];
@@ -678,7 +770,6 @@ async function loadData() {
           rows: rows.length
         }
       });
-      scheduleLineFullDataset(sharedLoader, 'snapshot');
     }
   }
 

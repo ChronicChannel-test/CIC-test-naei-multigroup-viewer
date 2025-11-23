@@ -480,6 +480,42 @@ function mergeGroupCollections(primary = [], secondary = []) {
   return merged;
 }
 
+function waitForFirstDatasetCandidate(promises = [], logError = () => {}) {
+  const activePromises = promises.filter(Boolean);
+  if (!activePromises.length) {
+    return Promise.resolve(null);
+  }
+
+  return new Promise(resolve => {
+    let settled = false;
+    let pending = activePromises.length;
+
+    const maybeResolve = value => {
+      if (settled) {
+        return;
+      }
+      if (value) {
+        settled = true;
+        resolve(value);
+        return;
+      }
+      pending -= 1;
+      if (!settled && pending <= 0) {
+        resolve(null);
+      }
+    };
+
+    activePromises.forEach(promise => {
+      Promise.resolve(promise)
+        .then(maybeResolve)
+        .catch(error => {
+          logError(error);
+          maybeResolve(null);
+        });
+    });
+  });
+}
+
 function triggerBubbleFullDatasetBootstrap(sharedLoader, reason = 'bubble-chart') {
   if (hasFullDataset) {
     return Promise.resolve({ source: 'already-hydrated' });
@@ -542,6 +578,7 @@ async function loadData(options = {}) {
   const defaultChartMode = Boolean(useDefaultSnapshot);
   const sharedLoader = await resolveSharedLoader();
   let snapshotRequestedAt = null;
+  let snapshotPromise = null;
 
   try {
     await trackAnalytics('page_load', {
@@ -585,26 +622,88 @@ async function loadData(options = {}) {
       });
     }
 
-    if (!haveData() && defaultChartMode && sharedLoader?.loadDefaultSnapshot) {
-      snapshotRequestedAt = bubbleDataNow();
-      const snapshot = await sharedLoader.loadDefaultSnapshot();
-      if (snapshot?.data) {
-        pollutants = snapshot.data.pollutants || [];
-        groups = snapshot.data.groups || [];
-        rows = snapshot.data.timeseries || snapshot.data.rows || snapshot.data.data || [];
-        hasFullDataset = false;
-        latestDatasetSource = 'snapshot';
-        const snapshotDuration = snapshotRequestedAt ? Number((bubbleDataNow() - snapshotRequestedAt).toFixed(1)) : null;
-        bubbleDataInfoLog('Bubble chart using default JSON snapshot', {
-          durationMs: snapshotDuration,
-          generatedAt: snapshot.generatedAt || null,
-          summary: {
+    if (!haveData() && sharedLoader) {
+      const raceCandidates = [];
+      if (!sharedLoader.isDataLoaded?.()) {
+        const bootstrapPromise = triggerBubbleFullDatasetBootstrap(sharedLoader, 'initial-race');
+        raceCandidates.push(
+          bootstrapPromise
+            .then(payload => {
+              if (payload?.pollutants?.length || payload?.timeseries?.length) {
+                return { source: 'supabase', payload };
+              }
+              return null;
+            })
+            .catch(error => {
+              bubbleDataInfoLog('Initial Supabase bootstrap candidate failed', {
+                message: error?.message || String(error)
+              });
+              return null;
+            })
+        );
+      }
+
+      if (defaultChartMode && sharedLoader.loadDefaultSnapshot) {
+        snapshotRequestedAt = bubbleDataNow();
+        if (!snapshotPromise) {
+          snapshotPromise = sharedLoader.loadDefaultSnapshot();
+        }
+        raceCandidates.push(
+          snapshotPromise
+            .then(snapshot => {
+              if (snapshot?.data) {
+                return { source: 'snapshot', snapshot, requestedAt: snapshotRequestedAt };
+              }
+              return null;
+            })
+            .catch(error => {
+              bubbleDataInfoLog('Default snapshot race candidate failed', {
+                message: error?.message || String(error)
+              });
+              return null;
+            })
+        );
+      }
+
+      if (raceCandidates.length) {
+        const initialResult = await waitForFirstDatasetCandidate(raceCandidates, error => {
+          bubbleDataInfoLog('Initial dataset candidate rejected', {
+            message: error?.message || String(error)
+          });
+        });
+
+        if (initialResult?.source === 'supabase') {
+          const payload = initialResult.payload || {};
+          pollutants = payload.pollutants || [];
+          groups = payload.groups || [];
+          rows = payload.timeseries || payload.rows || payload.data || [];
+          hasFullDataset = true;
+          latestDatasetSource = 'shared-bootstrap';
+          bubbleDataInfoLog('Bubble chart fulfilled via initial Supabase bootstrap', {
             pollutants: pollutants.length,
             groups: groups.length,
             rows: rows.length
-          }
-        });
-        triggerBubbleFullDatasetBootstrap(sharedLoader, 'snapshot');
+          });
+        } else if (initialResult?.source === 'snapshot') {
+          const snapshot = initialResult.snapshot;
+          pollutants = snapshot.data.pollutants || [];
+          groups = snapshot.data.groups || [];
+          rows = snapshot.data.timeseries || snapshot.data.rows || snapshot.data.data || [];
+          hasFullDataset = false;
+          latestDatasetSource = 'snapshot';
+          const snapshotDuration = initialResult.requestedAt
+            ? Number((bubbleDataNow() - initialResult.requestedAt).toFixed(1))
+            : null;
+          bubbleDataInfoLog('Bubble chart using default JSON snapshot', {
+            durationMs: snapshotDuration,
+            generatedAt: snapshot.generatedAt || null,
+            summary: {
+              pollutants: pollutants.length,
+              groups: groups.length,
+              rows: rows.length
+            }
+          });
+        }
       }
     }
 
