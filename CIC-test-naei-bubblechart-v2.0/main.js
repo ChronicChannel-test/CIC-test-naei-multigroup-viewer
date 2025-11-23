@@ -450,6 +450,7 @@ function updateChartWrapperHeight(contextLabel = 'init') {
 window.updateChartWrapperHeight = updateChartWrapperHeight;
 
 const SELECTOR_SNAPSHOT_PATHS = [
+  '/SharedResources/default-chart-data.json',
   'SharedResources/default-chart-data.json',
   '../SharedResources/default-chart-data.json',
   '../../SharedResources/default-chart-data.json'

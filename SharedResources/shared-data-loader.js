@@ -62,7 +62,10 @@ window.SharedDataCache = resolveExistingSharedCache() || {
 };
 
 const DEFAULT_SNAPSHOT_PATHS = [
-  '/CIC-test-naei-multigroup-viewer/SharedResources/default-chart-data.json'
+  '/SharedResources/default-chart-data.json',
+  'SharedResources/default-chart-data.json',
+  '../SharedResources/default-chart-data.json',
+  '../../SharedResources/default-chart-data.json'
 ];
 
 let defaultSnapshotPromise = null;
