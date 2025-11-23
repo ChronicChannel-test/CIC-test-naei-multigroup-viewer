@@ -327,25 +327,25 @@ function showShareDialog(shareUrl) {
     
     <div style="margin: 16px 0;">
       <label style="display: block; margin-bottom: 8px; font-weight: 600;">Shareable URL:</label>
-      <div style="display: flex; gap: 8px;">
+      <div style="display: flex; gap: 8px; align-items: center;">
    <input type="text" id="shareUrlInput" name="shareUrlInput" value="${shareUrl}" readonly 
-     style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; background: #f9f9f9;">
-        <button id="copyUrlBtn" style="padding: 8px 16px; background: #9C27B0; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; min-width: 130px;">
-          📋 Copy URL
+     style="flex: 1; padding: 10px 16px; border: 1px solid #ccc; border-radius: 6px; font-size: 18px; background: #f9f9f9; height: 48px; box-sizing: border-box;">
+        <button id="copyUrlBtn" style="padding: 10px 16px; background: #9C27B0; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; min-width: 130px; font-size: 18px; height: 48px; display: flex; align-items: center; gap: 8px;">
+          <img src="../SharedResources/images/clipboard_icon_mjh-alpha-200x279.svg" alt="Copy URL" style="height: 28px; width: auto; vertical-align: middle; margin-right: 8px;"> Copy URL
         </button>
       </div>
     </div>
     
     <div style="margin: 16px 0;">
-      <button id="copyPngBtn" style="padding: 10px 16px; background: #FF9800; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; min-width: 370px;">
-        🖼️ Copy Chart Image as PNG to clipboard
+      <button id="copyPngBtn" style="padding: 10px 16px; background: #FF9800; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; min-width: 370px; display: flex; align-items: center; gap: 8px; font-size: 18px;">
+        <img src="../SharedResources/images/clipboard_painting_icon_mjh-line-200x231.svg" alt="Copy Chart Image" style="height: 32px; width: auto; vertical-align: middle; margin-right: 8px;"> Copy Chart Image as PNG to clipboard
       </button>
     </div>
     
     <div style="margin: 16px 0;">
       <div style="display: flex; align-items: center; gap: 12px;">
-        <button id="emailShareBtn" style="padding: 12px 20px; background: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; white-space: nowrap;">
-          📧 Send Email
+        <button id="emailShareBtn" style="padding: 12px 20px; background: #2196F3; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; white-space: nowrap; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+          <img src="../SharedResources/images/email-icon-white.svg" alt="Send Email" style="height: 25px; width: auto; vertical-align: middle; margin-right: 8px;"> Send Email
         </button>
         <p style="margin: 0; color: #000; font-weight: 600;">Chart will be copied to clipboard<br>for pasting into email</p>
       </div>
