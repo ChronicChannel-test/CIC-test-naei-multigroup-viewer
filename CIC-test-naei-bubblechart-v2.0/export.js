@@ -848,6 +848,42 @@ function dataURLtoBlob(dataURL) {
 /**
  * Show share dialog
  */
+function resolveBubbleShareGroups(chartData) {
+  const fromSelectors = typeof window.getSelectedGroups === 'function'
+    ? window.getSelectedGroups().filter(name => !!name)
+    : [];
+  if (fromSelectors.length) {
+    return fromSelectors;
+  }
+
+  if (Array.isArray(chartData?.groupIds) && chartData.groupIds.length) {
+    const byId = chartData.groupIds.map(groupId => {
+      if (typeof window.supabaseModule?.getGroupName === 'function') {
+        return window.supabaseModule.getGroupName(groupId);
+      }
+      const point = chartData.dataPoints?.find(p => p.groupId === groupId);
+      return point?.groupName;
+    }).filter(Boolean);
+    if (byId.length) {
+      return byId;
+    }
+  }
+
+  if (Array.isArray(chartData?.dataPoints) && chartData.dataPoints.length) {
+    const deduped = [];
+    chartData.dataPoints.forEach(point => {
+      if (point?.groupName && !deduped.includes(point.groupName)) {
+        deduped.push(point.groupName);
+      }
+    });
+    if (deduped.length) {
+      return deduped;
+    }
+  }
+
+  return [];
+}
+
 function showShareDialog() {
   const chartData = window.ChartRenderer.getCurrentChartData();
   if (!chartData) {
@@ -857,7 +893,6 @@ function showShareDialog() {
 
   // Build shareable URL with parameters matching updateURL() format
   // Get group IDs with comparison flags ('c' suffix if checkbox is checked)
-  const allGroups = window.supabaseModule.allGroups || [];
   const groupRows = document.querySelectorAll('.groupRow');
   
   const groupIdsWithFlags = chartData.groupIds.map((groupId, index) => {
@@ -873,8 +908,11 @@ function showShareDialog() {
   // Format: pollutant_id, group_ids, year (year at the end)
   const query = `pollutant_id=${chartData.pollutantId}&group_ids=${groupIdsWithFlags.join(',')}&year=${chartData.year}`;
   const shareUrl = window.location.origin + window.location.pathname + '?' + query;
-  
-  const title = `${chartData.pollutantName} vs Activity Data (${chartData.year})`;
+
+  const shareGroupNames = resolveBubbleShareGroups(chartData);
+  const groupSummary = shareGroupNames.length ? shareGroupNames.join(', ') : 'Selected Groups';
+  const yearSuffix = chartData.year ? ` (${chartData.year})` : '';
+  const title = `${chartData.pollutantName} Emission Factors - ${groupSummary}${yearSuffix}`;
 
   // Create dialog
   const dialog = document.createElement('div');
