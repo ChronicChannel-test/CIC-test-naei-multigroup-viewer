@@ -276,6 +276,26 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
   data.addColumn({type: 'string', role: 'style'});
 
   // Add data rows with emission factor calculation and sizing
+  const groupDisplayOrder = (() => {
+    const order = new Map();
+    if (Array.isArray(groupIds)) {
+      groupIds.forEach((rawId, index) => {
+        const numericId = Number(rawId);
+        const groupName = window.supabaseModule?.getGroupName?.(numericId) || `${rawId}`;
+        if (!order.has(groupName)) {
+          order.set(groupName, index);
+        }
+      });
+    }
+    return order;
+  })();
+
+  const orderedVisiblePoints = [...visibleDataPoints].sort((a, b) => {
+    const orderA = groupDisplayOrder.has(a.groupName) ? groupDisplayOrder.get(a.groupName) : Number.POSITIVE_INFINITY;
+    const orderB = groupDisplayOrder.has(b.groupName) ? groupDisplayOrder.get(b.groupName) : Number.POSITIVE_INFINITY;
+    // Draw higher index first so lower index (top of selector) renders last and stays on top visually
+    return orderB - orderA;
+  });
   
   // Determine conversion factor based on pollutant unit (BEFORE calculating EFs)
   const pollutantUnit = window.supabaseModule.getPollutantUnit(pollutantId);
@@ -302,7 +322,7 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
   }
   
   // Calculate all EF values first to determine dynamic scale factor (use visible points only)
-  const allEFs = visibleDataPoints.map(p => p.EF !== undefined ? p.EF : (p.actDataValue !== 0 ? (p.pollutantValue / p.actDataValue) * conversionFactor : 0));
+  const allEFs = orderedVisiblePoints.map(p => p.EF !== undefined ? p.EF : (p.actDataValue !== 0 ? (p.pollutantValue / p.actDataValue) * conversionFactor : 0));
   const maxEF = Math.max(...allEFs);
   const minEF = Math.min(...allEFs.filter(ef => ef > 0)); // Exclude zeros
   
@@ -340,7 +360,7 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
     
     // No debug log for routine linear scaling
   }  
-  visibleDataPoints.forEach((point, index) => {
+  orderedVisiblePoints.forEach((point, index) => {
     const color = window.Colors.getColorForGroup(point.groupName);
 
     // Use Emission Factor (EF) directly for bubble size

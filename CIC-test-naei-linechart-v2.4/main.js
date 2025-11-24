@@ -1501,6 +1501,22 @@ async function updateChart(){
   });
 
   window.Colors.resetColorSystem();
+  if (seriesVisibility.length !== selectedGroups.length) {
+    seriesVisibility = Array(selectedGroups.length).fill(true);
+    window.seriesVisibility = seriesVisibility; // Keep export.js in sync
+  }
+
+  const layeredGroups = selectedGroups.map((group, uiIndex) => ({
+    name: group,
+    uiIndex,
+    color: window.Colors.getColorForGroup(group)
+  }));
+  const drawingGroups = layeredGroups.slice().reverse();
+  const drawingIndexByUi = new Map();
+  drawingGroups.forEach((entry, index) => {
+    drawingIndexByUi.set(entry.uiIndex, index);
+  });
+
   // Use the global year keys to determine which years to display
   const yearsAll = window.globalYears || [];
   const yearKeys = window.globalYearKeys || [];
@@ -1508,14 +1524,13 @@ async function updateChart(){
   const endIdx = yearsAll.indexOf(String(endYear));
   const years = yearsAll.slice(startIdx, endIdx + 1);
   const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
-  const colors = selectedGroups.map(g => window.Colors.getColorForGroup(g));
 
   // Build rows of data (year + series values). Use null for missing.
   const chartRows = years.map((y, rowIdx) => {
     const row = [y];
     const key = keysForYears[rowIdx]; // e.g. 'f2015'
-    selectedGroups.forEach(g => {
-      const dataRow = groupedData[pollutant]?.[g];
+    drawingGroups.forEach(({ name }) => {
+      const dataRow = groupedData[pollutant]?.[name];
       const raw = dataRow ? dataRow[key] : null;
       const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
       row.push(Number.isNaN(val) ? null : val);
@@ -1529,8 +1544,14 @@ async function updateChart(){
   stabilityHandle = beginLineChartStabilityCycle();
 
   // --- Determine which groups actually have data ---
-  const groupHasData = selectedGroups.map((g, i) => {
-    return chartRows.some(row => typeof row[i + 1] === 'number');
+  const dataPresenceByDrawingIndex = drawingGroups.map((_, seriesIndex) => (
+    chartRows.some(row => typeof row[seriesIndex + 1] === 'number')
+  ));
+  const groupHasData = layeredGroups.map(entry => {
+    const drawingIndex = drawingIndexByUi.get(entry.uiIndex);
+    return typeof drawingIndex === 'number'
+      ? dataPresenceByDrawingIndex[drawingIndex]
+      : false;
   });
 
   // Get unit before creating DataTable (needed for tooltips)
@@ -1539,8 +1560,8 @@ async function updateChart(){
   // Create DataTable explicitly to guarantee column types
   const dataTable = new google.visualization.DataTable();
   dataTable.addColumn('string', 'Year');           // year as string
-  selectedGroups.forEach(g => {
-    dataTable.addColumn('number', g);              // data column
+  drawingGroups.forEach(({ name }) => {
+    dataTable.addColumn('number', name);              // data column
     dataTable.addColumn({type: 'string', role: 'tooltip'}); // custom tooltip
   });
   
@@ -1555,7 +1576,8 @@ async function updateChart(){
       if (value === null || value === undefined) {
         newRow.push(null);
       } else {
-        const groupName = selectedGroups[i - 1];
+        const groupEntry = drawingGroups[i - 1];
+        const groupName = groupEntry ? groupEntry.name : '';
         let formattedValue;
         
         // Use more decimals for very small values
@@ -1575,16 +1597,12 @@ async function updateChart(){
   });
 
   const seriesOptions = {};
-  selectedGroups.forEach((g, i) => {
-    // Use the global seriesVisibility state to determine visibility
-    // Ensure the array is initialized if this is the first run or group count changed
-    if (seriesVisibility.length !== selectedGroups.length) {
-      seriesVisibility = Array(selectedGroups.length).fill(true);
-      window.seriesVisibility = seriesVisibility; // Update window reference
-    }
-    seriesOptions[i] = seriesVisibility[i]
-      ? { color: colors[i], lineWidth: 3, pointSize: 4 }
-      : { color: colors[i], lineWidth: 0, pointSize: 0 };
+  drawingGroups.forEach((entry, seriesIndex) => {
+    const isVisible = seriesVisibility[entry.uiIndex];
+    const color = entry.color;
+    seriesOptions[seriesIndex] = isVisible
+      ? { color, lineWidth: 3, pointSize: 4 }
+      : { color, lineWidth: 0, pointSize: 0 };
   });
 
   // Estimate left margin dynamically based on Y-axis label width
@@ -1635,17 +1653,17 @@ async function updateChart(){
     window.seriesVisibility = seriesVisibility; // Update window reference
   }
 
-  selectedGroups.forEach((g, i) => {
+  layeredGroups.forEach((entry, i) => {
     const item = document.createElement('span');
     const dot = document.createElement('span');
     dot.style.display = 'inline-block';
     dot.style.width = '12px';
     dot.style.height = '12px';
     dot.style.borderRadius = '50%';
-    dot.style.backgroundColor = colors[i];
+    dot.style.backgroundColor = entry.color;
     item.appendChild(dot);
 
-    const labelText = document.createTextNode(g + (groupHasData[i] ? '' : ' (No data available)'));
+    const labelText = document.createTextNode(entry.name + (groupHasData[i] ? '' : ' (No data available)'));
     item.appendChild(labelText);
 
     item.style.opacity = (!groupHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
