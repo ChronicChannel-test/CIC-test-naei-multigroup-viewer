@@ -884,9 +884,17 @@
       return { origin, base, query, hash };
     }
 
+    function humanizeUrlEncoding(value) {
+      if (typeof value !== 'string' || !value.length) {
+        return value || '';
+      }
+      return value.replace(/%2C/gi, ',');
+    }
+
     function rebuildUrl({ origin = '', base = '', query = '', hash = '' }) {
       const queryPart = query ? `?${query}` : '';
-      return `${origin}${base}${queryPart}${hash}`;
+      const assembled = `${origin}${base}${queryPart}${hash}`;
+      return humanizeUrlEncoding(assembled);
     }
 
     function applyBubbleTutorialFlag(url) {
