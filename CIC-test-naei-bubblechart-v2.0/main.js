@@ -292,10 +292,11 @@ window.addEventListener('message', (event) => {
 
   if (event.data.type === 'openBubbleTutorial') {
     const reason = event.data.reason || 'parent';
+    const skipScroll = reason !== 'user';
     if (typeof tutorialOverlayApi.open === 'function') {
       const isActive = typeof tutorialOverlayApi.isActive === 'function' && tutorialOverlayApi.isActive();
       if (!isActive) {
-        tutorialOverlayApi.open(reason);
+        tutorialOverlayApi.open(reason, { skipScroll });
       }
     } else {
       pendingTutorialOpenReason = reason;
@@ -1024,11 +1025,14 @@ function setupTutorialOverlay() {
       .then(scrollSelf);
   }
 
-  async function showOverlay(source = 'user') {
+  async function showOverlay(source = 'user', options = {}) {
     if (overlayActive) {
       return;
     }
-    await scrollTutorialIntoView();
+    const skipScroll = Boolean(options.skipScroll) || source === 'url-param';
+    if (!skipScroll) {
+      await scrollTutorialIntoView();
+    }
     overlayActive = true;
     lastFocusedElement = document.activeElement;
     overlay.classList.add('visible');
@@ -1104,7 +1108,8 @@ function setupTutorialOverlay() {
   tutorialOverlayApi.isActive = () => overlayActive;
 
   if (pendingTutorialOpenReason) {
-    showOverlay(pendingTutorialOpenReason);
+    const shouldSkipScroll = pendingTutorialOpenReason !== 'user';
+    showOverlay(pendingTutorialOpenReason, { skipScroll: shouldSkipScroll });
     pendingTutorialOpenReason = null;
   }
 }
