@@ -23,6 +23,62 @@ const sharedDataInfoLog = (() => {
 })();
 const sharedDataNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
+const SHARED_RESOURCES_BASE_PATH = (() => {
+  const normalizePath = path => {
+    if (!path || typeof path !== 'string') {
+      return null;
+    }
+    try {
+      const trimmed = path.trim();
+      if (!trimmed) {
+        return null;
+      }
+      if (/^https?:\/\//i.test(trimmed)) {
+        const absolute = new URL(trimmed, window.location.origin);
+        return absolute.pathname.endsWith('/') ? absolute.pathname : `${absolute.pathname}/`;
+      }
+      if (trimmed.startsWith('/')) {
+        return trimmed.endsWith('/') ? trimmed : `${trimmed}/`;
+      }
+      return `/${trimmed.replace(/^\/+/, '')}${trimmed.endsWith('/') ? '' : '/'}`;
+    } catch (error) {
+      sharedDataDebugLog('SharedResources base normalization failed', error);
+      return null;
+    }
+  };
+
+  const fromExplicitGlobal = normalizePath(window.__NAEI_SHARED_RESOURCES_BASE__);
+  if (fromExplicitGlobal) {
+    return fromExplicitGlobal;
+  }
+
+  try {
+    const currentScript = document.currentScript || Array.from(document.getElementsByTagName('script') || []).find(script => {
+      const src = script && script.getAttribute && script.getAttribute('src');
+      return src && src.includes('shared-data-loader');
+    });
+    if (!currentScript || !currentScript.src) {
+      return null;
+    }
+    const scriptUrl = new URL(currentScript.src, window.location.origin);
+    const segments = scriptUrl.pathname.split('/').filter(Boolean);
+    const sharedIndex = segments.lastIndexOf('SharedResources');
+    if (sharedIndex === -1) {
+      return null;
+    }
+    const baseSegments = segments.slice(0, sharedIndex + 1);
+    const basePath = `/${baseSegments.join('/')}/`;
+    return basePath;
+  } catch (error) {
+    sharedDataDebugLog('SharedResources base detection failed', error);
+    return null;
+  }
+})();
+
+if (SHARED_RESOURCES_BASE_PATH && !window.__NAEI_SHARED_RESOURCES_BASE__) {
+  window.__NAEI_SHARED_RESOURCES_BASE__ = SHARED_RESOURCES_BASE_PATH;
+}
+
 function resolveExistingSharedCache() {
   if (window.SharedDataCache) {
     return window.SharedDataCache;
@@ -61,12 +117,13 @@ window.SharedDataCache = resolveExistingSharedCache() || {
   }
 };
 
-const DEFAULT_SNAPSHOT_PATHS = [
+const DEFAULT_SNAPSHOT_PATHS = Array.from(new Set([
+  SHARED_RESOURCES_BASE_PATH ? `${SHARED_RESOURCES_BASE_PATH}default-chart-data.json` : null,
   '/SharedResources/default-chart-data.json',
   'SharedResources/default-chart-data.json',
   '../SharedResources/default-chart-data.json',
   '../../SharedResources/default-chart-data.json'
-];
+].filter(Boolean)));
 
 let defaultSnapshotPromise = null;
 const HERO_DEFAULT_ACTIVITY_NAME = 'Activity Data';

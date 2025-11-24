@@ -475,7 +475,7 @@
       <img id="cicLogo" src="SharedResources/images/CIC-Square-Border-Words-Alpha.svg" alt="CIC Logo">
     </a>
     <div class="sidebar-icons">
-      <a href="https://youtube.com/@chronichannelillness" target="_blank" class="sidebar-link">
+      <a href="https://youtube.com/@chroniillnesschannel" target="_blank" class="sidebar-link">
         <img src="SharedResources/images/youtube-logo-6.svg" alt="YouTube">
       </a>
       <a href="https://bsky.app/profile/chronicchannel.bsky.social" target="_blank" class="sidebar-link">
@@ -579,7 +579,7 @@
       <iframe
         id="groupinfo-iframe"
         class="chart-iframe lazy-iframe"
-        data-src="group-info-embed.html"
+        data-src="group-info/embed.html"
         loading="lazy"
         frameborder="0"
         scrolling="no"
@@ -592,7 +592,7 @@
       <iframe
         id="userguide-iframe"
         class="chart-iframe lazy-iframe"
-        data-src="user-guide-embed.html"
+        data-src="user-guide/embed.html"
         loading="lazy"
         frameborder="0"
         scrolling="no"
@@ -605,7 +605,7 @@
       <iframe
         id="resources-iframe"
         class="chart-iframe lazy-iframe"
-        data-src="resources-embed.html"
+        data-src="resources/embed.html"
         loading="lazy"
         frameborder="0"
         scrolling="no"
@@ -626,7 +626,7 @@
     <strong>Contact:</strong> <a  href="mailto:info@chronicillnesschannel.co.uk" target="_blank" rel="noopener" class="text-blue-600hover:text-blue-800">info@chronicillnesschannel.co.uk</a>
       <br>
       <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-        Explorer Version: v3.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.11.23
+        Explorer Version: v3.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.11.24
       </span>
     </footer>
 
@@ -717,6 +717,10 @@
       active: bubbleTutorialParamPresent,
       openRequestSent: false
     };
+
+    if (typeof window !== 'undefined' && window.history && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = bubbleTutorialControl.requested ? 'manual' : 'auto';
+    }
     
     // Load shared resources
     window.addEventListener('DOMContentLoaded', function() {
@@ -1603,11 +1607,19 @@
             const currentUrl = window.location.pathname + window.location.search + window.location.hash;
             updateHistoryState('replaceState', currentUrl);
           }
+
+          if (window.history && 'scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'manual';
+          }
         } else if (event.data.state === 'closed' && bubbleTutorialControl.active) {
           bubbleTutorialControl.active = false;
           bubbleTutorialControl.requested = false;
           bubbleTutorialControl.openRequestSent = false;
           removeBubbleTutorialFlagFromUrl();
+
+          if (window.history && 'scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'auto';
+          }
         }
         return;
       }

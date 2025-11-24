@@ -1,0 +1,32 @@
+vcd15cbe7772f49c399c6a5babf22c1241717689176015:1  Failed to load resource: net::ERR_BLOCKED_BY_ADBLOCKER
+vcd15cbe7772f49c399c6a5babf22c1241717689176015:1  Failed to load resource: net::ERR_BLOCKED_BY_ADBLOCKER
+vcd15cbe7772f49c399c6a5babf22c1241717689176015:1  Failed to load resource: net::ERR_BLOCKED_BY_ADBLOCKER
+vcd15cbe7772f49c399c6a5babf22c1241717689176015:1  Failed to load resource: net::ERR_BLOCKED_BY_ADBLOCKER
+vcd15cbe7772f49c399c6a5babf22c1241717689176015:1  Failed to load resource: net::ERR_BLOCKED_BY_ADBLOCKER
+vcd15cbe7772f49c399c6a5babf22c1241717689176015:1  Failed to load resource: net::ERR_BLOCKED_BY_ADBLOCKER
+shared-data-loader.js:22 [SharedData] Attempting to fetch default snapshot Object
+shared-data-loader.js:22 [SharedData] Full dataset bootstrap requested Object
+shared-data-loader.js:22 [SharedData] Starting shared Supabase fetch
+shared-data-loader.js:22 [SharedData] Supabase query started Object
+shared-data-loader.js:22 [SharedData] Supabase query started Object
+shared-data-loader.js:22 [SharedData] Supabase query started Object
+shared-data-loader.js:22 [SharedData] Supabase query started Object
+vcd15cbe7772f49c399c6a5babf22c1241717689176015:1  Failed to load resource: net::ERR_BLOCKED_BY_ADBLOCKER
+shared-data-loader.js:22 [SharedData] Attempting to fetch default snapshot Object
+util.js:378 Warning: Setting up fake worker.
+shared-data-loader.js:22 [SharedData] Default snapshot loaded Object
+supabase.js:68 [Linechart data] Line chart using default JSON snapshot Object
+app.js:1704 PDF a1dd1c62d4ff4995b8ab578156529517 [1.4 macOS Version 15.7.2 (Build 24G325) Quartz PDFContext / Pages] (PDF.js: 4.7.76 [8b73b828b])
+shared-data-loader.js:22 [SharedData] Using cached default JSON snapshot Object
+supabase.js:14 [Bubble data] Bubble chart using default JSON snapshot Object
+shared-data-loader.js:22 [SharedData] Using cached default JSON snapshot Object
+supabase.js:14 [Bubble data] Applied selector metadata for bubble dropdowns Object
+shared-data-loader.js:22 [SharedData] Supabase query completed Object
+shared-data-loader.js:22 [SharedData] Using cached default JSON snapshot Object
+shared-data-loader.js:22 [SharedData] Default snapshot loaded Object
+shared-data-loader.js:22 [SharedData] Supabase query completed Object
+shared-data-loader.js:22 [SharedData] Supabase query completed Object
+shared-data-loader.js:22 [SharedData] Supabase query completed Object
+shared-data-loader.js:22 [SharedData] Shared Supabase fetch completed Object
+supabase.js:68 [Linechart data] Line chart full dataset hydration completed Object
+supabase.js:14 [Bubble data] Bubble chart full dataset bootstrapped via SharedDataLoader Object
