@@ -278,8 +278,8 @@
 google.charts.load('current', {packages:['corechart']});
 
 // Data URLs (your gviz endpoints)
-const DATA_SHEET_URL='https://docs.google.com/spreadsheets/d/1m0as8iV7quPhM5fg_8fJpzAEQh_LBBDFwnuzf71QJZM/gviz/tq?sheet=23ds_group_data&tq=SELECT%20*';
-const UNIT_SHEET_URL='https://docs.google.com/spreadsheets/d/1m0as8iV7quPhM5fg_8fJpzAEQh_LBBDFwnuzf71QJZM/gviz/tq?sheet=Pollutant&tq=SELECT%20*';
+const DATA_SHEET_URL='https://docs.google.com/spreadsheets/d/1a41zMoKjsD9GR012RZyUpYlDjGKrr7XB5m37Wa34yXQ/gviz/tq?sheet=23ds_group_data&tq=SELECT%20*';
+const UNIT_SHEET_URL='https://docs.google.com/spreadsheets/d/1a41zMoKjsD9GR012RZyUpYlDjGKrr7XB5m37Wa34yXQ/gviz/tq?sheet=Pollutant&tq=SELECT%20*';
 
 let globalRows=[], globalHeaders=[], pollutantUnits={}, groupedData={};
 const distinctPalette=['#E6194B','#3CB44B','#FFE119','#4363D8','#F58231','#911EB4','#46F0F0','#F032E6','#BCF60C','#FABEBE'];
@@ -923,7 +923,7 @@ function exportData(format = 'csv') {
 }
 async function loadGroupInfo() {
   const NFRCODE_SHEET_URL =
-    'https://docs.google.com/spreadsheets/d/1m0as8iV7quPhM5fg_8fJpzAEQh_LBBDFwnuzf71QJZM/gviz/tq?sheet=NFRCodes&tq=SELECT%20*';
+    'https://docs.google.com/spreadsheets/d/1a41zMoKjsD9GR012RZyUpYlDjGKrr7XB5m37Wa34yXQ/gviz/tq?sheet=NFRCodes&tq=SELECT%20*';
 
   try {
     const nfrRes = await fetch(NFRCODE_SHEET_URL);
