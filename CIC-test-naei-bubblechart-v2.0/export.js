@@ -913,6 +913,19 @@ function formatShareUrlForDisplay(url) {
   return readable.replace(/^(https?:\/\/)/i, '');
 }
 
+async function copyChartImageSilently() {
+  if (!(navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined')) {
+    const error = new Error('Your browser does not support copying images to the clipboard.');
+    error.code = 'CLIPBOARD_UNSUPPORTED';
+    throw error;
+  }
+
+  const chartImageData = await generateChartImage();
+  const blob = dataURLtoBlob(chartImageData);
+  const clipboardItem = new ClipboardItem({ 'image/png': blob });
+  await navigator.clipboard.write([clipboardItem]);
+}
+
 function legacyShareUrlFallback(queryString) {
   const currentUrl = new URL(window.location.href);
   const pathSegments = currentUrl.pathname.split('/').filter(Boolean);
@@ -961,7 +974,7 @@ function showShareDialog() {
   const shareGroupNames = resolveBubbleShareGroups(chartData);
   const groupSummary = shareGroupNames.length ? shareGroupNames.join(', ') : 'Selected Groups';
   const yearSuffix = chartData.year ? ` (${chartData.year})` : '';
-  const title = `${chartData.pollutantName} Emission Factors - ${groupSummary}${yearSuffix}`;
+  const title = `${chartData.pollutantName} - ${groupSummary}${yearSuffix}`;
 
   // Create dialog
   const dialog = document.createElement('div');
@@ -1037,14 +1050,39 @@ function showShareDialog() {
   dialog.appendChild(content);
   document.body.appendChild(dialog);
 
+  const copyUrlBtn = content.querySelector('#copyUrlBtn');
+  const copyUrlDefaultHtml = copyUrlBtn.innerHTML;
+  const copyUrlDefaultBg = copyUrlBtn.style.background;
+  const copyPngBtn = content.querySelector('#copyPngBtn');
+  const copyPngDefaultHtml = copyPngBtn.innerHTML;
+  const copyPngDefaultBg = copyPngBtn.style.background;
+
+  function showCopiedState(button, label = 'Copied') {
+    const width = button.offsetWidth;
+    const height = button.offsetHeight;
+    button.style.width = `${width}px`;
+    button.style.height = `${height}px`;
+    button.innerHTML = `
+      <span style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+        <span aria-hidden="true" style="font-size: 1.1em;">✅</span>
+        <span>${label}</span>
+      </span>
+    `;
+    button.style.background = '#4CAF50';
+  }
+
+  function resetButtonState(button, html, backgroundColor) {
+    button.innerHTML = html;
+    button.style.background = backgroundColor;
+    button.style.width = '';
+    button.style.height = '';
+  }
+
   // Copy URL functionality
-  content.querySelector('#copyUrlBtn').addEventListener('click', async () => {
+  copyUrlBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(displayShareUrl);
-      const btn = content.querySelector('#copyUrlBtn');
-      const originalText = btn.textContent;
-      btn.textContent = '✅ Copied!';
-      btn.style.background = '#4CAF50';
+      showCopiedState(copyUrlBtn);
       
       if (window.Analytics && supabase) {
         window.Analytics.trackAnalytics(supabase, 'share_url_copied', {
@@ -1055,8 +1093,7 @@ function showShareDialog() {
       }
       
       setTimeout(() => {
-        btn.textContent = originalText;
-        btn.style.background = '#9C27B0';
+        resetButtonState(copyUrlBtn, copyUrlDefaultHtml, copyUrlDefaultBg);
       }, 2000);
     } catch (err) {
       // Fallback for older browsers
@@ -1068,14 +1105,9 @@ function showShareDialog() {
   });
 
   // Copy PNG functionality
-  content.querySelector('#copyPngBtn').addEventListener('click', async () => {
-    const btn = content.querySelector('#copyPngBtn');
-    const originalText = btn.textContent;
-    const originalBg = btn.style.background;
-    
+  copyPngBtn.addEventListener('click', async () => {
     try {
-      btn.disabled = true;
-      btn.textContent = 'Generating image...';
+      copyPngBtn.disabled = true;
       
       const chartImageData = await generateChartImage();
       const blob = dataURLtoBlob(chartImageData);
@@ -1084,8 +1116,7 @@ function showShareDialog() {
         const clipboardItem = new ClipboardItem({ 'image/png': blob });
         await navigator.clipboard.write([clipboardItem]);
         
-        btn.textContent = '✅ Copied!';
-        btn.style.background = '#4CAF50';
+        showCopiedState(copyPngBtn);
         
         if (window.Analytics && supabase) {
           window.Analytics.trackAnalytics(supabase, 'share_png_copied', {
@@ -1096,99 +1127,69 @@ function showShareDialog() {
         }
         
         setTimeout(() => {
-          btn.textContent = originalText;
-          btn.style.background = originalBg;
-          btn.disabled = false;
+          resetButtonState(copyPngBtn, copyPngDefaultHtml, copyPngDefaultBg);
+          copyPngBtn.disabled = false;
         }, 2000);
       } else {
-        btn.textContent = originalText;
-        btn.style.background = originalBg;
-        btn.disabled = false;
+        resetButtonState(copyPngBtn, copyPngDefaultHtml, copyPngDefaultBg);
+        copyPngBtn.disabled = false;
         alert('Your browser doesn\'t support copying images to clipboard. Please use the PNG download button instead.');
       }
     } catch (error) {
       console.error('Failed to copy PNG:', error);
-      btn.textContent = originalText;
-      btn.style.background = originalBg;
-      btn.disabled = false;
+      resetButtonState(copyPngBtn, copyPngDefaultHtml, copyPngDefaultBg);
+      copyPngBtn.disabled = false;
       alert('Failed to copy chart image: ' + error.message);
     }
   });
 
   // Email share functionality
   content.querySelector('#emailShareBtn').addEventListener('click', async () => {
-    const btn = content.querySelector('#emailShareBtn');
-    const originalText = btn.textContent;
-    const originalBg = btn.style.background;
-    
     try {
-      btn.disabled = true;
-      btn.textContent = 'Copying image...';
-      
-      const chartImageData = await generateChartImage();
-      const blob = dataURLtoBlob(chartImageData);
-      
-      if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
-        const clipboardItem = new ClipboardItem({ 'image/png': blob });
-        await navigator.clipboard.write([clipboardItem]);
-        
-        btn.textContent = '✅ Copied!';
-        btn.style.background = '#4CAF50';
-        
-        if (window.Analytics && supabase) {
-          window.Analytics.trackAnalytics(supabase, 'email_share_copied', {
-            year: chartData.year,
-            pollutant: chartData.pollutantName,
-            group_count: chartData.groupIds.length
-          });
-        }
-        
-        // Open email client with shared helper (fallbacks if unavailable)
-        const emailPayload = window.EmailShareHelper
-          ? window.EmailShareHelper.composeEmail({
-              pollutantName: chartData.pollutantName,
-              singleYear: chartData.year,
-              shareUrl,
-              groups: shareGroupNames
-            })
-          : null;
+      await copyChartImageSilently();
 
-        if (emailPayload && window.EmailShareHelper) {
-          window.EmailShareHelper.openEmailClient(emailPayload);
-        } else {
-          const fallbackSubject = `UK Air Pollution/Emissions Data: ${chartData.pollutantName || ''} ${chartData.year || ''}`.trim();
-          const readableShare = displayShareUrl || readableShareUrl(shareUrl);
-          const fallbackBody = [
-            `I'm sharing UK air pollution/emissions data for ${chartData.pollutantName || 'this chart'}.`,
-            '',
-            readableShare ? `Interactive chart: ${readableShare}` : '',
-            '',
-            'Generated by the Chronic Illness Channel UK Air Pollution/Emissions Data Explorer',
-            'chronicillnesschannel.co.uk/data-explorer'
-          ]
-            .filter(Boolean)
-            .join('\n');
-          const encodedSubject = encodeURIComponent(fallbackSubject);
-          const encodedBody = encodeURIComponent(fallbackBody);
-          window.location.href = `mailto:?subject=${encodedSubject}&body=${encodedBody}`;
-        }
-        
-        setTimeout(() => {
-          btn.textContent = originalText;
-          btn.style.background = originalBg;
-          btn.disabled = false;
-        }, 2000);
+      if (window.Analytics && supabase) {
+        window.Analytics.trackAnalytics(supabase, 'email_share_copied', {
+          year: chartData.year,
+          pollutant: chartData.pollutantName,
+          group_count: chartData.groupIds.length
+        });
+      }
+
+      const emailPayload = window.EmailShareHelper
+        ? window.EmailShareHelper.composeEmail({
+            pollutantName: chartData.pollutantName,
+            singleYear: chartData.year,
+            shareUrl,
+            groups: shareGroupNames
+          })
+        : null;
+
+      if (emailPayload && window.EmailShareHelper) {
+        window.EmailShareHelper.openEmailClient(emailPayload);
       } else {
-        btn.textContent = originalText;
-        btn.style.background = originalBg;
-        btn.disabled = false;
-        alert('Your browser doesn\'t support copying images to clipboard.');
+        const fallbackSubject = `UK Air Pollution/Emissions Data: ${chartData.pollutantName || ''} ${chartData.year || ''}`.trim();
+        const readableShare = displayShareUrl || readableShareUrl(shareUrl);
+        const fallbackBody = [
+          `I'm sharing UK air pollution/emissions data for ${chartData.pollutantName || 'this chart'}.`,
+          '',
+          readableShare ? `Interactive chart: ${readableShare}` : '',
+          '',
+          'Generated by the Chronic Illness Channel UK Air Pollution/Emissions Data Explorer',
+          'chronicillnesschannel.co.uk/data-explorer'
+        ]
+          .filter(Boolean)
+          .join('\n');
+        const encodedSubject = encodeURIComponent(fallbackSubject);
+        const encodedBody = encodeURIComponent(fallbackBody);
+        window.location.href = `mailto:?subject=${encodedSubject}&body=${encodedBody}`;
       }
     } catch (error) {
+      if (error?.code === 'CLIPBOARD_UNSUPPORTED') {
+        alert('Your browser doesn\'t support copying images to clipboard.');
+        return;
+      }
       console.error('Failed to copy image for email:', error);
-      btn.textContent = originalText;
-      btn.style.background = originalBg;
-      btn.disabled = false;
       alert('Failed to copy chart image: ' + error.message);
     }
   });

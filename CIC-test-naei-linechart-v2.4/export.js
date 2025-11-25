@@ -428,44 +428,66 @@ function showShareDialog(shareUrl) {
   dialog.appendChild(content);
   document.body.appendChild(dialog);
   
+  const shareUrlInput = content.querySelector('#shareUrlInput');
+  const copyUrlBtn = content.querySelector('#copyUrlBtn');
+  const copyUrlDefaultHtml = copyUrlBtn.innerHTML;
+  const copyUrlDefaultBg = copyUrlBtn.style.background;
+  const copyPngBtn = content.querySelector('#copyPngBtn');
+  const copyPngDefaultHtml = copyPngBtn.innerHTML;
+  const copyPngDefaultBg = copyPngBtn.style.background;
+
+  function showCopiedState(button, label = 'Copied') {
+    const width = button.offsetWidth;
+    const height = button.offsetHeight;
+    button.style.width = `${width}px`;
+    button.style.height = `${height}px`;
+    button.innerHTML = `
+      <span style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%;">
+        <span aria-hidden="true" style="font-size: 1.1em;">✅</span>
+        <span>${label}</span>
+      </span>
+    `;
+    button.style.background = '#4CAF50';
+  }
+
+  function resetButtonState(button, html, backgroundColor) {
+    button.innerHTML = html;
+    button.style.background = backgroundColor;
+    button.style.width = '';
+    button.style.height = '';
+  }
+  
   // Copy URL functionality
-  content.querySelector('#copyUrlBtn').addEventListener('click', async () => {
-    const input = content.querySelector('#shareUrlInput');
+  copyUrlBtn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(displayShareUrl);
-      const btn = content.querySelector('#copyUrlBtn');
-      const originalText = btn.textContent;
-      btn.textContent = '✅ Copied!';
-      btn.style.background = '#4CAF50';
-      
-      window.supabaseModule.trackAnalytics('share_url_copied', {
-        pollutant: pollutantName,
-        group_count: selectedGroups.length,
-        start_year: startYear,
-        end_year: endYear,
-        has_year_range: !!(startYear && endYear)
-      });
-      
+      showCopiedState(copyUrlBtn);
+
+      if (window.supabaseModule?.trackAnalytics) {
+        window.supabaseModule.trackAnalytics('share_url_copied', {
+          pollutant: pollutantName,
+          group_count: selectedGroups.length,
+          start_year: startYear,
+          end_year: endYear,
+          has_year_range: !!(startYear && endYear)
+        });
+      }
+
       setTimeout(() => {
-        btn.textContent = originalText;
-        btn.style.background = '#9C27B0';
+        resetButtonState(copyUrlBtn, copyUrlDefaultHtml, copyUrlDefaultBg);
       }, 2000);
     } catch (err) {
       // Fallback for older browsers
-      input.select();
+      shareUrlInput.select();
       document.execCommand('copy');
       alert('URL copied to clipboard!');
     }
   });
   
   // Copy PNG functionality
-  content.querySelector('#copyPngBtn').addEventListener('click', async () => {
-    const btn = content.querySelector('#copyPngBtn');
-    const originalText = btn.textContent;
-    const originalBg = btn.style.background;
-    
+  copyPngBtn.addEventListener('click', async () => {
     try {
-      btn.disabled = true;
+      copyPngBtn.disabled = true;
       
       const chartImageData = await generateChartImage();
       const blob = dataURLtoBlob(chartImageData);
@@ -473,33 +495,31 @@ function showShareDialog(shareUrl) {
       if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
         const clipboardItem = new ClipboardItem({ 'image/png': blob });
         await navigator.clipboard.write([clipboardItem]);
-        
-        btn.textContent = '✅ Copied!';
-        btn.style.background = '#4CAF50';
-        
-        window.supabaseModule.trackAnalytics('share_png_copied', {
-          pollutant: pollutantName,
-          group_count: selectedGroups.length,
-          start_year: startYear,
-          end_year: endYear
-        });
-        
+
+        showCopiedState(copyPngBtn);
+
+        if (window.supabaseModule?.trackAnalytics) {
+          window.supabaseModule.trackAnalytics('share_png_copied', {
+            pollutant: pollutantName,
+            group_count: selectedGroups.length,
+            start_year: startYear,
+            end_year: endYear
+          });
+        }
+
         setTimeout(() => {
-          btn.textContent = originalText;
-          btn.style.background = originalBg;
-          btn.disabled = false;
+          resetButtonState(copyPngBtn, copyPngDefaultHtml, copyPngDefaultBg);
+          copyPngBtn.disabled = false;
         }, 2000);
       } else {
-        btn.textContent = originalText;
-        btn.style.background = originalBg;
-        btn.disabled = false;
+        resetButtonState(copyPngBtn, copyPngDefaultHtml, copyPngDefaultBg);
+        copyPngBtn.disabled = false;
         alert('Your browser doesn\'t support copying images to clipboard. Please use the PNG download button instead.');
       }
     } catch (error) {
       console.error('Failed to copy PNG:', error);
-      btn.textContent = originalText;
-      btn.style.background = originalBg;
-      btn.disabled = false;
+      resetButtonState(copyPngBtn, copyPngDefaultHtml, copyPngDefaultBg);
+      copyPngBtn.disabled = false;
       alert('Failed to copy chart image: ' + error.message);
     }
   });
@@ -575,7 +595,7 @@ function showShareDialog(shareUrl) {
   
   // Focus the URL input for easy copying
   setTimeout(() => {
-    content.querySelector('#shareUrlInput').select();
+    shareUrlInput.select();
   }, 100);
 }
 
