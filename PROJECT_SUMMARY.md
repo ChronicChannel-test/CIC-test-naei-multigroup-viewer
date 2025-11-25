@@ -25,7 +25,6 @@ CIC-test-naei-data/
 │       ├── supabase.js
 │       ├── export.js
 │       ├── styles.css
-│       ├── styles-v2.4.css
 │       └── README_v2.4.md
 │
 └── CIC-test-naei-activity-data-scatterchart/  (NEW APPLICATION)
@@ -118,7 +117,7 @@ Updated version of the line chart viewer using shared resources:
 - **index.html**: Added shared resource references
 - **supabase.js**: Simplified (uses shared config and analytics)
 - **main.js**: Simplified (uses shared colors)
-- **styles-v2.4.css**: Line chart specific styles only
+- **styles.css**: Line chart styling (now includes footer + v2.4 overrides)
 
 #### Preserved:
 - **v2.3**: Original fully-functional version kept intact

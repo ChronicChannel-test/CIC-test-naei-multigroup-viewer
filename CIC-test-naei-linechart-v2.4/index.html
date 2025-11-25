@@ -58,7 +58,6 @@
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;600;700&family=Inter:wght@400;500;600;700&family=Roboto:wght@400;600;700&family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../SharedResources/common-styles.css">
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="styles-v2.4.css">
   <style>
     /* Hide social media sidebar when embedded in iframe */
     .sidebar-socials {
@@ -189,5 +188,48 @@
   <script src="supabase.js"></script>
   <script src="main.js"></script>
   <script src="export.js"></script>
+  <script>
+    (function logLineTitleStyles() {
+      if (!window || !window.getComputedStyle) {
+        return;
+      }
+
+      function emitDiagnostics() {
+        var title = document.querySelector('.main-title');
+        if (!title) {
+          console.warn('[Line] No .main-title found for diagnostics');
+          return;
+        }
+        var computed = window.getComputedStyle(title);
+        var snapshot = {
+          fontSize: computed.fontSize,
+          fontFamily: computed.fontFamily,
+          fontWeight: computed.fontWeight,
+          lineHeight: computed.lineHeight,
+          paddingRight: computed.paddingRight,
+          whiteSpace: computed.whiteSpace,
+          letterSpacing: computed.letterSpacing,
+          textTransform: computed.textTransform,
+          devicePixelRatio: window.devicePixelRatio || 1
+        };
+        var rect = title.getBoundingClientRect();
+        snapshot.boundingClientRect = {
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          left: rect.left
+        };
+        title.dataset.titleDebug = JSON.stringify(snapshot);
+        var logger = console.warn ? console.warn.bind(console) : console.info ? console.info.bind(console) : console.log;
+        logger('[Line] main-title computed styles:', snapshot);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', emitDiagnostics);
+      } else {
+        emitDiagnostics();
+      }
+    })();
+  </script>
 </body>
 </html>

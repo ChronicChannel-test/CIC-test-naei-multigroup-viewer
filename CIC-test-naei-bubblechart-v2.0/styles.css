@@ -8,6 +8,10 @@
   --bubble-viewport-height: 100vh; /* Standalone fallback, overridden via JS for embeds */
 }
 
+body {
+  font-family: system-ui, sans-serif;
+}
+
 /* Loading overlay */
 #loadingOverlay { 
   position: fixed; 
@@ -652,7 +656,6 @@ body.tutorial-open {
 /* Mobile ko-fi behavior - matches v2.4 working solution */
 /* Maintain shared heading sizing for bubble chart */
 h2.main-title {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 26px !important;
   font-weight: 700 !important;
   line-height: 1.3 !important;
@@ -747,7 +750,7 @@ h2.main-title {
   .main-title {
     padding-right: 0;
     width: 100%;
-    white-space: normal;
+    white-space: nowrap;
   }
 
   #mainContentTop {

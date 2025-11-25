@@ -25,8 +25,7 @@ v2.4-shared-resources/
 ├── supabase.js             (Simplified - uses shared config and analytics)
 ├── main.js                 (Simplified - uses shared colors)
 ├── export.js               (Unchanged)
-├── styles.css              (Original styles - kept for backwards compatibility)
-├── styles-v2.4.css         (Line chart specific styles only)
+├── styles.css              (All line chart styles, including v2.4-specific footer)
 ├── README_v2.4.md          (This file)
 └── ... (other files unchanged)
 ```

@@ -222,5 +222,47 @@
   <script src="chart-renderer.js?v=1"></script>
   <script src="export.js?v=2"></script>
   <script src="main.js?v=1"></script>
+  <script>
+    (function logBubbleTitleStyles() {
+      if (!window || !window.getComputedStyle) {
+        return;
+      }
+
+      function emitDiagnostics() {
+        var title = document.querySelector('.main-title');
+        if (!title) {
+          console.warn('[Bubble] No .main-title found for diagnostics');
+          return;
+        }
+        var computed = window.getComputedStyle(title);
+        var snapshot = {
+          fontSize: computed.fontSize,
+          fontFamily: computed.fontFamily,
+          fontWeight: computed.fontWeight,
+          lineHeight: computed.lineHeight,
+          paddingRight: computed.paddingRight,
+          whiteSpace: computed.whiteSpace,
+          letterSpacing: computed.letterSpacing,
+          textTransform: computed.textTransform,
+          devicePixelRatio: window.devicePixelRatio || 1
+        };
+        var rect = title.getBoundingClientRect();
+        snapshot.boundingClientRect = {
+          width: rect.width,
+          height: rect.height,
+          top: rect.top,
+          left: rect.left
+        };
+        title.dataset.titleDebug = JSON.stringify(snapshot);
+        console.log('[Bubble] main-title computed styles:', snapshot);
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', emitDiagnostics);
+      } else {
+        emitDiagnostics();
+      }
+    })();
+  </script>
 </body>
 </html>
