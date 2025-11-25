@@ -309,7 +309,7 @@
       pdfjsLib.GlobalWorkerOptions.workerPort = worker;
 
       const basePdfPath = '../SharedResources/docs/User-Guide-Pollution-Emissions-Data-Explorer-v0.8.pdf';
-      const tutorialPdfPath = '../SharedResources/docs/Bubble-Chart-Tutorial-v3.pdf';
+      const tutorialPdfPath = '../SharedResources/docs/Bubble-Chart-Tutorial-v1.pdf';
       const shell = document.querySelector('.chart-shell');
       const wrapper = document.querySelector('.user-guide-wrapper');
       const viewer = document.getElementById('guideViewer');
@@ -320,16 +320,19 @@
       const downloadGuideLink = document.getElementById('downloadUserGuide');
       const downloadTutorialLink = document.getElementById('downloadTutorial');
       const dualViewQuery = window.matchMedia('(min-width: 1100px)');
+      const ALWAYS_SINGLE_VIEW = true;
       const MIN_FRAME_HEIGHT = 460;
       const WRAPPER_BUFFER = 27;
       const READY_MESSAGE = 'Use the arrows or keyboard to move one page at a time.';
-      const MAX_PAGE_WIDTH = 580;
+      const MAX_PAGE_WIDTH = 1120;
       const MIN_PAGE_WIDTH = 260;
+      const TARGET_PAGE_WIDTH = 740;
       const PAGE_ASPECT_RATIO = Math.SQRT2; // height / width for A4
       const FOOTER_VIEWPORT_GAP = 12;
       const GUIDE_VERTICAL_GAP = 20;
       const FOOTER_CLAMP_BUFFER = 8;
       const FOOTER_SHADOW_OVERHANG = 18;
+      const SOCIAL_SIDEBAR_RESERVE = 140;
 
       let pdfDoc = null;
       let currentPage = 1;
@@ -457,6 +460,9 @@
     }
 
     function dualViewActive() {
+      if (ALWAYS_SINGLE_VIEW) {
+        return false;
+      }
       return dualViewQuery.matches;
     }
 
@@ -480,27 +486,41 @@
       currentPage = visiblePages[0];
       renderVersion += 1;
       const token = renderVersion;
-      spread.innerHTML = '';
+      const stagedContainers = [];
+      const containerMap = new Map();
       visiblePages.forEach(pageNumber => {
-        spread.appendChild(createPageContainer(pageNumber));
+        const container = createPageContainer(pageNumber);
+        containerMap.set(pageNumber, container);
+        stagedContainers.push(container);
       });
       updateNavState(visiblePages);
 
       const pageDimensions = getPageDimensions(visiblePages.length);
+      const releaseHeightLock = lockSpreadHeight();
 
-      for (const pageNumber of visiblePages) {
-        if (token !== renderVersion) {
-          return;
+      try {
+        for (const pageNumber of visiblePages) {
+          if (token !== renderVersion) {
+            releaseHeightLock();
+            return;
+          }
+          const container = containerMap.get(pageNumber);
+          await renderPage(pageNumber, container, pageDimensions, token);
+          if (token !== renderVersion) {
+            releaseHeightLock();
+            return;
+          }
         }
-        const container = spread.querySelector(`[data-page="${pageNumber}"]`);
-        await renderPage(pageNumber, container, pageDimensions, token);
-        if (token !== renderVersion) {
-          return;
-        }
+
+        spread.replaceChildren(...stagedContainers);
+        releaseHeightLock();
+        updateNavOffset();
+        setStatus(READY_MESSAGE);
+        scheduleHeightUpdate(60);
+      } catch (error) {
+        releaseHeightLock();
+        console.warn('Unable to complete spread render', error);
       }
-      updateNavOffset();
-      setStatus(READY_MESSAGE);
-      scheduleHeightUpdate(60);
     }
 
     function getVisiblePages() {
@@ -563,20 +583,14 @@
       const referenceHeight = getReferenceViewportHeight();
 
       if (pageCount === 1) {
-        const desiredHeight = Math.max(referenceHeight, MIN_FRAME_HEIGHT);
-        const maxWidthAllowed = Math.min(widthPerPage, MAX_PAGE_WIDTH);
-        let widthFromHeight = desiredHeight / PAGE_ASPECT_RATIO;
-        if (!Number.isFinite(widthFromHeight) || widthFromHeight <= 0) {
-          widthFromHeight = MAX_PAGE_WIDTH;
-        }
-
-        if (widthFromHeight > maxWidthAllowed) {
-          const constrainedWidth = Math.max(MIN_PAGE_WIDTH, maxWidthAllowed);
-          return { width: constrainedWidth, height: Math.round(constrainedWidth * PAGE_ASPECT_RATIO) };
-        }
-
-        const finalWidth = Math.max(MIN_PAGE_WIDTH, widthFromHeight);
-        return { width: finalWidth, height: Math.round(Math.max(desiredHeight, finalWidth * PAGE_ASPECT_RATIO)) };
+        const viewportWidth = window.innerWidth || document.documentElement?.clientWidth || available;
+        const maxSocialAdjustedWidth = viewportWidth - Math.max(0, SOCIAL_SIDEBAR_RESERVE);
+        const widthBudget = Math.min(widthPerPage, maxSocialAdjustedWidth);
+        const preferredWidth = Math.min(TARGET_PAGE_WIDTH, widthBudget);
+        const clampedWidth = Math.max(MIN_PAGE_WIDTH, Math.min(MAX_PAGE_WIDTH, preferredWidth));
+        const derivedHeight = Math.round(clampedWidth * PAGE_ASPECT_RATIO);
+        const finalHeight = Math.max(derivedHeight, MIN_FRAME_HEIGHT);
+        return { width: clampedWidth, height: finalHeight };
       }
 
       const heightLimitedWidth = referenceHeight > 0 ? (referenceHeight / PAGE_ASPECT_RATIO) : MAX_PAGE_WIDTH;
@@ -794,6 +808,21 @@
       const nextOffset = Math.max(6, Math.round(viewerRect.right - lastRect.right - nextWidth * 0.45));
       viewer.style.setProperty('--nav-offset-prev', `${prevOffset}px`);
       viewer.style.setProperty('--nav-offset-next', `${nextOffset}px`);
+    }
+
+    function lockSpreadHeight() {
+      if (!spread) {
+        return () => {};
+      }
+      const measured = spread.offsetHeight || spread.scrollHeight || 0;
+      if (measured > 0) {
+        spread.style.minHeight = `${measured}px`;
+      }
+      return () => {
+        if (spread) {
+          spread.style.minHeight = '';
+        }
+      };
     }
 
     function getElementBottom(el) {
