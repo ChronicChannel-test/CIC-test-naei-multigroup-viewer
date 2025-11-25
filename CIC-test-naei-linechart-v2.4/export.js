@@ -191,6 +191,57 @@ function exportData(format = 'csv') {
   }
 }
 
+function resolveShareUrl(queryInput) {
+  if (window.NAEIUrlState?.buildShareUrl) {
+    return window.NAEIUrlState.buildShareUrl(queryInput);
+  }
+  return legacyShareUrlFallback(queryInput);
+}
+
+function legacyShareUrlFallback(queryInput) {
+  const currentUrl = new URL(window.location.href);
+  const pathSegments = currentUrl.pathname.split('/').filter(Boolean);
+  if (pathSegments.length) {
+    const last = pathSegments[pathSegments.length - 1];
+    if (last && last.includes('.')) {
+      pathSegments.pop();
+    }
+  }
+  if (pathSegments.length) {
+    pathSegments.pop();
+  }
+  const basePath = pathSegments.length ? `/${pathSegments.join('/')}/` : '/';
+  const normalizedQuery = window.NAEIUrlState?.buildQueryString
+    ? window.NAEIUrlState.buildQueryString(queryInput)
+    : serializeShareQuery(queryInput);
+  return normalizedQuery
+    ? `${currentUrl.origin}${basePath}?${normalizedQuery}`
+    : `${currentUrl.origin}${basePath}`;
+}
+
+function serializeShareQuery(queryInput) {
+  if (!queryInput) {
+    return '';
+  }
+  if (typeof queryInput === 'string') {
+    return queryInput.replace(/^[?&]+/, '');
+  }
+  if (queryInput instanceof URLSearchParams) {
+    return queryInput.toString();
+  }
+  if (Array.isArray(queryInput)) {
+    return queryInput.filter(Boolean).join('&');
+  }
+  const params = new URLSearchParams();
+  Object.entries(queryInput).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+    params.set(key, value);
+  });
+  return params.toString();
+}
+
 // Generate shareable URL with current configuration
 function generateShareUrl() {
   const pollutantSelect = document.getElementById('pollutantSelect');
@@ -237,19 +288,18 @@ function generateShareUrl() {
   const startYear = startYearSelect ? startYearSelect.value : null;
   const endYear = endYearSelect ? endYearSelect.value : null;
   
-  // Build URL with all parameters
-  const baseUrl = window.location.origin + window.location.pathname;
-  let shareUrl = `${baseUrl}?pollutant_id=${pollutantData.id}&group_ids=${groupIds.join(',')}`;
-  
-  // Add year parameters if they are set
+  const params = new URLSearchParams();
+  params.set('chart', '2');
+  params.set('pollutant_id', pollutantData.id);
+  params.set('group_ids', groupIds.join(','));
   if (startYear) {
-    shareUrl += `&start_year=${startYear}`;
+    params.set('start_year', startYear);
   }
   if (endYear) {
-    shareUrl += `&end_year=${endYear}`;
+    params.set('end_year', endYear);
   }
-  
-  return shareUrl;
+
+  return resolveShareUrl(params);
 }
 
 // Setup share button functionality

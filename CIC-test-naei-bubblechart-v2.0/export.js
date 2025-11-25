@@ -884,6 +884,32 @@ function resolveBubbleShareGroups(chartData) {
   return [];
 }
 
+function resolveShareUrl(queryString) {
+  if (window.NAEIUrlState?.buildShareUrl) {
+    return window.NAEIUrlState.buildShareUrl(queryString);
+  }
+  return legacyShareUrlFallback(queryString);
+}
+
+function legacyShareUrlFallback(queryString) {
+  const currentUrl = new URL(window.location.href);
+  const pathSegments = currentUrl.pathname.split('/').filter(Boolean);
+  if (pathSegments.length) {
+    const last = pathSegments[pathSegments.length - 1];
+    if (last && last.includes('.')) {
+      pathSegments.pop();
+    }
+  }
+  if (pathSegments.length) {
+    pathSegments.pop();
+  }
+  const basePath = pathSegments.length ? `/${pathSegments.join('/')}/` : '/';
+  const normalizedQuery = typeof queryString === 'string' ? queryString.replace(/^[?&]+/, '') : '';
+  return normalizedQuery
+    ? `${currentUrl.origin}${basePath}?${normalizedQuery}`
+    : `${currentUrl.origin}${basePath}`;
+}
+
 function showShareDialog() {
   const chartData = window.ChartRenderer.getCurrentChartData();
   if (!chartData) {
@@ -906,8 +932,8 @@ function showShareDialog() {
   });
 
   // Format: pollutant_id, group_ids, year (year at the end)
-  const query = `pollutant_id=${chartData.pollutantId}&group_ids=${groupIdsWithFlags.join(',')}&year=${chartData.year}`;
-  const shareUrl = window.location.origin + window.location.pathname + '?' + query;
+  const query = `chart=1&pollutant_id=${chartData.pollutantId}&group_ids=${groupIdsWithFlags.join(',')}&year=${chartData.year}`;
+  const shareUrl = resolveShareUrl(query);
 
   const shareGroupNames = resolveBubbleShareGroups(chartData);
   const groupSummary = shareGroupNames.length ? shareGroupNames.join(', ') : 'Selected Groups';
