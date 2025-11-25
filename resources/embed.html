@@ -18,44 +18,29 @@
   <link rel="preload" as="image" href="../SharedResources/images/ERF logo.svg">
   <style>
     body {
-      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #ffffff;
       color: #111827;
       margin: 0;
     }
 
     .resources-shell {
-      padding: 20px 20px 20px 0;
+      padding: 20px;
       margin: 0;
       background: #ffffff;
     }
 
     .resources-frame {
-      width: calc(100% - 280px);
-      margin: 0 auto 0 140px;
-      padding: 0 32px 32px 0;
+      width: 100%;
+      margin: 0;
+      padding: 0 150px 0 0;
       background: #ffffff;
       border-radius: 6px;
       box-sizing: border-box;
     }
 
-    .resources-header {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      margin-bottom: 2rem;
-    }
-
-    .resources-header .main-title {
-      padding-right: 0;
-      margin: 0;
-    }
-
-    .resources-header p {
-      color: #475569;
-      font-size: 1rem;
-      max-width: 48ch;
-      margin: 0;
+    .resources-title {
+      margin: 0 0 1.5rem 0;
     }
 
     .resources-table-section {
@@ -228,15 +213,15 @@
       max-width: 140px;
     }
 
+    @media (max-width: 900px) {
+      .resources-frame {
+        padding-right: 0;
+      }
+    }
+
     @media (max-width: 620px) {
       .resources-shell {
-        padding: 20px;
-      }
-
-      .resources-frame {
-        width: 100%;
-        margin-left: 0;
-        padding: 0 24px 32px 0;
+        padding: 18px;
       }
     }
 
@@ -258,11 +243,11 @@
   </style>
 </head>
 <body>
-  <main class="resources-shell">
-    <div class="resources-frame">
-      <header class="resources-header">
-        <h1 class="main-title">Resources</h1>
-      </header>
+  <main class="chart-shell resources-shell">
+    <div class="resources-frame" id="mainContent">
+      <div class="title-row">
+        <h2 class="main-title resources-title">Resources</h2>
+      </div>
 
       <section class="resources-table-section" aria-label="Organisations focused on wood burning">
         <h2 class="resource-section-heading">Organisations who focus specifically on pollution from domestic wood burning</h2>
@@ -566,6 +551,55 @@
         if (event?.data?.type === 'requestHeight') {
           scheduleHeightUpdate(20, true);
         }
+      });
+    })();
+  </script>
+
+  <script>
+    (function() {
+      function safeNumber(value) {
+        const parsed = parseFloat(value);
+        return Number.isFinite(parsed) ? parsed : value;
+      }
+
+      function logElementMetrics(element, label) {
+        if (!element) {
+          console.warn(`Resources layout: missing ${label}`);
+          return;
+        }
+
+        const rect = element.getBoundingClientRect();
+        const styles = window.getComputedStyle(element);
+        console.groupCollapsed(`Resources layout metrics → ${label}`);
+        console.log('rect', {
+          top: Math.round(rect.top),
+          left: Math.round(rect.left),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height)
+        });
+        console.log('margins', {
+          marginTop: safeNumber(styles.marginTop),
+          marginRight: safeNumber(styles.marginRight),
+          marginBottom: safeNumber(styles.marginBottom),
+          marginLeft: safeNumber(styles.marginLeft)
+        });
+        console.log('paddingRight', safeNumber(styles.paddingRight));
+        console.log('font', {
+          family: styles.fontFamily,
+          size: styles.fontSize,
+          weight: styles.fontWeight,
+          lineHeight: styles.lineHeight
+        });
+        console.groupEnd();
+      }
+
+      document.addEventListener('DOMContentLoaded', () => {
+        const title = document.querySelector('.main-title');
+        const shell = document.querySelector('.chart-shell');
+        const frame = document.querySelector('.resources-frame');
+        logElementMetrics(title, 'main-title');
+        logElementMetrics(shell, 'chart-shell');
+        logElementMetrics(frame, 'resources-frame');
       });
     })();
   </script>
