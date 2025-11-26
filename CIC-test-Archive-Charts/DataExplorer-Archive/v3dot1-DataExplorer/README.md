@@ -1,6 +1,6 @@
 # NAEI Multi-Group Viewer
 
-This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and line (v2.4) chart applications for exploring NAEI emissions data.
+This workspace hosts the shared v3.1 shell plus the current bubble (v2.0) and line (v2.4) chart applications for exploring NAEI emissions data.
 
 ## Structure at a Glance
 - `index.html` &rarr; parent shell that preloads shared data, swaps between the line and bubble chart iframes, and injects shared styles/assets.
