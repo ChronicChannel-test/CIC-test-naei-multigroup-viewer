@@ -22,7 +22,7 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 
 ## Deep-Link Tabs & Embeds
 - The shell router inside `index.html` (mirrored in `404.html`) makes `/category-info`, `/user-guide`, and `/resources` deep links fall back to the SPA before the iframe content loads.
-- Each tab’s copy now lives in its own folder (`/category-info/`, `/user-guide/`, `/resources/`) under `embed.html`, while the folder `index.html` simply redirects to the full shell (`/?chart=…`) so direct visits keep the tab bar visible; the legacy `*-embed.html` files remain as tiny redirectors for older links and bookmarks.
+- Each tab’s copy now lives in its own folder (`/category-info/`, `/user-guide/`, `/resources/`) under `embed.html`, while the folder `index.html` simply redirects to the full shell (`/?page=…`) so direct visits keep the tab bar visible; the legacy `*-embed.html` files remain as tiny redirectors for older links and bookmarks.
 - The parent iframe wrapper is responsible for sizing; the embed documents only emit height messages, so keep any structural changes self-contained inside the embed file.
 
 ### Adding Another Static Tab

@@ -7,11 +7,11 @@
   <link rel="apple-touch-icon" href="SharedResources/images/favicon.png">
 
   <!-- Social preview / link preview meta tags -->
-  <meta name="description" content="NAEI Data Viewer - Interactive charts for UK emissions data">
+  <meta name="description" content="Interactive charts using UK Government data"> 
   <!-- Open Graph (Facebook, LinkedIn, Slack, etc.) -->
   <meta property="og:type" content="website">
   <meta property="og:title" content="UK Air Pollution/Emissions Data Explorer">
-  <meta property="og:description" content="Interactive charts for analyzing UK National Atmospheric Emissions Inventory data">
+  <meta property="og:description" content="Interactive charts using UK Government data">
   <meta property="og:url" content="https://github.com/Chronic-Illness-Channel/naei-multigroup-viewer">
   <meta property="og:image" content="SharedResources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
   <meta property="og:image:width" content="1120">
@@ -20,12 +20,28 @@
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="UK Air Pollution/Emissions Data Explorer">
-  <meta name="twitter:description" content="Interactive charts for UK emissions data">
+  <meta name="twitter:description" content="Interactive charts using UK Government data">
   <meta name="twitter:image" content="SharedResources/images/CIC%20-%20NAEI%20Multi-Group%20Viewer%20Thumbnail.1120x630.png">
   <meta name="twitter:site" content="@Chronic_Channel">
   <meta name="twitter:creator" content="@Chronic_Channel">
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <script>
+    (function primeScrollRestoration() {
+      try {
+        var params = new URLSearchParams(window.location.search || '');
+        var tutorialRequested = params.has('bubbletutorial') || params.has('bubbleTutorial');
+        if (tutorialRequested && window.history && 'scrollRestoration' in window.history) {
+          window.history.scrollRestoration = 'manual';
+          window.__NAEI_SCROLL_RESTORED_MANUALLY__ = true;
+        }
+      } catch (error) {
+        if (window && window.console && window.console.warn) {
+          window.console.warn('Unable to prime scroll restoration:', error);
+        }
+      }
+    })();
+  </script>
   
   <!-- Load Supabase and shared resources -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -247,12 +263,25 @@
       width: 295px;
     }
 
+    .header-bar {
+      min-height: 4rem;
+      height: auto;
+      flex-wrap: wrap;
+      row-gap: 4px;
+      align-items: flex-start;
+      padding-top: 6px;
+    }
+
     .page-title {
       line-height: 1.2;
       display: flex;
       flex-wrap: wrap;
       align-items: baseline;
       gap: 7px;
+      padding-right: 130px;
+    }
+
+    .tab-nav {
       padding-right: 130px;
     }
 
@@ -267,6 +296,10 @@
 
     @media (max-width: 620px) {
       .page-title {
+        padding-right: 0;
+      }
+
+      .tab-nav {
         padding-right: 0;
       }
     }
@@ -390,10 +423,61 @@
       width: 24px;
       height: 24px;
     }
+
+    html,
+    body {
+      height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-stack {
+      flex: 1 0 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #chart-interface {
+      flex: 1 1 auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    #mainFooter {
+      margin-top: auto;
+      flex-shrink: 0;
+    }
   </style>
 </head>
 
 <body>
+
+  <script>
+    (function bootstrapIframeMessageQueue() {
+      const queue = [];
+      function enqueue(event) {
+        if (typeof window.__NAEI_processIframeMessage === 'function') {
+          try {
+            window.__NAEI_processIframeMessage(event);
+          } catch (error) {
+            console.warn('Queued iframe message failed:', error);
+          }
+        } else {
+          queue.push(event);
+        }
+      }
+
+      window.__NAEI_messageQueue = queue;
+      window.__NAEI_iframeMessageBridge = enqueue;
+      window.addEventListener('message', enqueue, false);
+    })();
+  </script>
 
   <!-- Full-screen loading overlay -->
   <div id="main-loading-overlay">
@@ -407,10 +491,10 @@
       <img id="cicLogo" src="SharedResources/images/CIC-Square-Border-Words-Alpha.svg" alt="CIC Logo">
     </a>
     <div class="sidebar-icons">
-      <a href="https://youtube.com/@chronichannelillness" target="_blank" class="sidebar-link">
+      <a href="https://youtube.com/@chroniillnesschannel" target="_blank" class="sidebar-link">
         <img src="SharedResources/images/youtube-logo-6.svg" alt="YouTube">
       </a>
-      <a href="https://bsky.app/profile/chronicillnesschannel.bsky.social" target="_blank" class="sidebar-link">
+      <a href="https://bsky.app/profile/chronicchannel.bsky.social" target="_blank" class="sidebar-link">
         <img src="SharedResources/images/Bluesky_Logo.svg" alt="Bluesky">
       </a>
       <a href="https://twitter.com/chronic_channel" target="_blank" class="sidebar-link">
@@ -430,10 +514,11 @@
     </div>
   </div>
 
+  <div class="page-stack">
   <!-- Header -->
   <div class="bg-white">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+      <div class="flex items-center justify-between header-bar">
         <div class="flex items-center">
           <div>
             <h1 class="text-3xl font-bold text-gray-900 page-title">
@@ -443,7 +528,7 @@
                 <span>Data Explorer</span>
               </span>
             </h1>
-            <p class="text-sm text-gray-500">Interactive charts using UK Government data</p>
+            <p class="text-sm text-gray-500">Interactive Charts using UK Government Data</p>
           </div>
         </div>
       </div>
@@ -455,12 +540,12 @@
     <div class="bg-white">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="border-b border-gray-200">
-          <nav class="-mb-px flex flex-wrap items-center gap-6" role="tablist" aria-label="Chart views">
-            <button type="button" id="tab-1" data-chart="1" onclick="switchChart('1')" role="tab" aria-controls="chart-1" aria-selected="true" tabindex="0" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+          <nav class="tab-nav -mb-px flex flex-wrap items-center gap-6" role="tablist" aria-label="Chart views">
+            <button type="button" id="tab-bubblechart" data-chart="bubblechart" onclick="switchChart('bubblechart')" role="tab" aria-controls="chart-bubblechart" aria-selected="true" tabindex="0" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Bubble-Chart-Icon4.png" alt="Bubble chart icon" class="w-auto" style="height: 37px;">
               <span>Bubble Chart</span>
             </button>
-            <button type="button" id="tab-2" data-chart="2" onclick="switchChart('2')" role="tab" aria-controls="chart-2" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+            <button type="button" id="tab-linechart" data-chart="linechart" onclick="switchChart('linechart')" role="tab" aria-controls="chart-linechart" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Line-Chart-Icon7.png" alt="Line chart icon" class="w-auto" style="height: 37px;">
               <span>Line Chart</span>
             </button>
@@ -482,11 +567,11 @@
     </div>
 
     <!-- Bubble Chart Container -->
-  <div id="chart-1" class="chart-container" role="tabpanel" aria-labelledby="tab-1" aria-hidden="false">
+  <div id="chart-bubblechart" class="chart-container" role="tabpanel" aria-labelledby="tab-bubblechart" aria-hidden="false">
       <iframe
         id="bubblechart-iframe"
         class="chart-iframe"
-        src="CIC-test-naei-bubblechart-v2.0/index.html"
+        src="bubblechart/index.html"
         frameborder="0"
         scrolling="no"
         style="height: 600px;"
@@ -494,11 +579,11 @@
     </div>
 
     <!-- Line Chart Container -->
-  <div id="chart-2" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-2" aria-hidden="true">
+  <div id="chart-linechart" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-linechart" aria-hidden="true">
       <iframe
         id="linechart-iframe"
         class="chart-iframe"
-        src="CIC-test-naei-linechart-v2.4/index.html"
+        src="linechart/index.html"
         frameborder="0"
         scrolling="no"
         style="height: 600px;"
@@ -509,8 +594,9 @@
   <div id="chart-category-info" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-category-info" aria-hidden="true">
       <iframe
         id="categoryinfo-iframe"
-        class="chart-iframe"
-        src="category-info/embed.html"
+        class="chart-iframe lazy-iframe"
+        data-src="category-info/embed.html"
+        loading="lazy"
         frameborder="0"
         scrolling="no"
         style="height: 900px;"
@@ -521,8 +607,9 @@
   <div id="chart-user-guide" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-user-guide" aria-hidden="true">
       <iframe
         id="userguide-iframe"
-        class="chart-iframe"
-        src="user-guide/embed.html"
+        class="chart-iframe lazy-iframe"
+        data-src="user-guide/embed.html"
+        loading="lazy"
         frameborder="0"
         scrolling="no"
         style="height: 900px;"
@@ -533,27 +620,31 @@
   <div id="chart-resources" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-resources" aria-hidden="true">
       <iframe
         id="resources-iframe"
-        class="chart-iframe"
-        src="resources/embed.html"
+        class="chart-iframe lazy-iframe"
+        data-src="resources/embed.html"
+        loading="lazy"
         frameborder="0"
         scrolling="no"
         style="height: 900px;"
         title="NAEI Resources"></iframe>
     </div>
 
-    <!-- Footer (inside chart-interface so it fades in with the chart) -->
-  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" style="margin-top: 0; opacity: 1;">
-      <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ via
+  </div> <!-- End chart-interface -->
+  </div> <!-- End page-stack -->
+
+  <!-- Footer (now outside chart-interface to keep spacing consistent across tall embeds) -->
+  <footer class="bg-gray-50 border-t border-gray-200 py-1 px-4 text-center text-sm text-gray-700" id="mainFooter" style="margin-top: 0; opacity: 1;">
+      <span class="footer-copyright">© Crown 2025 copyright Defra &amp; DESNZ<span class="footer-break" aria-hidden="true"> </span> via
       <a href="https://naei.energysecurity.gov.uk" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">naei.energysecurity.gov.uk</a></span>
       <span class="footer-license">licensed under the <a href="http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">Open Government Licence (OGL)</a>.</span>
       <br>
-      <strong>YouTube:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">www.youtube.com/@ChronicIllnessChannel</a>
+      <strong>YouTube:</strong> <a href="https://www.youtube.com/@ChronicIllnessChannel" target="_blank" rel="noopener" class="text-blue-600 hover:text-blue-800">www.youtube.com/@ChronicIllnessChannel</a><span class="footer-break" aria-hidden="true"> </span>
+    <strong>Contact:</strong> <a  href="mailto:info@chronicillnesschannel.co.uk" target="_blank" rel="noopener" class="text-blue-600hover:text-blue-800">info@chronicillnesschannel.co.uk</a>
       <br>
       <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-        Viewer Version: v3.0 Shared CIC-testdb (Line: v2.4, Bubble: v2.0) • Build: 2025.11.24
+        Explorer Version: v3.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.11.24
       </span>
     </footer>
-  </div> <!-- End chart-interface -->
 
   <style>
     .chart-iframe {
@@ -573,6 +664,18 @@
     @media (max-width: 900px) {
       .footer-copyright {
         display: block;
+      }
+    }
+
+    .footer-break {
+      display: inline;
+    }
+
+    @media (max-width: 768px) {
+      .footer-break {
+        display: block;
+        width: 100%;
+        height: 0;
       }
     }
   </style>
@@ -606,10 +709,10 @@
     }
     
     const STATIC_CHART_IDS = new Set(['category-info', 'user-guide', 'resources']);
-    const CHART_SEQUENCE = ['1', '2', 'category-info', 'user-guide', 'resources'];
+    const CHART_SEQUENCE = ['bubblechart', 'linechart', 'category-info', 'user-guide', 'resources'];
     const TAB_ID_MAP = {
-      '1': 'tab-1',
-      '2': 'tab-2',
+      'bubblechart': 'tab-bubblechart',
+      'linechart': 'tab-linechart',
       'category-info': 'tab-category-info',
       'user-guide': 'tab-user-guide',
       'resources': 'tab-resources'
@@ -617,12 +720,93 @@
 
     // Store last known state for each chart (populated by messages from iframes)
     const chartStates = {
-      '1': [],            // Bubble chart state
-      '2': [],            // Line chart state
+      'bubblechart': [],            // Bubble chart state
+      'linechart': [],            // Line chart state
       'category-info': [],   // Category info view (static)
       'user-guide': [],   // User guide view (static)
       'resources': []     // Resources view (static)
     };
+
+    const bubbleTutorialParamPresent = ['bubbletutorial', 'bubbleTutorial'].some(param => globalUrlParams.has(param));
+    const bubbleTutorialControl = {
+      requested: bubbleTutorialParamPresent,
+      active: bubbleTutorialParamPresent,
+      openRequestSent: false
+    };
+
+    const reloadNavigationDetected = detectReloadNavigation();
+    if (reloadNavigationDetected) {
+      bubbleTutorialControl.requested = false;
+      bubbleTutorialControl.active = false;
+      bubbleTutorialControl.openRequestSent = false;
+      if (bubbleTutorialParamPresent) {
+        removeBubbleTutorialFlagFromUrl();
+      }
+    }
+
+    if (typeof window !== 'undefined' && window.history && 'scrollRestoration' in window.history) {
+      window.history.scrollRestoration = bubbleTutorialControl.requested ? 'manual' : 'auto';
+    }
+
+    enforceBubbleTutorialScrollReset();
+
+    function detectReloadNavigation() {
+      try {
+        if (typeof performance !== 'undefined') {
+          if (typeof performance.getEntriesByType === 'function') {
+            const entries = performance.getEntriesByType('navigation');
+            if (entries && entries.length) {
+              return entries[entries.length - 1].type === 'reload';
+            }
+          }
+          if (performance.navigation && typeof performance.navigation.type === 'number') {
+            return performance.navigation.type === performance.navigation.TYPE_RELOAD;
+          }
+        }
+      } catch (error) {
+        debugWarn('Unable to determine navigation type:', error);
+      }
+      return false;
+    }
+
+    function enforceBubbleTutorialScrollReset() {
+      if (!bubbleTutorialControl.requested || typeof window === 'undefined' || typeof window.scrollTo !== 'function') {
+        return;
+      }
+
+      const runResetSequence = () => {
+        let attempts = 0;
+        const maxAttempts = 3;
+        const raf = window.requestAnimationFrame || function(cb) { return window.setTimeout(cb, 0); };
+
+        const tick = () => {
+          attempts += 1;
+          try {
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+            if (document.documentElement) {
+              document.documentElement.scrollTop = 0;
+            }
+            if (document.body) {
+              document.body.scrollTop = 0;
+            }
+          } catch (error) {
+            debugWarn('Unable to reset scroll position for bubble tutorial:', error);
+          }
+
+          if (attempts < maxAttempts) {
+            raf(tick);
+          }
+        };
+
+        tick();
+      };
+
+      if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        runResetSequence();
+      } else {
+        document.addEventListener('DOMContentLoaded', runResetSequence, { once: true });
+      }
+    }
     
     // Load shared resources
     window.addEventListener('DOMContentLoaded', function() {
@@ -641,27 +825,272 @@
       });
     }
     const chartReadyState = {
-      bubble: false,
-      line: false
+      bubblechart: false,
+      linechart: false
     };
+    let sharedDataBootstrapLaunched = false;
+
+    function requestSharedDataBootstrap(reason = 'chart-ready') {
+      if (sharedDataBootstrapLaunched) {
+        return;
+      }
+      sharedDataBootstrapLaunched = true;
+      setTimeout(() => {
+        try {
+          window.SharedDataLoader?.loadSharedData?.().catch(error => {
+            console.warn('Background shared data load failed:', error);
+          });
+        } catch (error) {
+          console.warn('Unable to launch background shared data load:', error, 'reason:', reason);
+        }
+      }, 50);
+    }
 
     const iframeElements = {
-      bubble: document.getElementById('bubblechart-iframe'),
-      line: document.getElementById('linechart-iframe'),
+      bubblechart: document.getElementById('bubblechart-iframe'),
+      linechart: document.getElementById('linechart-iframe'),
       'category-info': document.getElementById('categoryinfo-iframe'),
       'user-guide': document.getElementById('userguide-iframe'),
       resources: document.getElementById('resources-iframe')
     };
 
+    function decomposeUrl(rawUrl) {
+      if (typeof rawUrl !== 'string' || !rawUrl.length) {
+        return { origin: '', base: '', query: '', hash: '' };
+      }
+
+      let working = rawUrl;
+      let origin = '';
+
+      const absoluteUrlPattern = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//;
+      if (absoluteUrlPattern.test(rawUrl)) {
+        try {
+          const parsed = new URL(rawUrl);
+          origin = `${parsed.protocol}//${parsed.host}`;
+          working = parsed.pathname + parsed.search + parsed.hash;
+        } catch (error) {
+          debugWarn('Unable to parse absolute URL:', error);
+        }
+      }
+
+      const hashIndex = working.indexOf('#');
+      const hash = hashIndex >= 0 ? working.slice(hashIndex) : '';
+      const withoutHash = hashIndex >= 0 ? working.slice(0, hashIndex) : working;
+
+      const queryIndex = withoutHash.indexOf('?');
+      const base = queryIndex >= 0 ? withoutHash.slice(0, queryIndex) : withoutHash;
+      const query = queryIndex >= 0 ? withoutHash.slice(queryIndex + 1) : '';
+
+      return { origin, base, query, hash };
+    }
+
+    function humanizeUrlEncoding(value) {
+      if (typeof value !== 'string' || !value.length) {
+        return value || '';
+      }
+      return value.replace(/%2C/gi, ',');
+    }
+
+    function rebuildUrl({ origin = '', base = '', query = '', hash = '' }) {
+      const queryPart = query ? `?${query}` : '';
+      const assembled = `${origin}${base}${queryPart}${hash}`;
+      return humanizeUrlEncoding(assembled);
+    }
+
+    function inferChartIdFromBasePath(basePath) {
+      if (typeof basePath !== 'string' || !basePath.length) {
+        return null;
+      }
+
+      try {
+        const segments = basePath.split('/').filter(Boolean);
+        if (!segments.length) {
+          return null;
+        }
+
+        const normalizeSegment = (value) => value.replace(/\.html?$/, '').toLowerCase();
+        let candidate = normalizeSegment(segments[segments.length - 1]);
+
+        if (STATIC_CHART_IDS.has(candidate) || candidate === 'bubblechart' || candidate === 'linechart') {
+          return candidate;
+        }
+
+        if (candidate === 'index' && segments.length > 1) {
+          candidate = normalizeSegment(segments[segments.length - 2]);
+          if (STATIC_CHART_IDS.has(candidate) || candidate === 'bubblechart' || candidate === 'linechart') {
+            return candidate;
+          }
+        }
+      } catch (error) {
+        debugWarn('Unable to infer chart from base path:', error);
+      }
+
+      return null;
+    }
+
+    function applyBubbleTutorialFlag(url) {
+      if (!url) {
+        return url;
+      }
+
+      const components = decomposeUrl(url);
+      const params = new URLSearchParams(components.query || '');
+      const normalizedPage = normalizeChartId(params.get('page'));
+      const legacyChart = normalizeChartId(params.get('chart'));
+      const inferredChart = inferChartIdFromBasePath(components.base);
+      const targetChart = normalizedPage || legacyChart || inferredChart || 'bubblechart';
+      if (!normalizedPage && !inferredChart && targetChart) {
+        params.set('page', targetChart);
+      }
+      params.delete('chart');
+
+      const shouldIncludeFlag = bubbleTutorialControl.active && targetChart === 'bubblechart';
+
+      if (shouldIncludeFlag) {
+        if (!params.has('bubbletutorial')) {
+          params.append('bubbletutorial', '1');
+        }
+      } else {
+        params.delete('bubbletutorial');
+        params.delete('bubbleTutorial');
+      }
+
+      components.query = params.toString();
+      return rebuildUrl(components);
+    }
+
+    function updateHistoryState(method, targetUrl) {
+      const finalUrl = applyBubbleTutorialFlag(targetUrl);
+      const stateData = { path: finalUrl };
+      try {
+        window.history[method](stateData, '', finalUrl);
+      } catch (error) {
+        debugWarn(`Unable to update history via ${method}:`, error);
+      }
+    }
+
+    function removeBubbleTutorialFlagFromUrl() {
+      try {
+        const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+        const components = decomposeUrl(currentUrl);
+        const params = components.query
+          ? components.query.split('&').filter(Boolean)
+          : [];
+        const filtered = params.filter(param => {
+          const [key] = param.split('=');
+          return key && key.toLowerCase() !== 'bubbletutorial';
+        });
+        components.query = filtered.join('&');
+        const cleanUrl = rebuildUrl(components);
+        window.history.replaceState({ path: cleanUrl }, '', cleanUrl);
+      } catch (error) {
+        debugWarn('Unable to remove bubbletutorial flag from URL:', error);
+      }
+    }
+
+    function attemptBubbleTutorialAutoOpen() {
+      if (!bubbleTutorialControl.requested || bubbleTutorialControl.openRequestSent) {
+        return;
+      }
+
+      const iframe = iframeElements.bubblechart;
+      if (!iframe || !iframe.contentWindow) {
+        return;
+      }
+
+      try {
+        iframe.contentWindow.postMessage({
+          type: 'openBubbleTutorial',
+          reason: 'url-param'
+        }, '*');
+        bubbleTutorialControl.openRequestSent = true;
+      } catch (error) {
+        debugWarn('Unable to request bubble tutorial overlay:', error);
+      }
+    }
+
+    let cachedParentFooterHeight = 0;
+    let cachedViewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+
+    function getParentFooterHeight() {
+      const footerEl = document.getElementById('mainFooter');
+      if (!footerEl) {
+        cachedParentFooterHeight = 0;
+        return 0;
+      }
+      const rect = footerEl.getBoundingClientRect();
+      cachedParentFooterHeight = Math.round(rect.height || 0);
+      return cachedParentFooterHeight;
+    }
+
+    function broadcastViewportMetrics(targetKeys) {
+      const keys = Array.isArray(targetKeys)
+        ? targetKeys
+        : (targetKeys ? [targetKeys] : ['bubblechart', 'linechart', 'user-guide']);
+      const normalizedKeys = keys.map(key => normalizeChartId(key) || key);
+
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+      if (viewportHeight) {
+        cachedViewportHeight = viewportHeight;
+      }
+
+      normalizedKeys.forEach(key => {
+        const iframe = iframeElements[key];
+        if (!iframe || !iframe.contentWindow) {
+          return;
+        }
+        iframe.contentWindow.postMessage({
+          type: 'parentViewportMetrics',
+          viewportHeight: cachedViewportHeight,
+          footerHeight: cachedParentFooterHeight
+        }, '*');
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      getParentFooterHeight();
+      broadcastViewportMetrics();
+    });
+    window.addEventListener('resize', () => {
+      getParentFooterHeight();
+      ['bubblechart', 'user-guide'].forEach(key => {
+        const iframe = iframeElements[key];
+        if (iframe && iframe.contentWindow) {
+          iframe.contentWindow.postMessage({
+            type: 'parentFooterHeight',
+            value: cachedParentFooterHeight
+          }, '*');
+        }
+      });
+    });
+
+    window.addEventListener('load', () => {
+      getParentFooterHeight();
+      broadcastViewportMetrics();
+      prepaintSupplementalCharts();
+    });
+
     if (debugLoggingEnabled) {
       Object.values(iframeElements).forEach(iframe => {
-        if (!iframe) return;
+        if (!iframe) {
+          return;
+        }
 
         try {
-          const iframeUrl = new URL(iframe.getAttribute('src'), window.location.href);
+          const currentSrcAttr = iframe.getAttribute('src');
+          const effectiveSrc = currentSrcAttr || iframe.dataset.src;
+          if (!effectiveSrc) {
+            return;
+          }
+
+          const iframeUrl = new URL(effectiveSrc, window.location.href);
           if (!iframeUrl.searchParams.has('debug')) {
             iframeUrl.searchParams.set('debug', '1');
-            iframe.src = iframeUrl.toString();
+            if (currentSrcAttr) {
+              iframe.src = iframeUrl.toString();
+            } else {
+              iframe.dataset.src = iframeUrl.toString();
+            }
           }
         } catch (error) {
           debugWarn('Unable to append debug flag to iframe source', error);
@@ -738,6 +1167,10 @@
         return pathChart;
       }
       const params = new URLSearchParams(window.location.search);
+      const pageParam = normalizeChartId(params.get('page'));
+      if (pageParam) {
+        return pageParam;
+      }
       return normalizeChartId(params.get('chart'));
     }
 
@@ -751,35 +1184,42 @@
         return rawId;
       }
 
+      const lower = String(rawId).toLowerCase();
       const mapping = {
+        '1': 'bubblechart',
+        'bubble': 'bubblechart',
+        'bubblechart': 'bubblechart',
+        '2': 'linechart',
+        'line': 'linechart',
+        'linechart': 'linechart',
         '3': 'category-info',
-        '4': 'user-guide',
-        '5': 'resources',
         'category-info': 'category-info',
+        '4': 'user-guide',
         'user-guide': 'user-guide',
+        '5': 'resources',
         'resources': 'resources'
       };
 
-      return mapping[rawId] || rawId;
+      return mapping[lower] || rawId;
     }
 
     function getDefaultUrl(chartId) {
       const basePath = getBasePath();
       const queryBase = basePath;
 
-      const normalizedId = normalizeChartId(chartId) || '1';
+      const normalizedId = normalizeChartId(chartId) || 'bubblechart';
 
-      if (normalizedId === '1') {
-        return `${queryBase}?chart=1&pollutant_id=5&group_ids=20,37&year=2023`;
+      if (normalizedId === 'bubblechart') {
+        return `${queryBase}?page=bubblechart&pollutant_id=5&group_ids=20,37&year=2023`;
       }
-      if (normalizedId === '2') {
-        return `${queryBase}?chart=2&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+      if (normalizedId === 'linechart') {
+        return `${queryBase}?page=linechart&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
       }
       if (STATIC_CHART_IDS.has(normalizedId)) {
         return `${basePath}${normalizedId}`;
       }
 
-      return queryBase;
+      return `${queryBase}?page=bubblechart`;
     }
 
     function selectChart(chartId) {
@@ -791,7 +1231,7 @@
 
       // Set default URL and load chart interface
       const defaultUrl = getDefaultUrl(chartId);
-      window.history.replaceState({}, '', defaultUrl);
+      updateHistoryState('replaceState', defaultUrl);
 
       setTimeout(async () => {
         await loadChartInterface(chartId);
@@ -803,9 +1243,12 @@
         console.log('Loading chart interface for chart', chartId);
         
         // Preload shared data 
-        console.log('Preloading shared data...');
-        await window.SharedDataLoader.loadSharedData();
-        console.log('Shared data loaded successfully');
+        console.log('Priming default snapshot...');
+        if (window.SharedDataLoader?.loadDefaultSnapshot) {
+          window.SharedDataLoader.loadDefaultSnapshot().catch(error => {
+            console.warn('Default snapshot preload failed:', error);
+          });
+        }
         
         // Simple delay to let everything initialize
         await new Promise(resolve => setTimeout(resolve, 500));
@@ -829,7 +1272,7 @@
         }
 
         document.getElementById('chart-interface').classList.remove('hidden');
-        currentChart = normalizeChartId(chartId) || '1';
+        currentChart = normalizeChartId(chartId) || 'bubblechart';
         updateTabStates();
         showChart(currentChart);
       }
@@ -839,7 +1282,7 @@
       console.log('Starting fade to complete interface');
       
       // Set the active chart
-      currentChart = normalizeChartId(chartId) || '1';
+      currentChart = normalizeChartId(chartId) || 'bubblechart';
       
       // Ensure chart containers are ready
       const chartContainers = Array.from(document.querySelectorAll('.chart-container'));
@@ -890,10 +1333,10 @@
 
     function hasParamsForChart(chartId, params) {
       if (!params) return false;
-      if (chartId === '1') {
+      if (chartId === 'bubblechart') {
         return ['pollutant_id', 'group_ids', 'year'].every(key => params.has(key) && params.get(key));
       }
-      if (chartId === '2') {
+      if (chartId === 'linechart') {
         return ['pollutant_id', 'group_ids', 'start_year', 'end_year'].every(key => params.has(key) && params.get(key));
       }
       return false;
@@ -903,14 +1346,14 @@
       if (!hasParamsForChart(chartId, params)) {
         return [];
       }
-      if (chartId === '1') {
+      if (chartId === 'bubblechart') {
         return [
           `pollutant_id=${params.get('pollutant_id')}`,
           `group_ids=${params.get('group_ids')}`,
           `year=${params.get('year')}`
         ];
       }
-      if (chartId === '2') {
+      if (chartId === 'linechart') {
         return [
           `pollutant_id=${params.get('pollutant_id')}`,
           `group_ids=${params.get('group_ids')}`,
@@ -922,7 +1365,7 @@
     }
 
     function switchChart(rawChartId) {
-      const chartId = normalizeChartId(rawChartId) || '1';
+      const chartId = normalizeChartId(rawChartId) || 'bubblechart';
 
       if (currentChart === chartId) return;
 
@@ -938,13 +1381,14 @@
 
       if (storedState && storedState.length > 0) {
         console.log('Using stored state for chart', chartId, storedState);
-        const paramsArray = ['chart=' + chartId, ...storedState];
+        const paramsArray = ['page=' + chartId, ...storedState];
         const newQuery = paramsArray.join('&');
         const newUrl = `${queryBase}?${newQuery}`;
         const historyMethod = currentChart ? 'pushState' : 'replaceState';
 
-        if (window.location.search.substring(1) !== newQuery || normalizeChartId(urlParams.get('chart')) !== chartId) {
-          window.history[historyMethod]({}, '', newUrl);
+        const canonicalParam = normalizeChartId(urlParams.get('page')) || normalizeChartId(urlParams.get('chart'));
+        if (window.location.search.substring(1) !== newQuery || canonicalParam !== chartId) {
+          updateHistoryState(historyMethod, newUrl);
         }
       } else {
         console.log('No stored state for chart', chartId, '- using defaults');
@@ -952,21 +1396,21 @@
         const historyMethod = currentChart ? 'pushState' : 'replaceState';
         let newUrl = null;
 
-        if (chartId === '1' || chartId === '2') {
+        if (chartId === 'bubblechart' || chartId === 'linechart') {
           const newParams = new URLSearchParams();
-          newParams.set('chart', chartId);
+          newParams.set('page', chartId);
 
-          if (chartId === '1') {
+          if (chartId === 'bubblechart') {
             newParams.set('pollutant_id', '5');
             newParams.set('group_ids', '20,37');
             newParams.set('year', '2023');
-            chartStates['1'] = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
-          } else if (chartId === '2') {
+            chartStates.bubblechart = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
+          } else if (chartId === 'linechart') {
             newParams.set('pollutant_id', '5');
             newParams.set('group_ids', '1');
             newParams.set('start_year', '1970');
             newParams.set('end_year', '2023');
-            chartStates['2'] = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
+            chartStates.linechart = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
           }
 
           const paramsArray = [];
@@ -986,7 +1430,7 @@
         }
 
         if (newUrl) {
-          window.history[historyMethod]({}, '', newUrl);
+          updateHistoryState(historyMethod, newUrl);
         }
       }
 
@@ -1015,7 +1459,7 @@
     }
 
     function focusTab(chartId) {
-      const normalizedId = normalizeChartId(chartId) || '1';
+      const normalizedId = normalizeChartId(chartId) || 'bubblechart';
       const tabId = TAB_ID_MAP[normalizedId];
       if (!tabId) {
         return;
@@ -1041,7 +1485,7 @@
         container.setAttribute('aria-hidden', 'true');
       });
       
-      const normalizedId = normalizeChartId(chartId) || '1';
+      const normalizedId = normalizeChartId(chartId) || 'bubblechart';
       const chartContainer = document.getElementById(`chart-${normalizedId}`);
       if (!chartContainer) {
         debugWarn('Unable to locate chart container for', normalizedId);
@@ -1051,7 +1495,112 @@
       chartContainer.style.height = 'auto';
       chartContainer.style.overflow = 'visible';
       chartContainer.setAttribute('aria-hidden', 'false');
+      loadLazyIframeForChart(normalizedId);
 
+    }
+
+    function loadLazyIframeForChart(chartId) {
+      const container = document.getElementById(`chart-${chartId}`);
+      if (!container) {
+        return;
+      }
+      const iframe = container.querySelector('iframe[data-src]');
+      if (!iframe) {
+        return;
+      }
+      const src = iframe.dataset.src;
+      if (!src) {
+        return;
+      }
+      iframe.src = src;
+      try {
+        iframe.loading = 'eager';
+      } catch (error) {
+        /* noop */
+      }
+      iframe.dataset.loaded = 'true';
+      iframe.removeAttribute('data-src');
+    }
+
+    const PREPAINT_CHARTS = ['category-info', 'user-guide', 'resources'];
+
+    function prepaintHiddenChart(chartId) {
+      const container = document.getElementById(`chart-${chartId}`);
+      if (!container || container.dataset.prepainted === 'true') {
+        return;
+      }
+
+      const iframe = container.querySelector('iframe');
+      if (!iframe) {
+        return;
+      }
+
+      loadLazyIframeForChart(chartId);
+
+      const previousState = {
+        visibility: container.style.visibility,
+        height: container.style.height,
+        overflow: container.style.overflow,
+        ariaHidden: container.getAttribute('aria-hidden')
+      };
+
+      container.style.visibility = 'visible';
+      container.style.height = 'auto';
+      container.style.overflow = 'visible';
+      container.style.opacity = '0';
+      container.style.pointerEvents = 'none';
+      container.setAttribute('aria-hidden', 'true');
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (container.getAttribute('aria-hidden') === 'false') {
+            container.style.opacity = '';
+            container.style.pointerEvents = '';
+            container.dataset.prepainted = 'true';
+            return;
+          }
+
+          container.style.visibility = previousState.visibility || 'hidden';
+          container.style.height = previousState.height || '0';
+          container.style.overflow = previousState.overflow || 'hidden';
+          container.style.opacity = '';
+          container.style.pointerEvents = '';
+
+          if (previousState.ariaHidden !== null && previousState.ariaHidden !== undefined) {
+            container.setAttribute('aria-hidden', previousState.ariaHidden);
+          } else {
+            container.removeAttribute('aria-hidden');
+          }
+
+          container.dataset.prepainted = 'true';
+        });
+      });
+    }
+
+    function prepaintSupplementalCharts() {
+      PREPAINT_CHARTS.forEach(prepaintHiddenChart);
+    }
+
+    function navigateChartByDelta(delta) {
+      if (!currentChart || !Number.isFinite(delta) || delta === 0) {
+        return null;
+      }
+
+      const normalizedCurrent = normalizeChartId(currentChart) || 'bubblechart';
+      const currentIndex = CHART_SEQUENCE.indexOf(normalizedCurrent);
+      if (currentIndex === -1) {
+        return null;
+      }
+
+      const nextIndex = (currentIndex + delta + CHART_SEQUENCE.length) % CHART_SEQUENCE.length;
+      const nextChartId = CHART_SEQUENCE[nextIndex];
+
+      if (nextChartId === normalizedCurrent) {
+        return null;
+      }
+
+      switchChart(nextChartId);
+      return nextChartId;
     }
 
     function handleTabKeyboardNavigation(event) {
@@ -1072,30 +1621,16 @@
         return;
       }
 
-      if (!currentChart) {
-        return;
-      }
-
       event.preventDefault();
-
-      const normalizedCurrent = normalizeChartId(currentChart) || '1';
-      const currentIndex = CHART_SEQUENCE.indexOf(normalizedCurrent);
-      if (currentIndex === -1) {
-        return;
-      }
-
-      const delta = event.key === 'ArrowRight' ? 1 : -1;
-      const nextIndex = (currentIndex + delta + CHART_SEQUENCE.length) % CHART_SEQUENCE.length;
-      const nextChartId = CHART_SEQUENCE[nextIndex];
-
-      if (nextChartId === normalizedCurrent) {
-        return;
-      }
 
       const preservedScrollX = window.scrollX;
       const preservedScrollY = window.scrollY;
+      const delta = event.key === 'ArrowRight' ? 1 : -1;
+      const nextChartId = navigateChartByDelta(delta);
 
-      switchChart(nextChartId);
+      if (!nextChartId) {
+        return;
+      }
 
       requestAnimationFrame(() => {
         window.scrollTo({ top: preservedScrollY, left: preservedScrollX });
@@ -1108,56 +1643,67 @@
     
     // Simple loading overlay control - MESSAGE BASED APPROACH
     let overlayHidden = false;
-    const heightsReceived = { bubble: false, line: false };
+    const heightsReceived = { bubblechart: false, linechart: false, 'user-guide': false };
     
     // Set initial reasonable height estimate
-    const lineIframe = iframeElements.line;
+    const lineIframe = iframeElements.linechart;
     if (lineIframe) {
       lineIframe.style.height = '1200px'; // Initial estimate
-      console.log('📏 Line chart iframe initial height: 1200px');
     }
 
-    const bubbleIframe = iframeElements.bubble;
+    const bubbleIframe = iframeElements.bubblechart;
     if (bubbleIframe) {
       bubbleIframe.style.height = '1100px';
-      console.log('📏 Bubble chart iframe initial height: 1100px');
     }
 
     const categoryInfoIframe = iframeElements['category-info'];
     if (categoryInfoIframe) {
       categoryInfoIframe.style.height = '1000px';
-      console.log('📏 Category info iframe initial height: 1000px');
     }
 
     const userGuideIframe = iframeElements['user-guide'];
     if (userGuideIframe) {
       userGuideIframe.style.height = '1000px';
-      console.log('📏 User guide iframe initial height: 1000px');
     }
 
     const resourcesIframe = iframeElements.resources;
     if (resourcesIframe) {
       resourcesIframe.style.height = '800px';
-      console.log('📏 Resources iframe initial height: 800px');
     }
     
-    // Set up message listener IMMEDIATELY (before DOM is ready)
-    console.log('🎯 Setting up message listener...');
-    window.addEventListener('message', function(event) {
-      console.log('🔥 Parent received message:', event.data);
+    // Defer iframe message processing until helper functions are available
+    function processIframeMessage(event) {
+
+      if (event.data && event.data.type === 'requestChartNavigation') {
+        const direction = event.data.direction === 'previous' ? -1 : 1;
+        const preservedScrollX = window.scrollX;
+        const preservedScrollY = window.scrollY;
+        const nextChartId = navigateChartByDelta(direction);
+
+        if (!nextChartId) {
+          return;
+        }
+
+        requestAnimationFrame(() => {
+          window.scrollTo({ top: preservedScrollY, left: preservedScrollX });
+          focusTab(nextChartId);
+        });
+        return;
+      }
 
       if (event.data && event.data.type === 'scrollToBubbleTutorial') {
         const requestId = event.data.requestId;
         const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const bubbleContainer = document.getElementById('chart-1') || document.getElementById('bubblechart-iframe');
+        const bubbleContainer = document.getElementById('chart-bubblechart') || document.getElementById('bubblechart-iframe');
         const headerOffset = 32;
+        const scrollTarget = bubbleContainer;
 
         let scrolled = false;
-        if (bubbleContainer) {
-          const rect = bubbleContainer.getBoundingClientRect();
+        if (scrollTarget) {
+          const rect = scrollTarget.getBoundingClientRect();
           const pageOffset = window.pageYOffset || document.documentElement.scrollTop || 0;
           const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
-          const containerHeight = rect.height || bubbleContainer.offsetHeight || 0;
+          const containerHeight = rect.height || scrollTarget.offsetHeight || 0;
           const centerOffset = Math.max(0, (viewportHeight - containerHeight) / 2);
           const targetTop = Math.max(0, rect.top + pageOffset - centerOffset - headerOffset);
           const currentTop = window.pageYOffset || document.documentElement.scrollTop || 0;
@@ -1173,7 +1719,7 @@
               event.source.postMessage({ type: 'bubbleTutorialScrollComplete', requestId }, '*');
             }
           } catch (error) {
-            console.warn('Unable to acknowledge bubble tutorial scroll (404):', error);
+            console.warn('Unable to acknowledge bubble tutorial scroll:', error);
           }
         };
 
@@ -1187,31 +1733,65 @@
 
       // Handle URL updates from iframes
       if (event.data && event.data.type === 'updateUrl') {
-        console.log('🔗 Updating URL to:', event.data.url);
-        window.history.replaceState({ path: event.data.url }, '', event.data.url);
+        updateHistoryState('replaceState', event.data.url);
+      }
+
+      if (event.data && event.data.type === 'requestParentViewportMetrics') {
+        const chartKey = normalizeChartId(event.data.chart) || event.data.chart;
+        getParentFooterHeight();
+        broadcastViewportMetrics(chartKey);
+        return;
+      }
+
+      if (event.data && event.data.type === 'bubbleTutorialState') {
+        if (event.data.state === 'opened') {
+          bubbleTutorialControl.openRequestSent = true;
+
+          if (!bubbleTutorialControl.active) {
+            bubbleTutorialControl.active = true;
+            bubbleTutorialControl.requested = false;
+            const currentUrl = window.location.pathname + window.location.search + window.location.hash;
+            updateHistoryState('replaceState', currentUrl);
+          }
+
+          if (window.history && 'scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'manual';
+          }
+        } else if (event.data.state === 'closed' && bubbleTutorialControl.active) {
+          bubbleTutorialControl.active = false;
+          bubbleTutorialControl.requested = false;
+          bubbleTutorialControl.openRequestSent = false;
+          removeBubbleTutorialFlagFromUrl();
+
+          if (window.history && 'scrollRestoration' in window.history) {
+            window.history.scrollRestoration = 'auto';
+          }
+        }
+        return;
       }
       
       if (event.data && event.data.type === 'chartReady' && !overlayHidden) {
-        const chartKey = event.data.chart;
+        const rawChartKey = event.data.chart;
+        const chartKey = normalizeChartId(rawChartKey) || rawChartKey;
         const keyLabel = typeof chartKey === 'string'
           ? chartKey.charAt(0).toUpperCase() + chartKey.slice(1)
           : 'Unknown';
-
-        console.log('📨 Chart ready message received');
-        console.log('🎯 Chart type:', chartKey);
         
         if (chartReadyState.hasOwnProperty(chartKey)) {
           chartReadyState[chartKey] = true;
-          console.log(`✅ ${keyLabel} chart is ready`);
         } else {
-          debugWarn('⚠️ Unknown chart reported ready:', chartKey);
+          debugWarn('⚠️ Unknown chart reported ready:', rawChartKey);
+        }
+
+        requestSharedDataBootstrap(`chartReady:${chartKey}`);
+
+        if (chartKey === 'bubblechart') {
+          attemptBubbleTutorialAutoOpen();
         }
         
         if (areAllChartsReady()) {
-          console.log('✅ All charts ready - requesting heights before hiding overlay');
           Object.entries(iframeElements).forEach(([key, iframe]) => {
             if (iframe && iframe.contentWindow) {
-              console.log(`📐 Requesting height from ${key} chart iframe...`);
               iframe.contentWindow.postMessage({ type: 'requestHeight' }, '*');
             }
           });
@@ -1220,13 +1800,13 @@
             .filter(([, ready]) => !ready)
             .map(([key]) => key)
             .join(', ');
-          console.log(`⏳ Waiting for: ${pending}`);
         }
       }
       
       // Handle content height from iframe (sent once after initial render)
       if (event.data && event.data.type === 'contentHeight') {
-        const chartKey = event.data.chart;
+        const rawChartKey = event.data.chart;
+        const chartKey = normalizeChartId(rawChartKey) || rawChartKey;
         const iframe = iframeElements[chartKey];
         
         if (iframe) {
@@ -1236,18 +1816,38 @@
             ? reportedHeight
             : fallbackHeight;
 
-          if (!Number.isFinite(reportedHeight) || reportedHeight <= 0) {
-            debugWarn(`⚠️ Received invalid height (${event.data.height}) from ${chartKey}; using fallback ${safeHeight}px`);
-          } else {
-            console.log(`📏 Received content height from ${chartKey}: ${reportedHeight}px`);
+          let finalHeight = safeHeight;
+
+          if (chartKey === 'category-info') {
+            const container = document.getElementById('chart-category-info');
+            const containerVisible = container && container.getAttribute('aria-hidden') === 'false';
+            if (containerVisible) {
+              const iframeRect = iframe.getBoundingClientRect();
+              const footerEl = document.getElementById('mainFooter');
+              const footerRect = footerEl ? footerEl.getBoundingClientRect() : null;
+              const footerStyles = footerEl ? window.getComputedStyle(footerEl) : null;
+              const footerMargins = footerStyles
+                ? (parseFloat(footerStyles.marginTop) || 0) + (parseFloat(footerStyles.marginBottom) || 0)
+                : 0;
+              const reservedFooterSpace = (footerRect?.height || 0) + footerMargins;
+              const viewportRemaining = Math.max(window.innerHeight - Math.max(iframeRect.top, 0) - reservedFooterSpace, 0);
+              finalHeight = Math.max(safeHeight, viewportRemaining, 320);
+            }
           }
 
-          iframe.style.height = safeHeight + 'px';
+          if (!Number.isFinite(reportedHeight) || reportedHeight <= 0) {
+            debugWarn(`⚠️ Received invalid height (${event.data.height}) from ${chartKey}; using fallback ${safeHeight}px`);
+          }
+
+          iframe.style.height = finalHeight + 'px';
+          if (chartKey === 'bubblechart' || chartKey === 'linechart' || chartKey === 'user-guide') {
+            getParentFooterHeight();
+            broadcastViewportMetrics(chartKey);
+          }
           
           heightsReceived[chartKey] = true;
-          
-          if (heightsReceived.bubble && heightsReceived.line && areAllChartsReady()) {
-            console.log('✅ Both chart heights received, layout stable - hiding overlay now');
+
+          if (heightsReceived.bubblechart && heightsReceived.linechart && areAllChartsReady()) {
             setTimeout(() => {
               window.hideLoadingOverlay();
             }, 50);
@@ -1257,7 +1857,6 @@
       
       // Debug messages from iframes
       if (event.data && event.data.type === 'debug') {
-        console.log('🐛 Debug message from iframe:', event.data.message);
       }
       
       // URL update messages from iframe
@@ -1268,40 +1867,75 @@
         if (iframeEntry) {
           const sourceKey = iframeEntry[0];
           if (sourceKey === 'bubble') {
-            chartKey = '1';
+            chartKey = 'bubblechart';
           } else if (sourceKey === 'line') {
-            chartKey = '2';
+            chartKey = 'linechart';
           } else {
             chartKey = normalizeChartId(sourceKey) || null;
           }
         }
 
         if (!chartKey) {
-          const fallbackParam = normalizeChartId(new URLSearchParams(window.location.search).get('chart'));
-          chartKey = fallbackParam || currentChart || '1';
+          const fallbackParams = new URLSearchParams(window.location.search);
+          const fallbackParam = normalizeChartId(fallbackParams.get('page')) || normalizeChartId(fallbackParams.get('chart'));
+          chartKey = fallbackParam || currentChart || 'bubblechart';
         }
 
         const paramsArray = Array.isArray(event.data.params) ? event.data.params : [];
-        chartStates[chartKey] = paramsArray;
-
-        if (currentChart !== chartKey) {
-          console.log(`ℹ️ Stored state for inactive chart ${chartKey}; URL unchanged`);
+        if (!paramsArray.length) {
           return;
         }
 
-        const basePath = getBasePath();
-        const newParams = ['chart=' + chartKey, ...paramsArray];
-        const newUrl = `${basePath}?${newParams.join('&')}`;
+        const paramsSearch = new URLSearchParams(paramsArray.join('&'));
+        const messageChart = normalizeChartId(event.data.chart) || normalizeChartId(paramsSearch.get('page')) || normalizeChartId(paramsSearch.get('chart'));
+        if (messageChart && messageChart !== chartKey) {
+          return;
+        }
 
-        window.history.replaceState({ path: newUrl }, '', newUrl);
-        console.log('🔗 URL updated:', newUrl);
+        const sanitizedState = [];
+        paramsSearch.forEach((value, key) => {
+          if (key === 'page' || key === 'chart') {
+            return;
+          }
+          sanitizedState.push(`${key}=${value}`);
+        });
+        chartStates[chartKey] = sanitizedState;
+
+        if (currentChart !== chartKey) {
+          return;
+        }
+
+        paramsSearch.delete('chart');
+        paramsSearch.set('page', chartKey);
+        const serialized = [`page=${chartKey}`];
+        paramsSearch.forEach((value, key) => {
+          if (key === 'page') {
+            return;
+          }
+          serialized.push(`${key}=${value}`);
+        });
+        const basePath = getBasePath();
+        const newUrl = `${basePath}?${serialized.join('&')}`;
+
+        updateHistoryState('replaceState', newUrl);
       }
       
       // Line debug messages
       if (event.data && event.data.type === 'lineDebug') {
-        console.log('🐛 Line chart debug:', event.data.payload);
       }
-    });
+    }
+
+    window.__NAEI_processIframeMessage = processIframeMessage;
+    if (Array.isArray(window.__NAEI_messageQueue) && window.__NAEI_messageQueue.length) {
+      const pendingMessages = window.__NAEI_messageQueue.splice(0);
+      pendingMessages.forEach(event => {
+        try {
+          processIframeMessage(event);
+        } catch (error) {
+          console.warn('Deferred iframe message failed:', error);
+        }
+      });
+    }
     
     // Hide loading overlay function - make it global for iframe onload
     window.hideLoadingOverlay = function() {
@@ -1343,17 +1977,21 @@
       console.log('Main page DOM loaded');
       const pathChart = resolveChartFromPath();
       const urlParams = new URLSearchParams(window.location.search);
-      let chartParam = pathChart || urlParams.get('chart') || '1';
+      let chartParam = pathChart || urlParams.get('page') || urlParams.get('chart') || 'bubblechart';
 
-      chartParam = normalizeChartId(chartParam) || '1';
+      if (bubbleTutorialControl.requested) {
+        chartParam = 'bubblechart';
+      }
+
+      chartParam = normalizeChartId(chartParam) || 'bubblechart';
       console.log('Initial chart selection:', chartParam);
       switchChart(chartParam);
 
       document.addEventListener('keydown', handleTabKeyboardNavigation);
       
     // Comprehensive iframe debugging
-    const lineIframe = iframeElements.line;
-    const bubbleIframe = iframeElements.bubble;
+    const lineIframe = iframeElements.linechart;
+    const bubbleIframe = iframeElements.bubblechart;
       
       if (lineIframe) {
         if (debugLoggingEnabled) {

@@ -56,9 +56,9 @@
       <h3>Current URL:</h3>
       <p id="current-url"></p>
       
-      <h3>Generated URLs:</h3>
-  <p><strong>Bubble Chart (chart=1):</strong> <span id="bubble-url"></span></p>
-  <p><strong>Line Chart (chart=2):</strong> <span id="line-url"></span></p>
+        <h3>Generated URLs:</h3>
+      <p><strong>Bubble Chart (page=bubblechart):</strong> <span id="bubble-url"></span></p>
+      <p><strong>Line Chart (page=linechart):</strong> <span id="line-url"></span></p>
     </div>
     
     <div>
@@ -72,6 +72,22 @@
 
   <script>
     // Copy the same functions from index.html for testing
+    function normalizeChartId(chartId) {
+      if (!chartId) {
+        return 'bubblechart';
+      }
+      const mapping = {
+        '1': 'bubblechart',
+        'bubble': 'bubblechart',
+        'bubblechart': 'bubblechart',
+        '2': 'linechart',
+        'line': 'linechart',
+        'linechart': 'linechart'
+      };
+      const lower = String(chartId).toLowerCase();
+      return mapping[lower] || lower;
+    }
+
     function getDefaultUrl(chartId) {
       // Handle both local and GitHub Pages URLs
       let baseUrl = window.location.pathname;
@@ -84,15 +100,18 @@
         baseUrl = '/CIC-test-naei-multigroup-viewer/';
       }
 
-      if (chartId === '1' || !chartId) {
-  // Bubble chart defaults: PM2.5 (id=5), Ecodesign Stove + Gas Boilers (ids 20,37), most recent year (2023)
-  return `${baseUrl}?chart=1&pollutant_id=5&group_ids=20,37&year=2023`;
-      } else if (chartId === '2') {
+      const normalizedId = normalizeChartId(chartId);
+
+      if (normalizedId === 'bubblechart') {
+        // Bubble chart defaults: PM2.5 (id=5), Ecodesign Stove + Gas Boilers (ids 20,37), most recent year (2023)
+        return `${baseUrl}?page=bubblechart&pollutant_id=5&group_ids=20,37&year=2023`;
+      }
+      if (normalizedId === 'linechart') {
         // Line chart defaults: PM2.5 (id=5), All group (id=1), full history
-        return `${baseUrl}?chart=2&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+        return `${baseUrl}?page=linechart&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
       }
 
-      return baseUrl;
+      return `${baseUrl}?page=bubblechart`;
     }
 
     function getRedirectUrl(chartId) {
@@ -109,17 +128,17 @@
         isLocal ? 'Local Development' : 'Other';
       
       document.getElementById('current-url').textContent = window.location.href;
-      document.getElementById('bubble-url').textContent = getDefaultUrl('1');
-      document.getElementById('line-url').textContent = getRedirectUrl('2');
+      document.getElementById('bubble-url').textContent = getDefaultUrl('bubblechart');
+      document.getElementById('line-url').textContent = getRedirectUrl('linechart');
     });
 
     function testBubbleChart() {
-      const url = getDefaultUrl('1');
+      const url = getDefaultUrl('bubblechart');
       showResult('Bubble Chart URL', url);
     }
 
     function testLineChart() {
-      const url = getRedirectUrl('2');
+      const url = getRedirectUrl('linechart');
       showResult('Line Chart URL', url);
     }
 

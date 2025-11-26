@@ -541,11 +541,11 @@
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="border-b border-gray-200">
           <nav class="tab-nav -mb-px flex flex-wrap items-center gap-6" role="tablist" aria-label="Chart views">
-            <button type="button" id="tab-1" data-chart="1" onclick="switchChart('1')" role="tab" aria-controls="chart-1" aria-selected="true" tabindex="0" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+            <button type="button" id="tab-bubblechart" data-chart="bubblechart" onclick="switchChart('bubblechart')" role="tab" aria-controls="chart-bubblechart" aria-selected="true" tabindex="0" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Bubble-Chart-Icon4.png" alt="Bubble chart icon" class="w-auto" style="height: 37px;">
               <span>Bubble Chart</span>
             </button>
-            <button type="button" id="tab-2" data-chart="2" onclick="switchChart('2')" role="tab" aria-controls="chart-2" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+            <button type="button" id="tab-linechart" data-chart="linechart" onclick="switchChart('linechart')" role="tab" aria-controls="chart-linechart" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/Line-Chart-Icon7.png" alt="Line chart icon" class="w-auto" style="height: 37px;">
               <span>Line Chart</span>
             </button>
@@ -567,11 +567,11 @@
     </div>
 
     <!-- Bubble Chart Container -->
-  <div id="chart-1" class="chart-container" role="tabpanel" aria-labelledby="tab-1" aria-hidden="false">
+  <div id="chart-bubblechart" class="chart-container" role="tabpanel" aria-labelledby="tab-bubblechart" aria-hidden="false">
       <iframe
         id="bubblechart-iframe"
         class="chart-iframe"
-        src="CIC-test-naei-bubblechart-v2.0/index.html"
+        src="bubblechart/index.html"
         frameborder="0"
         scrolling="no"
         style="height: 600px;"
@@ -579,11 +579,11 @@
     </div>
 
     <!-- Line Chart Container -->
-  <div id="chart-2" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-2" aria-hidden="true">
+  <div id="chart-linechart" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-linechart" aria-hidden="true">
       <iframe
         id="linechart-iframe"
         class="chart-iframe"
-        src="CIC-test-naei-linechart-v2.4/index.html"
+        src="linechart/index.html"
         frameborder="0"
         scrolling="no"
         style="height: 600px;"
@@ -709,10 +709,10 @@
     }
     
     const STATIC_CHART_IDS = new Set(['category-info', 'user-guide', 'resources']);
-    const CHART_SEQUENCE = ['1', '2', 'category-info', 'user-guide', 'resources'];
+    const CHART_SEQUENCE = ['bubblechart', 'linechart', 'category-info', 'user-guide', 'resources'];
     const TAB_ID_MAP = {
-      '1': 'tab-1',
-      '2': 'tab-2',
+      'bubblechart': 'tab-bubblechart',
+      'linechart': 'tab-linechart',
       'category-info': 'tab-category-info',
       'user-guide': 'tab-user-guide',
       'resources': 'tab-resources'
@@ -720,8 +720,8 @@
 
     // Store last known state for each chart (populated by messages from iframes)
     const chartStates = {
-      '1': [],            // Bubble chart state
-      '2': [],            // Line chart state
+      'bubblechart': [],            // Bubble chart state
+      'linechart': [],            // Line chart state
       'category-info': [],   // Category info view (static)
       'user-guide': [],   // User guide view (static)
       'resources': []     // Resources view (static)
@@ -825,8 +825,8 @@
       });
     }
     const chartReadyState = {
-      bubble: false,
-      line: false
+      bubblechart: false,
+      linechart: false
     };
     let sharedDataBootstrapLaunched = false;
 
@@ -847,8 +847,8 @@
     }
 
     const iframeElements = {
-      bubble: document.getElementById('bubblechart-iframe'),
-      line: document.getElementById('linechart-iframe'),
+      bubblechart: document.getElementById('bubblechart-iframe'),
+      linechart: document.getElementById('linechart-iframe'),
       'category-info': document.getElementById('categoryinfo-iframe'),
       'user-guide': document.getElementById('userguide-iframe'),
       resources: document.getElementById('resources-iframe')
@@ -897,6 +897,37 @@
       return humanizeUrlEncoding(assembled);
     }
 
+    function inferChartIdFromBasePath(basePath) {
+      if (typeof basePath !== 'string' || !basePath.length) {
+        return null;
+      }
+
+      try {
+        const segments = basePath.split('/').filter(Boolean);
+        if (!segments.length) {
+          return null;
+        }
+
+        const normalizeSegment = (value) => value.replace(/\.html?$/, '').toLowerCase();
+        let candidate = normalizeSegment(segments[segments.length - 1]);
+
+        if (STATIC_CHART_IDS.has(candidate) || candidate === 'bubblechart' || candidate === 'linechart') {
+          return candidate;
+        }
+
+        if (candidate === 'index' && segments.length > 1) {
+          candidate = normalizeSegment(segments[segments.length - 2]);
+          if (STATIC_CHART_IDS.has(candidate) || candidate === 'bubblechart' || candidate === 'linechart') {
+            return candidate;
+          }
+        }
+      } catch (error) {
+        debugWarn('Unable to infer chart from base path:', error);
+      }
+
+      return null;
+    }
+
     function applyBubbleTutorialFlag(url) {
       if (!url) {
         return url;
@@ -904,8 +935,16 @@
 
       const components = decomposeUrl(url);
       const params = new URLSearchParams(components.query || '');
-      const targetChart = normalizeChartId(params.get('chart')) || '1';
-      const shouldIncludeFlag = bubbleTutorialControl.active && targetChart === '1';
+      const normalizedPage = normalizeChartId(params.get('page'));
+      const legacyChart = normalizeChartId(params.get('chart'));
+      const inferredChart = inferChartIdFromBasePath(components.base);
+      const targetChart = normalizedPage || legacyChart || inferredChart || 'bubblechart';
+      if (!normalizedPage && !inferredChart && targetChart) {
+        params.set('page', targetChart);
+      }
+      params.delete('chart');
+
+      const shouldIncludeFlag = bubbleTutorialControl.active && targetChart === 'bubblechart';
 
       if (shouldIncludeFlag) {
         if (!params.has('bubbletutorial')) {
@@ -954,7 +993,7 @@
         return;
       }
 
-      const iframe = iframeElements.bubble;
+      const iframe = iframeElements.bubblechart;
       if (!iframe || !iframe.contentWindow) {
         return;
       }
@@ -987,14 +1026,15 @@
     function broadcastViewportMetrics(targetKeys) {
       const keys = Array.isArray(targetKeys)
         ? targetKeys
-        : (targetKeys ? [targetKeys] : ['bubble', 'line', 'user-guide']);
+        : (targetKeys ? [targetKeys] : ['bubblechart', 'linechart', 'user-guide']);
+      const normalizedKeys = keys.map(key => normalizeChartId(key) || key);
 
       const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
       if (viewportHeight) {
         cachedViewportHeight = viewportHeight;
       }
 
-      keys.forEach(key => {
+      normalizedKeys.forEach(key => {
         const iframe = iframeElements[key];
         if (!iframe || !iframe.contentWindow) {
           return;
@@ -1013,7 +1053,7 @@
     });
     window.addEventListener('resize', () => {
       getParentFooterHeight();
-      ['bubble', 'user-guide'].forEach(key => {
+      ['bubblechart', 'user-guide'].forEach(key => {
         const iframe = iframeElements[key];
         if (iframe && iframe.contentWindow) {
           iframe.contentWindow.postMessage({
@@ -1127,6 +1167,10 @@
         return pathChart;
       }
       const params = new URLSearchParams(window.location.search);
+      const pageParam = normalizeChartId(params.get('page'));
+      if (pageParam) {
+        return pageParam;
+      }
       return normalizeChartId(params.get('chart'));
     }
 
@@ -1140,35 +1184,42 @@
         return rawId;
       }
 
+      const lower = String(rawId).toLowerCase();
       const mapping = {
+        '1': 'bubblechart',
+        'bubble': 'bubblechart',
+        'bubblechart': 'bubblechart',
+        '2': 'linechart',
+        'line': 'linechart',
+        'linechart': 'linechart',
         '3': 'category-info',
-        '4': 'user-guide',
-        '5': 'resources',
         'category-info': 'category-info',
+        '4': 'user-guide',
         'user-guide': 'user-guide',
+        '5': 'resources',
         'resources': 'resources'
       };
 
-      return mapping[rawId] || rawId;
+      return mapping[lower] || rawId;
     }
 
     function getDefaultUrl(chartId) {
       const basePath = getBasePath();
       const queryBase = basePath;
 
-      const normalizedId = normalizeChartId(chartId) || '1';
+      const normalizedId = normalizeChartId(chartId) || 'bubblechart';
 
-      if (normalizedId === '1') {
-        return `${queryBase}?chart=1&pollutant_id=5&group_ids=20,37&year=2023`;
+      if (normalizedId === 'bubblechart') {
+        return `${queryBase}?page=bubblechart&pollutant_id=5&group_ids=20,37&year=2023`;
       }
-      if (normalizedId === '2') {
-        return `${queryBase}?chart=2&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+      if (normalizedId === 'linechart') {
+        return `${queryBase}?page=linechart&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
       }
       if (STATIC_CHART_IDS.has(normalizedId)) {
         return `${basePath}${normalizedId}`;
       }
 
-      return queryBase;
+      return `${queryBase}?page=bubblechart`;
     }
 
     function selectChart(chartId) {
@@ -1221,7 +1272,7 @@
         }
 
         document.getElementById('chart-interface').classList.remove('hidden');
-        currentChart = normalizeChartId(chartId) || '1';
+        currentChart = normalizeChartId(chartId) || 'bubblechart';
         updateTabStates();
         showChart(currentChart);
       }
@@ -1231,7 +1282,7 @@
       console.log('Starting fade to complete interface');
       
       // Set the active chart
-      currentChart = normalizeChartId(chartId) || '1';
+      currentChart = normalizeChartId(chartId) || 'bubblechart';
       
       // Ensure chart containers are ready
       const chartContainers = Array.from(document.querySelectorAll('.chart-container'));
@@ -1282,10 +1333,10 @@
 
     function hasParamsForChart(chartId, params) {
       if (!params) return false;
-      if (chartId === '1') {
+      if (chartId === 'bubblechart') {
         return ['pollutant_id', 'group_ids', 'year'].every(key => params.has(key) && params.get(key));
       }
-      if (chartId === '2') {
+      if (chartId === 'linechart') {
         return ['pollutant_id', 'group_ids', 'start_year', 'end_year'].every(key => params.has(key) && params.get(key));
       }
       return false;
@@ -1295,14 +1346,14 @@
       if (!hasParamsForChart(chartId, params)) {
         return [];
       }
-      if (chartId === '1') {
+      if (chartId === 'bubblechart') {
         return [
           `pollutant_id=${params.get('pollutant_id')}`,
           `group_ids=${params.get('group_ids')}`,
           `year=${params.get('year')}`
         ];
       }
-      if (chartId === '2') {
+      if (chartId === 'linechart') {
         return [
           `pollutant_id=${params.get('pollutant_id')}`,
           `group_ids=${params.get('group_ids')}`,
@@ -1314,7 +1365,7 @@
     }
 
     function switchChart(rawChartId) {
-      const chartId = normalizeChartId(rawChartId) || '1';
+      const chartId = normalizeChartId(rawChartId) || 'bubblechart';
 
       if (currentChart === chartId) return;
 
@@ -1330,12 +1381,13 @@
 
       if (storedState && storedState.length > 0) {
         console.log('Using stored state for chart', chartId, storedState);
-        const paramsArray = ['chart=' + chartId, ...storedState];
+        const paramsArray = ['page=' + chartId, ...storedState];
         const newQuery = paramsArray.join('&');
         const newUrl = `${queryBase}?${newQuery}`;
         const historyMethod = currentChart ? 'pushState' : 'replaceState';
 
-        if (window.location.search.substring(1) !== newQuery || normalizeChartId(urlParams.get('chart')) !== chartId) {
+        const canonicalParam = normalizeChartId(urlParams.get('page')) || normalizeChartId(urlParams.get('chart'));
+        if (window.location.search.substring(1) !== newQuery || canonicalParam !== chartId) {
           updateHistoryState(historyMethod, newUrl);
         }
       } else {
@@ -1344,21 +1396,21 @@
         const historyMethod = currentChart ? 'pushState' : 'replaceState';
         let newUrl = null;
 
-        if (chartId === '1' || chartId === '2') {
+        if (chartId === 'bubblechart' || chartId === 'linechart') {
           const newParams = new URLSearchParams();
-          newParams.set('chart', chartId);
+          newParams.set('page', chartId);
 
-          if (chartId === '1') {
+          if (chartId === 'bubblechart') {
             newParams.set('pollutant_id', '5');
             newParams.set('group_ids', '20,37');
             newParams.set('year', '2023');
-            chartStates['1'] = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
-          } else if (chartId === '2') {
+            chartStates.bubblechart = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
+          } else if (chartId === 'linechart') {
             newParams.set('pollutant_id', '5');
             newParams.set('group_ids', '1');
             newParams.set('start_year', '1970');
             newParams.set('end_year', '2023');
-            chartStates['2'] = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
+            chartStates.linechart = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
           }
 
           const paramsArray = [];
@@ -1407,7 +1459,7 @@
     }
 
     function focusTab(chartId) {
-      const normalizedId = normalizeChartId(chartId) || '1';
+      const normalizedId = normalizeChartId(chartId) || 'bubblechart';
       const tabId = TAB_ID_MAP[normalizedId];
       if (!tabId) {
         return;
@@ -1433,7 +1485,7 @@
         container.setAttribute('aria-hidden', 'true');
       });
       
-      const normalizedId = normalizeChartId(chartId) || '1';
+      const normalizedId = normalizeChartId(chartId) || 'bubblechart';
       const chartContainer = document.getElementById(`chart-${normalizedId}`);
       if (!chartContainer) {
         debugWarn('Unable to locate chart container for', normalizedId);
@@ -1534,7 +1586,7 @@
         return null;
       }
 
-      const normalizedCurrent = normalizeChartId(currentChart) || '1';
+      const normalizedCurrent = normalizeChartId(currentChart) || 'bubblechart';
       const currentIndex = CHART_SEQUENCE.indexOf(normalizedCurrent);
       if (currentIndex === -1) {
         return null;
@@ -1591,15 +1643,15 @@
     
     // Simple loading overlay control - MESSAGE BASED APPROACH
     let overlayHidden = false;
-    const heightsReceived = { bubble: false, line: false, 'user-guide': false };
+    const heightsReceived = { bubblechart: false, linechart: false, 'user-guide': false };
     
     // Set initial reasonable height estimate
-    const lineIframe = iframeElements.line;
+    const lineIframe = iframeElements.linechart;
     if (lineIframe) {
       lineIframe.style.height = '1200px'; // Initial estimate
     }
 
-    const bubbleIframe = iframeElements.bubble;
+    const bubbleIframe = iframeElements.bubblechart;
     if (bubbleIframe) {
       bubbleIframe.style.height = '1100px';
     }
@@ -1642,7 +1694,7 @@
       if (event.data && event.data.type === 'scrollToBubbleTutorial') {
         const requestId = event.data.requestId;
         const prefersReducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        const bubbleContainer = document.getElementById('chart-1') || document.getElementById('bubblechart-iframe');
+        const bubbleContainer = document.getElementById('chart-bubblechart') || document.getElementById('bubblechart-iframe');
         const headerOffset = 32;
         const scrollTarget = bubbleContainer;
 
@@ -1685,7 +1737,7 @@
       }
 
       if (event.data && event.data.type === 'requestParentViewportMetrics') {
-        const chartKey = event.data.chart;
+        const chartKey = normalizeChartId(event.data.chart) || event.data.chart;
         getParentFooterHeight();
         broadcastViewportMetrics(chartKey);
         return;
@@ -1719,7 +1771,8 @@
       }
       
       if (event.data && event.data.type === 'chartReady' && !overlayHidden) {
-        const chartKey = event.data.chart;
+        const rawChartKey = event.data.chart;
+        const chartKey = normalizeChartId(rawChartKey) || rawChartKey;
         const keyLabel = typeof chartKey === 'string'
           ? chartKey.charAt(0).toUpperCase() + chartKey.slice(1)
           : 'Unknown';
@@ -1727,12 +1780,12 @@
         if (chartReadyState.hasOwnProperty(chartKey)) {
           chartReadyState[chartKey] = true;
         } else {
-          debugWarn('⚠️ Unknown chart reported ready:', chartKey);
+          debugWarn('⚠️ Unknown chart reported ready:', rawChartKey);
         }
 
         requestSharedDataBootstrap(`chartReady:${chartKey}`);
 
-        if (chartKey === 'bubble') {
+        if (chartKey === 'bubblechart') {
           attemptBubbleTutorialAutoOpen();
         }
         
@@ -1752,7 +1805,8 @@
       
       // Handle content height from iframe (sent once after initial render)
       if (event.data && event.data.type === 'contentHeight') {
-        const chartKey = event.data.chart;
+        const rawChartKey = event.data.chart;
+        const chartKey = normalizeChartId(rawChartKey) || rawChartKey;
         const iframe = iframeElements[chartKey];
         
         if (iframe) {
@@ -1786,14 +1840,14 @@
           }
 
           iframe.style.height = finalHeight + 'px';
-          if (chartKey === 'bubble' || chartKey === 'line' || chartKey === 'user-guide') {
+          if (chartKey === 'bubblechart' || chartKey === 'linechart' || chartKey === 'user-guide') {
             getParentFooterHeight();
             broadcastViewportMetrics(chartKey);
           }
           
           heightsReceived[chartKey] = true;
-          
-          if (heightsReceived.bubble && heightsReceived.line && areAllChartsReady()) {
+
+          if (heightsReceived.bubblechart && heightsReceived.linechart && areAllChartsReady()) {
             setTimeout(() => {
               window.hideLoadingOverlay();
             }, 50);
@@ -1813,17 +1867,18 @@
         if (iframeEntry) {
           const sourceKey = iframeEntry[0];
           if (sourceKey === 'bubble') {
-            chartKey = '1';
+            chartKey = 'bubblechart';
           } else if (sourceKey === 'line') {
-            chartKey = '2';
+            chartKey = 'linechart';
           } else {
             chartKey = normalizeChartId(sourceKey) || null;
           }
         }
 
         if (!chartKey) {
-          const fallbackParam = normalizeChartId(new URLSearchParams(window.location.search).get('chart'));
-          chartKey = fallbackParam || currentChart || '1';
+          const fallbackParams = new URLSearchParams(window.location.search);
+          const fallbackParam = normalizeChartId(fallbackParams.get('page')) || normalizeChartId(fallbackParams.get('chart'));
+          chartKey = fallbackParam || currentChart || 'bubblechart';
         }
 
         const paramsArray = Array.isArray(event.data.params) ? event.data.params : [];
@@ -1831,32 +1886,36 @@
           return;
         }
 
-        const messageChart = normalizeChartId(event.data.chart);
+        const paramsSearch = new URLSearchParams(paramsArray.join('&'));
+        const messageChart = normalizeChartId(event.data.chart) || normalizeChartId(paramsSearch.get('page')) || normalizeChartId(paramsSearch.get('chart'));
         if (messageChart && messageChart !== chartKey) {
           return;
         }
 
-        const chartFromParams = normalizeChartId(new URLSearchParams(paramsArray.join('&')).get('chart'));
-        if (chartFromParams && chartFromParams !== chartKey) {
-          return;
-        }
-        chartStates[chartKey] = paramsArray;
+        const sanitizedState = [];
+        paramsSearch.forEach((value, key) => {
+          if (key === 'page' || key === 'chart') {
+            return;
+          }
+          sanitizedState.push(`${key}=${value}`);
+        });
+        chartStates[chartKey] = sanitizedState;
 
         if (currentChart !== chartKey) {
           return;
         }
 
-        const basePath = getBasePath();
-        const paramsSearch = new URLSearchParams(paramsArray.join('&'));
-        paramsSearch.set('chart', chartKey);
-        const newParams = [`chart=${chartKey}`];
+        paramsSearch.delete('chart');
+        paramsSearch.set('page', chartKey);
+        const serialized = [`page=${chartKey}`];
         paramsSearch.forEach((value, key) => {
-          if (key === 'chart') {
+          if (key === 'page') {
             return;
           }
-          newParams.push(`${key}=${value}`);
+          serialized.push(`${key}=${value}`);
         });
-        const newUrl = `${basePath}?${newParams.join('&')}`;
+        const basePath = getBasePath();
+        const newUrl = `${basePath}?${serialized.join('&')}`;
 
         updateHistoryState('replaceState', newUrl);
       }
@@ -1918,21 +1977,21 @@
       console.log('Main page DOM loaded');
       const pathChart = resolveChartFromPath();
       const urlParams = new URLSearchParams(window.location.search);
-      let chartParam = pathChart || urlParams.get('chart') || '1';
+      let chartParam = pathChart || urlParams.get('page') || urlParams.get('chart') || 'bubblechart';
 
       if (bubbleTutorialControl.requested) {
-        chartParam = '1';
+        chartParam = 'bubblechart';
       }
 
-      chartParam = normalizeChartId(chartParam) || '1';
+      chartParam = normalizeChartId(chartParam) || 'bubblechart';
       console.log('Initial chart selection:', chartParam);
       switchChart(chartParam);
 
       document.addEventListener('keydown', handleTabKeyboardNavigation);
       
     // Comprehensive iframe debugging
-    const lineIframe = iframeElements.line;
-    const bubbleIframe = iframeElements.bubble;
+    const lineIframe = iframeElements.linechart;
+    const bubbleIframe = iframeElements.bubblechart;
       
       if (lineIframe) {
         if (debugLoggingEnabled) {
