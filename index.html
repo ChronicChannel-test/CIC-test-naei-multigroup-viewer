@@ -411,7 +411,7 @@
       object-fit: contain;
     }
 
-    .group-info {
+    .category-info {
       display: flex;
       align-items: center;
       justify-content: center;
@@ -419,7 +419,7 @@
       margin-top: 16px;
     }
 
-    .group-info img {
+    .category-info img {
       width: 24px;
       height: 24px;
     }
@@ -549,9 +549,9 @@
               <img src="SharedResources/images/Line-Chart-Icon7.png" alt="Line chart icon" class="w-auto" style="height: 37px;">
               <span>Line Chart</span>
             </button>
-            <button type="button" id="tab-group-info" data-chart="group-info" onclick="switchChart('group-info')" role="tab" aria-controls="chart-group-info" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
-              <img src="SharedResources/images/Group-Info-Icon.png" alt="Group info icon" class="h-8 w-auto" style="height: 37px;">
-              <span>Group Info</span>
+            <button type="button" id="tab-category-info" data-chart="category-info" onclick="switchChart('category-info')" role="tab" aria-controls="chart-category-info" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
+              <img src="SharedResources/images/Group-Info-Icon.png" alt="Category info icon" class="h-8 w-auto" style="height: 37px;">
+              <span>Category Info</span>
             </button>
             <button type="button" id="tab-user-guide" data-chart="user-guide" onclick="switchChart('user-guide')" role="tab" aria-controls="chart-user-guide" aria-selected="false" tabindex="-1" class="py-4 px-2 border-b-2 font-semibold text-[21px] transition-colors flex items-center gap-2">
               <img src="SharedResources/images/instructions-alpha-v4.png" alt="User guide icon" class="w-auto" style="height: 37px;">
@@ -590,17 +590,17 @@
         title="NAEI Activity Data Line Chart"></iframe>
     </div>
 
-    <!-- Group Info Container -->
-  <div id="chart-group-info" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-group-info" aria-hidden="true">
+    <!-- Category Info Container -->
+  <div id="chart-category-info" class="chart-container" style="visibility: hidden; height: 0; overflow: hidden;" role="tabpanel" aria-labelledby="tab-category-info" aria-hidden="true">
       <iframe
-        id="groupinfo-iframe"
+        id="categoryinfo-iframe"
         class="chart-iframe lazy-iframe"
-        data-src="group-info/embed.html"
+        data-src="category-info/embed.html"
         loading="lazy"
         frameborder="0"
         scrolling="no"
         style="height: 900px;"
-        title="NAEI Group Information"></iframe>
+        title="NAEI Category Information"></iframe>
     </div>
 
     <!-- User Guide Container -->
@@ -708,12 +708,12 @@
       }
     }
     
-    const STATIC_CHART_IDS = new Set(['group-info', 'user-guide', 'resources']);
-    const CHART_SEQUENCE = ['1', '2', 'group-info', 'user-guide', 'resources'];
+    const STATIC_CHART_IDS = new Set(['category-info', 'user-guide', 'resources']);
+    const CHART_SEQUENCE = ['1', '2', 'category-info', 'user-guide', 'resources'];
     const TAB_ID_MAP = {
       '1': 'tab-1',
       '2': 'tab-2',
-      'group-info': 'tab-group-info',
+      'category-info': 'tab-category-info',
       'user-guide': 'tab-user-guide',
       'resources': 'tab-resources'
     };
@@ -722,7 +722,7 @@
     const chartStates = {
       '1': [],            // Bubble chart state
       '2': [],            // Line chart state
-      'group-info': [],   // Group info view (static)
+      'category-info': [],   // Category info view (static)
       'user-guide': [],   // User guide view (static)
       'resources': []     // Resources view (static)
     };
@@ -849,7 +849,7 @@
     const iframeElements = {
       bubble: document.getElementById('bubblechart-iframe'),
       line: document.getElementById('linechart-iframe'),
-      'group-info': document.getElementById('groupinfo-iframe'),
+      'category-info': document.getElementById('categoryinfo-iframe'),
       'user-guide': document.getElementById('userguide-iframe'),
       resources: document.getElementById('resources-iframe')
     };
@@ -1141,10 +1141,10 @@
       }
 
       const mapping = {
-        '3': 'group-info',
+        '3': 'category-info',
         '4': 'user-guide',
         '5': 'resources',
-        'group-info': 'group-info',
+        'category-info': 'category-info',
         'user-guide': 'user-guide',
         'resources': 'resources'
       };
@@ -1470,7 +1470,7 @@
       iframe.removeAttribute('data-src');
     }
 
-    const PREPAINT_CHARTS = ['group-info', 'user-guide', 'resources'];
+    const PREPAINT_CHARTS = ['category-info', 'user-guide', 'resources'];
 
     function prepaintHiddenChart(chartId) {
       const container = document.getElementById(`chart-${chartId}`);
@@ -1604,9 +1604,9 @@
       bubbleIframe.style.height = '1100px';
     }
 
-    const groupInfoIframe = iframeElements['group-info'];
-    if (groupInfoIframe) {
-      groupInfoIframe.style.height = '1000px';
+    const categoryInfoIframe = iframeElements['category-info'];
+    if (categoryInfoIframe) {
+      categoryInfoIframe.style.height = '1000px';
     }
 
     const userGuideIframe = iframeElements['user-guide'];
@@ -1764,8 +1764,8 @@
 
           let finalHeight = safeHeight;
 
-          if (chartKey === 'group-info') {
-            const container = document.getElementById('chart-group-info');
+          if (chartKey === 'category-info') {
+            const container = document.getElementById('chart-category-info');
             const containerVisible = container && container.getAttribute('aria-hidden') === 'false';
             if (containerVisible) {
               const iframeRect = iframe.getBoundingClientRect();

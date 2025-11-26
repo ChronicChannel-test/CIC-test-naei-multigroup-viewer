@@ -21,8 +21,8 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 - Supabase functions live under `supabase/functions/` and can be deployed via the Supabase CLI when backend updates are needed.
 
 ## Deep-Link Tabs & Embeds
-- The shell router inside `index.html` (mirrored in `404.html`) makes `/group-info`, `/user-guide`, and `/resources` deep links fall back to the SPA before the iframe content loads.
-- Each tab’s copy now lives in its own folder (`/group-info/`, `/user-guide/`, `/resources/`) under `embed.html`, while the folder `index.html` simply redirects to the full shell (`/?chart=…`) so direct visits keep the tab bar visible; the legacy `*-embed.html` files remain as tiny redirectors for older links and bookmarks.
+- The shell router inside `index.html` (mirrored in `404.html`) makes `/category-info`, `/user-guide`, and `/resources` deep links fall back to the SPA before the iframe content loads.
+- Each tab’s copy now lives in its own folder (`/category-info/`, `/user-guide/`, `/resources/`) under `embed.html`, while the folder `index.html` simply redirects to the full shell (`/?chart=…`) so direct visits keep the tab bar visible; the legacy `*-embed.html` files remain as tiny redirectors for older links and bookmarks.
 - The parent iframe wrapper is responsible for sizing; the embed documents only emit height messages, so keep any structural changes self-contained inside the embed file.
 
 ### Adding Another Static Tab
@@ -39,7 +39,7 @@ cd /Users/mikehinford/Dropbox/Projects/NAEI\ Multigroup\ Viewer
 npx http-server-spa ./CIC-test-naei-multigroup-viewer index.html 4173 -c-1
 ```
 
-- Visit `http://localhost:4173/CIC-test-naei-multigroup-viewer/` for the default view, or append `/group-info`, `/user-guide`, or `/resources` to confirm deep links mount the SPA shell before loading the iframe content.
+- Visit `http://localhost:4173/CIC-test-naei-multigroup-viewer/` for the default view, or append `/category-info`, `/user-guide`, or `/resources` to confirm deep links mount the SPA shell before loading the iframe content.
 - Any SPA-aware server (`vite preview`, `serve-spa`, etc.) works as long as it rewrites unknown routes to `index.html` and preserves the `/CIC-test-naei-multigroup-viewer/` prefix.
 
 ## Tailwind Build

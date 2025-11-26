@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>UK Air Pollution and Emissions Data Explorer</title>
+  <title>UK Air Pollution/Emissions Data Explorer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="Interactive charts using UK Government data">
   <meta property="og:type" content="website">
@@ -84,29 +84,29 @@
       width: 28%;
     }
 
-    .group-info-source-heading {
+    .category-info-source-heading {
       text-decoration: underline;
       font-weight: 600;
       display: block;
       margin-bottom: 4px;
     }
 
-    .group-info-source-heading mark.group-info-highlight {
+    .category-info-source-heading mark.category-info-highlight {
       text-decoration: inherit;
     }
 
-    .group-info-item-list {
+    .category-info-item-list {
       display: grid;
       grid-template-columns: 1fr;
       gap: 4px;
     }
 
-    .group-info-item {
+    .category-info-item {
       display: block;
       line-height: 1.25;
     }
 
-    mark.group-info-highlight {
+    mark.category-info-highlight {
       background: rgba(255, 174, 1, 0.45);
       color: #5b2109;
       padding: 0;
@@ -115,18 +115,18 @@
       -webkit-box-decoration-break: clone;
     }
 
-    .group-info-activity-column {
+    .category-info-activity-column {
       text-align: left !important;
       vertical-align: middle;
     }
 
-    .group-info-activity-heading {
+    .category-info-activity-heading {
       display: inline-block;
       text-align: left;
       line-height: 1.1;
     }
 
-    .group-info-activity-cell {
+    .category-info-activity-cell {
       text-align: left;
       vertical-align: top;
       white-space: nowrap;
@@ -136,7 +136,7 @@
       min-height: 24px;
     }
 
-    .group-info-activity-icon {
+    .category-info-activity-icon {
       width: 24px;
       height: 24px;
       position: absolute;
@@ -145,16 +145,16 @@
     }
 
     @media (min-width: 980px) {
-      .group-info-item-list--multi {
+      .category-info-item-list--multi {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
     }
 
-    .group-info-shell {
+    .category-info-shell {
       padding: 20px;
     }
 
-    .group-info-frame {
+    .category-info-frame {
       width: calc(100% - 140px);
       margin: 0 auto 0 0;
       border-radius: 6px;
@@ -167,7 +167,7 @@
       position: relative;
     }
 
-    .group-info-header {
+    .category-info-header {
       display: flex;
       flex-direction: column;
       align-items: flex-start;
@@ -176,14 +176,14 @@
       margin-bottom: 6px;
     }
 
-    .group-info-title-main {
+    .category-info-title-main {
       line-height: 1.25;
       color: #0f172a;
       padding-right: 0;
       margin: 0 0 6px 0;
     }
 
-    .group-info-filter-block {
+    .category-info-filter-block {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -192,14 +192,14 @@
       max-width: 100%;
     }
 
-    .group-info-filter-label {
+    .category-info-filter-label {
       font-size: 1.1rem;
       font-weight: 600;
       color: #1f2937;
       white-space: nowrap;
     }
 
-    .group-info-filter-input {
+    .category-info-filter-input {
       flex: 1 1 320px;
       min-width: 240px;
       padding: 10px 14px;
@@ -211,19 +211,19 @@
       background-color: #fff;
     }
 
-    .group-info-filter-input:disabled {
+    .category-info-filter-input:disabled {
       cursor: not-allowed;
       background-color: #f1f5f9;
       color: #94a3b8;
       border-color: #d1d5db;
     }
 
-    .group-info-filter-input:focus {
+    .category-info-filter-input:focus {
       outline: 2px solid #ff9301;
       outline-offset: 1px;
     }
 
-    .group-info-column-filters {
+    .category-info-column-filters {
       display: flex;
       flex-wrap: wrap;
       align-items: center;
@@ -231,20 +231,20 @@
       margin-bottom: 24px;
     }
 
-    .group-info-column-label {
+    .category-info-column-label {
       font-size: 0.95rem;
       font-weight: 600;
       color: #1f2937;
       white-space: nowrap;
     }
 
-    .group-info-column-options {
+    .category-info-column-options {
       display: flex;
       flex-wrap: wrap;
       gap: 14px;
     }
 
-    .group-info-column-option {
+    .category-info-column-option {
       display: inline-flex;
       align-items: center;
       gap: 6px;
@@ -252,12 +252,12 @@
       color: #1f2937;
     }
 
-    .group-info-table-container {
+    .category-info-table-container {
       margin-top: 18px;
       overflow-x: auto;
     }
 
-    .group-info-overlay {
+    .category-info-overlay {
       position: absolute;
       inset: 0;
       background: rgba(255, 255, 255, 0.94);
@@ -270,13 +270,13 @@
       z-index: 5;
     }
 
-    .group-info-overlay--hidden {
+    .category-info-overlay--hidden {
       opacity: 0;
       visibility: hidden;
       pointer-events: none;
     }
 
-    .group-info-overlay-content {
+    .category-info-overlay-content {
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -285,16 +285,16 @@
       font-weight: 600;
     }
 
-    .group-info-spinner {
+    .category-info-spinner {
       width: 32px;
       height: 32px;
       border: 3px solid #ffe0b2;
       border-top-color: #ff9301;
       border-radius: 50%;
-      animation: group-info-spin 0.9s linear infinite;
+      animation: category-info-spin 0.9s linear infinite;
     }
 
-    @keyframes group-info-spin {
+    @keyframes category-info-spin {
       from {
         transform: rotate(0deg);
       }
@@ -310,19 +310,19 @@
       margin-bottom: 16px;
     }
 
-    #group-info-status:empty {
+    #category-info-status:empty {
       min-height: 0;
       height: 0;
       margin-bottom: 0;
     }
 
     @media (max-width: 620px) {
-      .group-info-frame {
+      .category-info-frame {
         width: 100%;
         padding: 0 24px 32px 0;
       }
 
-      .group-info-shell {
+      .category-info-shell {
         padding: 20px;
       }
     }
@@ -351,61 +351,61 @@
   <script src="../SharedResources/shared-data-loader.js"></script>
 </head>
 <body>
-  <main class="group-info-shell">
-    <section class="group-info-frame" aria-labelledby="group-info-heading">
-      <div id="group-info-overlay" class="group-info-overlay" aria-hidden="true">
-        <div class="group-info-overlay-content">
-          <div class="group-info-spinner" role="status" aria-live="polite" aria-label="Loading group information"></div>
-          <p class="group-info-overlay-message">Loading group information…</p>
+  <main class="category-info-shell">
+    <section class="category-info-frame" aria-labelledby="category-info-heading">
+      <div id="category-info-overlay" class="category-info-overlay" aria-hidden="true">
+        <div class="category-info-overlay-content">
+          <div class="category-info-spinner" role="status" aria-live="polite" aria-label="Loading category information"></div>
+          <p class="category-info-overlay-message">Loading Category Information…</p>
         </div>
       </div>
-      <header class="group-info-header">
-        <h1 class="main-title group-info-title-main" id="group-info-heading">Group Information</h1>
+      <header class="category-info-header">
+        <h1 class="main-title category-info-title-main" id="category-info-heading">Pollution Category Information</h1>
       </header>
 
-      <div class="group-info-filter-block">
-        <label for="group-info-filter-input" class="group-info-filter-label">Filter:</label>
-        <input type="search" id="group-info-filter-input" class="group-info-filter-input" placeholder="Search groups, sources, or fuel types" autocomplete="off" aria-describedby="group-info-filter-columns-label">
+      <div class="category-info-filter-block">
+        <label for="category-info-filter-input" class="category-info-filter-label">Filter:</label>
+        <input type="search" id="category-info-filter-input" class="category-info-filter-input" placeholder="Search groups, sources, or fuel types" autocomplete="off" aria-describedby="category-info-filter-columns-label">
       </div>
 
-      <div class="group-info-column-filters" role="group" aria-labelledby="group-info-filter-columns-label">
-        <span class="group-info-column-label" id="group-info-filter-columns-label">Filter Columns:</span>
-        <div class="group-info-column-options">
-          <label class="group-info-column-option">
-            <input type="checkbox" id="group-info-filter-column-all" value="all" checked>
+      <div class="category-info-column-filters" role="group" aria-labelledby="category-info-filter-columns-label">
+        <span class="category-info-column-label" id="category-info-filter-columns-label">Filter Columns:</span>
+        <div class="category-info-column-options">
+          <label class="category-info-column-option">
+            <input type="checkbox" id="category-info-filter-column-all" value="all" checked>
             <span>All</span>
           </label>
-          <label class="group-info-column-option">
-            <input type="checkbox" id="group-info-filter-column-name" value="name" checked>
+          <label class="category-info-column-option">
+            <input type="checkbox" id="category-info-filter-column-name" value="name" checked>
             <span>Group Name</span>
           </label>
-          <label class="group-info-column-option">
-            <input type="checkbox" id="group-info-filter-column-sources" value="sources" checked>
+          <label class="category-info-column-option">
+            <input type="checkbox" id="category-info-filter-column-sources" value="sources" checked>
             <span>Sources &amp; NFR Code</span>
           </label>
-          <label class="group-info-column-option">
-            <input type="checkbox" id="group-info-filter-column-fuels" value="fuels" checked>
+          <label class="category-info-column-option">
+            <input type="checkbox" id="category-info-filter-column-fuels" value="fuels" checked>
             <span>Fuel Types</span>
           </label>
         </div>
       </div>
 
-      <p id="group-info-status" class="status-text" aria-live="polite"></p>
+      <p id="category-info-status" class="status-text" aria-live="polite"></p>
 
-      <div class="group-info-table-container">
-        <div id="group-info-content"></div>
+      <div class="category-info-table-container">
+        <div id="category-info-content"></div>
       </div>
     </section>
   </main>
 
   <script>
     (function() {
-      const statusEl = document.getElementById('group-info-status');
-      const contentEl = document.getElementById('group-info-content');
-      const overlayEl = document.getElementById('group-info-overlay');
-      const overlayMessageEl = overlayEl ? overlayEl.querySelector('.group-info-overlay-message') : null;
-      const filterInput = document.getElementById('group-info-filter-input');
-      const columnOptionsEl = document.querySelector('.group-info-column-options');
+      const statusEl = document.getElementById('category-info-status');
+      const contentEl = document.getElementById('category-info-content');
+      const overlayEl = document.getElementById('category-info-overlay');
+      const overlayMessageEl = overlayEl ? overlayEl.querySelector('.category-info-overlay-message') : null;
+      const filterInput = document.getElementById('category-info-filter-input');
+      const columnOptionsEl = document.querySelector('.category-info-column-options');
       const columnCheckboxes = columnOptionsEl ? Array.from(columnOptionsEl.querySelectorAll('input[type="checkbox"]')) : [];
       let statusTimer = null;
       let groupInfoState = null;
@@ -415,7 +415,7 @@
       let sharedLoaderRef = null;
       let lastSentHeight = 0;
       let contentResizeObserver = null;
-      const overlayHiddenClass = 'group-info-overlay--hidden';
+      const overlayHiddenClass = 'category-info-overlay--hidden';
       let overlayVisible = false;
       const actDataStatus = {
         ready: false,
@@ -461,7 +461,7 @@
         try {
           supabaseClient = config.initSupabaseClient();
         } catch (error) {
-          console.warn('Failed to initialize Supabase client for group info:', error);
+          console.warn('Failed to initialize Supabase client for category info:', error);
         }
         return supabaseClient;
       }
@@ -528,7 +528,7 @@
             };
             return directGroupDataset;
           } catch (error) {
-            console.warn('Direct group info fetch failed:', error);
+            console.warn('Direct category info fetch failed:', error);
             return null;
           } finally {
             directGroupDatasetPromise = null;
@@ -557,20 +557,20 @@
         return snapshot || null;
       }
 
-      function requestSharedDatasetBootstrap(reason = 'group-info') {
+      function requestSharedDatasetBootstrap(reason = 'category-info') {
         const loader = resolveSharedDataLoader();
         if (!loader) {
           return;
         }
         if (typeof loader.bootstrapFullDataset === 'function') {
           loader.bootstrapFullDataset(reason).catch(error => {
-            console.warn('Shared dataset bootstrap failed (group-info):', error);
+            console.warn('Shared dataset bootstrap failed (category-info):', error);
           });
           return;
         }
         if (typeof loader.loadSharedData === 'function') {
           loader.loadSharedData().catch(error => {
-            console.warn('Shared dataset load failed (group-info):', error);
+            console.warn('Shared dataset load failed (category-info):', error);
           });
         }
       }
@@ -629,8 +629,8 @@
       }
 
       function measureHeight() {
-        const shell = document.querySelector('.group-info-shell');
-        const frame = document.querySelector('.group-info-frame');
+        const shell = document.querySelector('.category-info-shell');
+        const frame = document.querySelector('.category-info-frame');
         const frameRect = frame ? frame.getBoundingClientRect() : null;
         const frameHeight = frameRect?.height || frame?.offsetHeight || frame?.scrollHeight || 0;
         const shellStyles = shell ? window.getComputedStyle(shell) : null;
@@ -656,11 +656,11 @@
           lastSentHeight = height;
           window.parent.postMessage({
             type: 'contentHeight',
-            chart: 'group-info',
+            chart: 'category-info',
             height
           }, '*');
         } catch (error) {
-          console.warn('Unable to send group info height to parent:', error);
+          console.warn('Unable to send category info height to parent:', error);
         }
       }
 
@@ -670,7 +670,7 @@
         }, delay);
       }
 
-      function showLoadingOverlay(message = 'Loading group information…') {
+      function showLoadingOverlay(message = 'Loading category information…') {
         if (overlayMessageEl) {
           overlayMessageEl.textContent = message;
         }
@@ -714,7 +714,7 @@
         }
 
         if (!loader) {
-          console.warn('Shared data loader unavailable when preparing group info page.');
+          console.warn('Shared data loader unavailable when preparing category info page.');
           groupInfoDatasetSource = 'unavailable';
           return null;
         }
@@ -738,7 +738,7 @@
             }
           }
         } catch (error) {
-          console.warn('Shared data loader failed while preparing group info page:', error);
+          console.warn('Shared data loader failed while preparing category info page:', error);
         }
 
         groupInfoDatasetSource = 'unavailable';
@@ -976,7 +976,7 @@
         if (!highlightRegex) {
           return safeValue;
         }
-        return safeValue.replace(highlightRegex, match => `<mark class="group-info-highlight">${match}</mark>`);
+        return safeValue.replace(highlightRegex, match => `<mark class="category-info-highlight">${match}</mark>`);
       }
 
       function buildItemList(items, options = {}, highlightRegex = null) {
@@ -995,12 +995,12 @@
         }
 
         const threshold = Number.isFinite(options.multiColumnThreshold) ? options.multiColumnThreshold : 6;
-        const multiClass = filteredItems.length >= threshold ? ' group-info-item-list--multi' : '';
+        const multiClass = filteredItems.length >= threshold ? ' category-info-item-list--multi' : '';
         const itemsHtml = filteredItems
-          .map(item => `<span class="group-info-item">${highlightText(item, highlightRegex)}</span>`)
+          .map(item => `<span class="category-info-item">${highlightText(item, highlightRegex)}</span>`)
           .join('');
 
-        return `<div class="group-info-item-list${multiClass}">${itemsHtml}</div>`;
+        return `<div class="category-info-item-list${multiClass}">${itemsHtml}</div>`;
       }
 
       function splitMultiValue(value) {
@@ -1125,7 +1125,7 @@
             const description = nfrMap[code];
             return description ? `${code}: ${description}` : code;
           });
-          const heading = `<span class="group-info-source-heading">${highlightText('All Sources from the following NFR Code categories:', highlightRegex)}</span>`;
+          const heading = `<span class="category-info-source-heading">${highlightText('All Sources from the following NFR Code categories:', highlightRegex)}</span>`;
           return `${heading}${buildItemList(nfrItems, { multiColumnThreshold: 8 }, highlightRegex)}`;
         }
 
@@ -1269,11 +1269,11 @@
         }
 
         let tableHtml = `
-          <table id="groupTable" aria-label="NAEI group information">
+          <table id="groupTable" aria-label="NAEI category information">
             <thead>
               <tr>
                 <th>Group Name</th>
-                <th class="group-info-activity-column"><span class="group-info-activity-heading" aria-hidden="true">Activity<br>Data</span><span class="sr-only">Activity Data</span></th>
+                <th class="category-info-activity-column"><span class="category-info-activity-heading" aria-hidden="true">Activity<br>Data</span><span class="sr-only">Activity Data</span></th>
                 <th>Sources</th>
                 <th>Fuel Types (Activity in NAEI data)</th>
               </tr>
@@ -1288,8 +1288,8 @@
           tableHtml += `
             <tr>
               <td style="font-weight:600;">${highlightText(group.name, nameHighlight)}</td>
-              <td class="group-info-activity-cell" data-copy-text="${escapeHtml(activityInfo.description)}">
-                <img src="${activityInfo.iconSrc}" alt="" class="group-info-activity-icon" width="24" height="24" loading="lazy">
+              <td class="category-info-activity-cell" data-copy-text="${escapeHtml(activityInfo.description)}">
+                <img src="${activityInfo.iconSrc}" alt="" class="category-info-activity-icon" width="24" height="24" loading="lazy">
                 <span class="sr-only">${escapeHtml(activityInfo.description)}</span>
               </td>
               <td>${sourcesHtml}</td>
@@ -1484,7 +1484,7 @@
             }
           }
         } catch (error) {
-          console.warn('Unable to access cached group information:', error);
+          console.warn('Unable to access cached category information:', error);
         }
 
         if (!nfrRows.length && dataset?.nfrCodes?.length) {
@@ -1492,7 +1492,7 @@
         }
 
         if (!groupRows.length) {
-          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Unable to load group information right now. Please try again later.</p>";
+          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Unable to load category information right now. Please try again later.</p>";
           setStatus('', true);
           hideLoadingOverlay();
           scheduleHeightUpdate();
@@ -1502,7 +1502,7 @@
         const { groups, nfrMap } = buildGroupMaps(groupRows, nfrRows);
 
         if (!groups.length) {
-          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ No group information is available.</p>";
+          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ No category information is available.</p>";
           setStatus('', true);
           hideLoadingOverlay();
           scheduleHeightUpdate();
@@ -1521,14 +1521,14 @@
         scheduleHeightUpdate(30);
 
         if (groupInfoDatasetSource === 'direct-supabase') {
-          requestSharedDatasetBootstrap('group-info-direct');
+          requestSharedDatasetBootstrap('category-info-direct');
         }
       }
 
       document.addEventListener('DOMContentLoaded', () => {
         loadGroupInfo().catch(error => {
-          console.error('Failed to load group info page:', error);
-          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Something went wrong while loading group information.</p>";
+          console.error('Failed to load category info page:', error);
+          contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Something went wrong while loading category information.</p>";
           setStatus('', true);
           hideLoadingOverlay();
           scheduleHeightUpdate();
