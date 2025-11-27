@@ -34,7 +34,7 @@
       border: 0;
     }
 
-    #groupTable {
+    #categoryTable {
       border-collapse: collapse;
       width: 100%;
       font-size: 0.95rem;
@@ -42,8 +42,8 @@
       font-family: inherit;
     }
 
-    #groupTable th,
-    #groupTable td {
+    #categoryTable th,
+    #categoryTable td {
       border: 1px solid #444;
       padding: 12px;
       text-align: left;
@@ -51,36 +51,36 @@
       white-space: pre-line;
     }
 
-    #groupTable thead tr {
+    #categoryTable thead tr {
       background: #d0d0d0;
     }
 
-    #groupTable tbody tr {
+    #categoryTable tbody tr {
       cursor: pointer;
     }
 
-    #groupTable tbody tr:hover {
+    #categoryTable tbody tr:hover {
       background: #f5f5f5;
     }
 
-    #groupTable th:nth-child(1),
-    #groupTable td:nth-child(1) {
+    #categoryTable th:nth-child(1),
+    #categoryTable td:nth-child(1) {
       width: 26%;
     }
 
-    #groupTable th:nth-child(2),
-    #groupTable td:nth-child(2) {
+    #categoryTable th:nth-child(2),
+    #categoryTable td:nth-child(2) {
       width: 6.5%;
       white-space: nowrap;
     }
 
-    #groupTable th:nth-child(3),
-    #groupTable td:nth-child(3) {
+    #categoryTable th:nth-child(3),
+    #categoryTable td:nth-child(3) {
       width: 39.5%;
     }
 
-    #groupTable th:nth-child(4),
-    #groupTable td:nth-child(4) {
+    #categoryTable th:nth-child(4),
+    #categoryTable td:nth-child(4) {
       width: 28%;
     }
 
@@ -365,7 +365,7 @@
 
       <div class="category-info-filter-block">
         <label for="category-info-filter-input" class="category-info-filter-label">Filter:</label>
-        <input type="search" id="category-info-filter-input" class="category-info-filter-input" placeholder="Search groups, sources, or fuel types" autocomplete="off" aria-describedby="category-info-filter-columns-label">
+        <input type="search" id="category-info-filter-input" class="category-info-filter-input" placeholder="Search categories, sources, or fuel types" autocomplete="off" aria-describedby="category-info-filter-columns-label">
       </div>
 
       <div class="category-info-column-filters" role="group" aria-labelledby="category-info-filter-columns-label">
@@ -377,7 +377,7 @@
           </label>
           <label class="category-info-column-option">
             <input type="checkbox" id="category-info-filter-column-name" value="name" checked>
-            <span>Group Name</span>
+            <span>Category Name</span>
           </label>
           <label class="category-info-column-option">
             <input type="checkbox" id="category-info-filter-column-sources" value="sources" checked>
@@ -408,7 +408,7 @@
       const columnOptionsEl = document.querySelector('.category-info-column-options');
       const columnCheckboxes = columnOptionsEl ? Array.from(columnOptionsEl.querySelectorAll('input[type="checkbox"]')) : [];
       let statusTimer = null;
-      let groupInfoState = null;
+      let categoryInfoState = null;
       const highlightMatchesEnabled = true;
       let filterInputActive = true;
       const MIN_HEIGHT_DELTA = 8;
@@ -419,9 +419,9 @@
       let overlayVisible = false;
       const actDataStatus = {
         ready: false,
-        hasActDataByGroupName: new Map(),
-        hasActDataByGroupId: new Map(),
-        groupsWithoutActData: []
+        hasActDataByCategoryName: new Map(),
+        hasActDataByCategoryId: new Map(),
+        categoriesWithoutActData: []
       };
       const DEFAULT_SNAPSHOT_PATHS = [
         '/SharedResources/default-chart-data.json',
@@ -430,10 +430,10 @@
       ];
       let defaultSnapshotPromise = null;
       let cachedDefaultSnapshot = null;
-      let directGroupDatasetPromise = null;
-      let directGroupDataset = null;
+      let directCategoryDatasetPromise = null;
+      let directCategoryDataset = null;
       let supabaseClient = null;
-      let groupInfoDatasetSource = 'unknown';
+      let categoryInfoDatasetSource = 'unknown';
 
       function resolveSupabaseConfig() {
         if (window.SupabaseConfig?.initSupabaseClient) {
@@ -495,12 +495,12 @@
         return snapshot;
       }
 
-      async function fetchGroupsAndNfrDirectly() {
-        if (directGroupDataset) {
-          return directGroupDataset;
+      async function fetchCategoriesAndNfrDirectly() {
+        if (directCategoryDataset) {
+          return directCategoryDataset;
         }
-        if (directGroupDatasetPromise) {
-          return directGroupDatasetPromise;
+        if (directCategoryDatasetPromise) {
+          return directCategoryDatasetPromise;
         }
 
         const client = getSupabaseClient();
@@ -508,34 +508,34 @@
           return null;
         }
 
-        directGroupDatasetPromise = (async () => {
+        directCategoryDatasetPromise = (async () => {
           try {
-            const [groupsResp, nfrResp] = await Promise.all([
+            const [categoriesResp, nfrResp] = await Promise.all([
               client.from('naei_global_t_category').select('*'),
               client.from('naei_global_t_nfrcode').select('*')
             ]);
 
-            if (groupsResp.error) {
-              throw groupsResp.error;
+            if (categoriesResp.error) {
+              throw categoriesResp.error;
             }
             if (nfrResp.error) {
               throw nfrResp.error;
             }
 
-            directGroupDataset = {
-              groups: groupsResp.data || [],
+            directCategoryDataset = {
+              categories: categoriesResp.data || [],
               nfrCodes: nfrResp.data || []
             };
-            return directGroupDataset;
+            return directCategoryDataset;
           } catch (error) {
             console.warn('Direct category info fetch failed:', error);
             return null;
           } finally {
-            directGroupDatasetPromise = null;
+            directCategoryDatasetPromise = null;
           }
         })();
 
-        return directGroupDatasetPromise;
+        return directCategoryDatasetPromise;
       }
 
       async function getActDataSnapshotDataset() {
@@ -696,7 +696,7 @@
         if (loader) {
           if (loader.isDataLoaded?.()) {
             try {
-              groupInfoDatasetSource = 'shared-cache';
+              categoryInfoDatasetSource = 'shared-cache';
               return loader.getCachedData();
             } catch (error) {
               console.warn('Unable to read cached shared data:', error);
@@ -707,7 +707,7 @@
             if (typeof loader.loadSharedData === 'function') {
               const payload = await loader.loadSharedData();
               if (payload) {
-                groupInfoDatasetSource = 'shared-loader';
+                categoryInfoDatasetSource = 'shared-loader';
                 return payload;
               }
             }
@@ -719,7 +719,7 @@
             try {
               const cached = loader.getCachedData();
               if (cached) {
-                groupInfoDatasetSource = 'shared-cache-fallback';
+                categoryInfoDatasetSource = 'shared-cache-fallback';
                 return cached;
               }
             } catch (error) {
@@ -728,12 +728,12 @@
           }
         }
 
-        const directPayload = await fetchGroupsAndNfrDirectly();
-        if (directPayload?.groups?.length) {
-          groupInfoDatasetSource = 'direct-supabase';
+        const directPayload = await fetchCategoriesAndNfrDirectly();
+        if (directPayload?.categories?.length || directPayload?.groups?.length) {
+          categoryInfoDatasetSource = 'direct-supabase';
           return {
             pollutants: [],
-            groups: directPayload.groups,
+            categories: directPayload.categories || directPayload.groups,
             timeseries: [],
             nfrCodes: directPayload.nfrCodes || []
           };
@@ -743,7 +743,7 @@
           console.warn('Shared data loader unavailable when preparing category info page.');
         }
 
-        groupInfoDatasetSource = 'unavailable';
+        categoryInfoDatasetSource = 'unavailable';
         return null;
       }
 
@@ -790,11 +790,15 @@
           : Array.isArray(dataset?.data?.pollutants)
             ? dataset.data.pollutants
             : [];
-        const groups = Array.isArray(dataset.groups)
-          ? dataset.groups
-          : Array.isArray(dataset?.data?.groups)
-            ? dataset.data.groups
-            : [];
+        const categories = Array.isArray(dataset.categories)
+          ? dataset.categories
+          : Array.isArray(dataset.groups)
+            ? dataset.groups
+            : Array.isArray(dataset?.data?.categories)
+              ? dataset.data.categories
+              : Array.isArray(dataset?.data?.groups)
+                ? dataset.data.groups
+                : [];
         const timeseries = Array.isArray(dataset.timeseries)
           ? dataset.timeseries
           : Array.isArray(dataset.rows)
@@ -805,7 +809,7 @@
                 ? dataset.data.rows
                 : [];
 
-        const actDataRowsByGroup = new Map();
+        const actDataRowsByCategoryId = new Map();
         let yearColumns = [];
         let actDataPollutant = null;
 
@@ -820,36 +824,36 @@
             }
             timeseries.forEach(row => {
               if (row?.pollutant_id === actDataPollutant.id) {
-                actDataRowsByGroup.set(row.category_id, row);
+                actDataRowsByCategoryId.set(row.category_id, row);
               }
             });
           }
         }
 
-        const supportsActRows = Boolean(actDataPollutant && yearColumns.length && actDataRowsByGroup.size);
-        const hasGroupFlagData = groups.some(group => typeof group?.has_activity_data === 'boolean');
+        const supportsActRows = Boolean(actDataPollutant && yearColumns.length && actDataRowsByCategoryId.size);
+        const hasCategoryFlagData = categories.some(category => typeof category?.has_activity_data === 'boolean');
 
-        if (!supportsActRows && !hasGroupFlagData) {
+        if (!supportsActRows && !hasCategoryFlagData) {
           console.warn('Activity Data signals unavailable; cannot compute ActData availability.');
           return actDataStatus;
         }
 
-        const hasActDataByGroupName = new Map();
-        const hasActDataByGroupId = new Map();
+        const hasActDataByCategoryName = new Map();
+        const hasActDataByCategoryId = new Map();
         const missingNamesSet = new Set();
 
-        groups.forEach(group => {
+        categories.forEach(category => {
           const rawName = normalizeValue(
-            group?.category_title
-            || group?.group_name
-            || group?.name
+            category?.category_title
+            || category?.group_name
+            || category?.name
           );
           if (!rawName) {
             return;
           }
           const key = rawName.toLowerCase();
           let hasActData = false;
-          const actRow = actDataRowsByGroup.get(group.id);
+          const actRow = actDataRowsByCategoryId.get(category.id);
 
           if (actRow && yearColumns.length) {
             hasActData = yearColumns.some(column => {
@@ -862,32 +866,32 @@
             });
           }
 
-          if (!hasActData && typeof group?.has_activity_data === 'boolean') {
-            hasActData = group.has_activity_data;
+          if (!hasActData && typeof category?.has_activity_data === 'boolean') {
+            hasActData = category.has_activity_data;
           }
 
           if (key === 'all') {
             hasActData = false;
           }
 
-          hasActDataByGroupName.set(key, hasActData);
-          hasActDataByGroupId.set(group.id, hasActData);
+          hasActDataByCategoryName.set(key, hasActData);
+          hasActDataByCategoryId.set(category.id, hasActData);
           if (!hasActData) {
             missingNamesSet.add(rawName);
           }
         });
 
         actDataStatus.ready = true;
-        actDataStatus.hasActDataByGroupName = hasActDataByGroupName;
-        actDataStatus.hasActDataByGroupId = hasActDataByGroupId;
-        actDataStatus.groupsWithoutActData = Array.from(missingNamesSet).sort((a, b) => a.localeCompare(b));
+        actDataStatus.hasActDataByCategoryName = hasActDataByCategoryName;
+        actDataStatus.hasActDataByCategoryId = hasActDataByCategoryId;
+        actDataStatus.categoriesWithoutActData = Array.from(missingNamesSet).sort((a, b) => a.localeCompare(b));
 
-        if (actDataStatus.groupsWithoutActData.length) {
-          window.groupsWithoutActData = actDataStatus.groupsWithoutActData.slice();
+        if (actDataStatus.categoriesWithoutActData.length) {
+          window.categoriesWithoutActData = actDataStatus.categoriesWithoutActData.slice();
         }
-        window.inactiveActDataGroupIds = groups
-          .filter(group => hasActDataByGroupId.get(group.id) === false)
-          .map(group => group.id);
+        window.inactiveActDataCategoryIds = categories
+          .filter(category => hasActDataByCategoryId.get(category.id) === false)
+          .map(category => category.id);
 
         return actDataStatus;
       }
@@ -1032,7 +1036,7 @@
           .filter(item => item.length > 0 && !isNullToken(item));
       }
 
-      function buildGroupMaps(groupRows, nfrRows) {
+      function buildCategoryMaps(categoryRows, nfrRows) {
         const nfrMap = {};
         if (Array.isArray(nfrRows)) {
           nfrRows.forEach(row => {
@@ -1046,15 +1050,15 @@
           });
         }
 
-        const groupMap = {};
-        groupRows.forEach(row => {
+        const categoryMap = {};
+        categoryRows.forEach(row => {
           const rawTitle = row?.category_title || row?.group_name || row?.name;
-          const groupTitle = normalizeValue(rawTitle);
-          if (isNullToken(groupTitle)) return;
+          const categoryTitle = normalizeValue(rawTitle);
+          if (isNullToken(categoryTitle)) return;
 
-          if (!groupMap[groupTitle]) {
-            groupMap[groupTitle] = {
-              name: groupTitle,
+          if (!categoryMap[categoryTitle]) {
+            categoryMap[categoryTitle] = {
+              name: categoryTitle,
               sources: new Set(),
               activities: new Set(),
               nfrCodes: new Set()
@@ -1067,12 +1071,12 @@
 
           const sourceValues = splitMultiValue(sourceName);
           if (sourceValues.length) {
-            sourceValues.forEach(item => groupMap[groupTitle].sources.add(item));
+            sourceValues.forEach(item => categoryMap[categoryTitle].sources.add(item));
           }
 
           const activityValues = splitMultiValue(activityName);
           if (activityValues.length) {
-            activityValues.forEach(item => groupMap[groupTitle].activities.add(item));
+            activityValues.forEach(item => categoryMap[categoryTitle].activities.add(item));
           }
 
           const normalizedNfrField = typeof nfrField === 'string' ? nfrField : String(nfrField ?? '');
@@ -1082,11 +1086,11 @@
               .map(code => code.trim())
               .map(normalizeValue)
               .filter(code => !isNullToken(code))
-              .forEach(code => groupMap[groupTitle].nfrCodes.add(code));
+              .forEach(code => categoryMap[categoryTitle].nfrCodes.add(code));
           }
         });
 
-        const groups = Object.values(groupMap)
+        const categories = Object.values(categoryMap)
           .map(g => ({
             name: g.name,
             sources: Array.from(g.sources).sort((a, b) => a.localeCompare(b)),
@@ -1099,35 +1103,35 @@
             return a.name.localeCompare(b.name);
           });
 
-        return { groups, nfrMap };
+        return { categories, nfrMap };
       }
 
-      function collectSourceStrings(group, nfrMap) {
+      function collectSourceStrings(category, nfrMap) {
         const results = [];
-        if (group.nfrCodes.length) {
+        if (category.nfrCodes.length) {
           results.push('All Sources from the following NFR Code categories:');
-          group.nfrCodes.forEach(code => {
+          category.nfrCodes.forEach(code => {
             const description = nfrMap[code];
             results.push(description ? `${code}: ${description}` : code);
           });
-        } else if (group.sources.length) {
-          results.push(...group.sources);
+        } else if (category.sources.length) {
+          results.push(...category.sources);
         } else {
           results.push('All Sources');
         }
         return results;
       }
 
-      function collectFuelStrings(group) {
-        if (group.activities.length) {
-          return [...group.activities];
+      function collectFuelStrings(category) {
+        if (category.activities.length) {
+          return [...category.activities];
         }
         return ['All Fuel Types'];
       }
 
-      function formatSourcesCell(group, nfrMap, highlightRegex) {
-        if (group.nfrCodes.length) {
-          const nfrItems = group.nfrCodes.map(code => {
+      function formatSourcesCell(category, nfrMap, highlightRegex) {
+        if (category.nfrCodes.length) {
+          const nfrItems = category.nfrCodes.map(code => {
             const description = nfrMap[code];
             return description ? `${code}: ${description}` : code;
           });
@@ -1135,40 +1139,40 @@
           return `${heading}${buildItemList(nfrItems, { multiColumnThreshold: 8 }, highlightRegex)}`;
         }
 
-        if (group.sources.length) {
-          return buildItemList(group.sources, { multiColumnThreshold: 8 }, highlightRegex);
+        if (category.sources.length) {
+          return buildItemList(category.sources, { multiColumnThreshold: 8 }, highlightRegex);
         }
 
         return highlightText('All Sources', highlightRegex);
       }
 
-      function formatFuelCell(group, highlightRegex) {
-        if (group.activities.length) {
-          return buildItemList(group.activities, { multiColumnThreshold: 8 }, highlightRegex);
+      function formatFuelCell(category, highlightRegex) {
+        if (category.activities.length) {
+          return buildItemList(category.activities, { multiColumnThreshold: 8 }, highlightRegex);
         }
         return highlightText('All Fuel Types', highlightRegex);
       }
 
-      function hasActDataForGroup(group) {
-        if (!group) {
+      function hasActDataForCategory(category) {
+        if (!category) {
           return false;
         }
-        const normalizedName = normalizeValue(group.name);
+        const normalizedName = normalizeValue(category.name);
         if (!normalizedName) {
           return false;
         }
         const key = normalizedName.toLowerCase();
-        if (actDataStatus.hasActDataByGroupName && actDataStatus.hasActDataByGroupName.has(key)) {
-          return actDataStatus.hasActDataByGroupName.get(key);
+        if (actDataStatus.hasActDataByCategoryName && actDataStatus.hasActDataByCategoryName.has(key)) {
+          return actDataStatus.hasActDataByCategoryName.get(key);
         }
-        if (Array.isArray(group.activities)) {
-          return group.activities.some(item => !isNullToken(item));
+        if (Array.isArray(category.activities)) {
+          return category.activities.some(item => !isNullToken(item));
         }
         return false;
       }
 
-      function getActivityIndicatorInfo(group) {
-        const hasData = hasActDataForGroup(group);
+      function getActivityIndicatorInfo(category) {
+        const hasData = hasActDataForCategory(category);
         const message = hasData ? 'Yes' : 'No';
         const description = hasData ? 'Activity data available' : 'Activity data unavailable';
         const iconSrc = hasData
@@ -1208,7 +1212,7 @@
         return keys;
       }
 
-      function matchesGroup(group, normalizedTerm, columnKeys, nfrMap) {
+      function matchesCategory(category, normalizedTerm, columnKeys, nfrMap) {
         if (!normalizedTerm || !normalizedTerm.tokens || !normalizedTerm.tokens.length) {
           return true;
         }
@@ -1217,7 +1221,7 @@
         const whitespaceRegex = /[\s\u00A0]+/g;
 
         if (!columnKeys.length || columnKeys.includes('name')) {
-          const lowerName = group.name.toLowerCase();
+          const lowerName = category.name.toLowerCase();
           const haystack = lowerName.replace(whitespaceRegex, '');
           if (haystack.includes(combinedNeedle)) {
             return true;
@@ -1229,7 +1233,7 @@
         }
 
         if (!columnKeys.length || columnKeys.includes('sources')) {
-          const sourceStrings = collectSourceStrings(group, nfrMap);
+          const sourceStrings = collectSourceStrings(category, nfrMap);
           if (sourceStrings.some(entry => entry.toLowerCase().replace(whitespaceRegex, '').includes(combinedNeedle))) {
             return true;
           }
@@ -1242,7 +1246,7 @@
         }
 
         if (!columnKeys.length || columnKeys.includes('fuels')) {
-          const fuelStrings = collectFuelStrings(group);
+          const fuelStrings = collectFuelStrings(category);
           if (fuelStrings.some(entry => entry.toLowerCase().replace(whitespaceRegex, '').includes(combinedNeedle))) {
             return true;
           }
@@ -1257,7 +1261,7 @@
         return false;
       }
 
-      function renderGroupTable(groupList, options = {}) {
+      function renderCategoryTable(categoryList, options = {}) {
         const highlightRegex = options.highlightRegex || null;
         const selectedColumns = Array.isArray(options.selectedColumns)
           ? options.selectedColumns
@@ -1266,19 +1270,19 @@
         const nameHighlight = (applyHighlightToAll || selectedColumns.includes('name')) ? highlightRegex : null;
         const sourcesHighlight = (applyHighlightToAll || selectedColumns.includes('sources')) ? highlightRegex : null;
         const fuelHighlight = (applyHighlightToAll || selectedColumns.includes('fuels')) ? highlightRegex : null;
-        const nfrLookup = groupInfoState ? groupInfoState.nfrMap : {};
+        const nfrLookup = categoryInfoState ? categoryInfoState.nfrMap : {};
 
-        if (!Array.isArray(groupList) || !groupList.length) {
-          contentEl.innerHTML = '<p class="text-sm text-gray-600">No groups match the current filter.</p>';
+        if (!Array.isArray(categoryList) || !categoryList.length) {
+          contentEl.innerHTML = '<p class="text-sm text-gray-600">No categories match the current filter.</p>';
           scheduleHeightUpdate(40);
           return;
         }
 
         let tableHtml = `
-          <table id="groupTable" aria-label="NAEI category information">
+          <table id="categoryTable" aria-label="NAEI category information">
             <thead>
               <tr>
-                <th>Group Name</th>
+                <th>Category Name</th>
                 <th class="category-info-activity-column"><span class="category-info-activity-heading" aria-hidden="true">Activity<br>Data</span><span class="sr-only">Activity Data</span></th>
                 <th>Sources</th>
                 <th>Fuel Types (Activity in NAEI data)</th>
@@ -1287,13 +1291,13 @@
             <tbody>
         `;
 
-        groupList.forEach(group => {
-          const activityInfo = getActivityIndicatorInfo(group);
-          const sourcesHtml = formatSourcesCell(group, nfrLookup, sourcesHighlight);
-          const fuelHtml = formatFuelCell(group, fuelHighlight);
+        categoryList.forEach(category => {
+          const activityInfo = getActivityIndicatorInfo(category);
+          const sourcesHtml = formatSourcesCell(category, nfrLookup, sourcesHighlight);
+          const fuelHtml = formatFuelCell(category, fuelHighlight);
           tableHtml += `
             <tr>
-              <td style="font-weight:600;">${highlightText(group.name, nameHighlight)}</td>
+              <td style="font-weight:600;">${highlightText(category.name, nameHighlight)}</td>
               <td class="category-info-activity-cell" data-copy-text="${escapeHtml(activityInfo.description)}">
                 <img src="${activityInfo.iconSrc}" alt="" class="category-info-activity-icon" width="24" height="24" loading="lazy">
                 <span class="sr-only">${escapeHtml(activityInfo.description)}</span>
@@ -1312,25 +1316,25 @@
         scheduleHeightUpdate(60);
       }
 
-      function applyGroupFilters() {
-        if (!groupInfoState) {
+      function applyCategoryFilters() {
+        if (!categoryInfoState) {
           return;
         }
 
         const rawTerm = filterInput ? filterInput.value : '';
         const normalizedTerm = normalizeSearchTerm(rawTerm);
         const columnKeys = getSelectedColumnKeys();
-        let filteredGroups;
+        let filteredCategories;
         let highlightRegex = null;
 
         if (!columnKeys.length) {
-          filteredGroups = groupInfoState.groups.slice();
+          filteredCategories = categoryInfoState.categories.slice();
         } else {
-          filteredGroups = groupInfoState.groups.filter(group => matchesGroup(group, normalizedTerm, columnKeys, groupInfoState.nfrMap));
+          filteredCategories = categoryInfoState.categories.filter(category => matchesCategory(category, normalizedTerm, columnKeys, categoryInfoState.nfrMap));
           highlightRegex = createHighlightRegex(normalizedTerm);
         }
 
-        renderGroupTable(filteredGroups, {
+        renderCategoryTable(filteredCategories, {
           highlightRegex: columnKeys.length ? highlightRegex : null,
           selectedColumns: columnKeys
         });
@@ -1374,18 +1378,18 @@
         if (filterInput) {
           filterInput.addEventListener('input', () => {
             if (!isFilterInputActive()) return;
-            applyGroupFilters();
+            applyCategoryFilters();
           });
           filterInput.addEventListener('search', () => {
             if (!isFilterInputActive()) return;
-            applyGroupFilters();
+            applyCategoryFilters();
           });
         }
 
         columnCheckboxes.forEach(box => {
           box.addEventListener('change', event => {
             handleColumnCheckboxChange(event.currentTarget);
-            applyGroupFilters();
+            applyCategoryFilters();
           });
         });
 
@@ -1413,7 +1417,7 @@
 
           if (!textToCopy) return;
 
-          const successMessage = 'Copied group details to clipboard.';
+          const successMessage = 'Copied category details to clipboard.';
 
           const onSuccess = () => {
             setStatus(successMessage, false);
@@ -1465,24 +1469,28 @@
         });
       }
 
-      async function loadGroupInfo() {
+      async function loadCategoryInfo() {
         showLoadingOverlay();
 
         const dataset = await ensureSharedDataLoaded();
         await ensureActDataStatus();
 
-        let groupRows = [];
+        let categoryRows = [];
         let nfrRows = [];
 
         try {
-          if (dataset && Array.isArray(dataset.groups) && dataset.groups.length) {
-            groupRows = dataset.groups.slice();
+          if (dataset && Array.isArray(dataset.categories) && dataset.categories.length) {
+            categoryRows = dataset.categories.slice();
+          } else if (dataset && Array.isArray(dataset.groups) && dataset.groups.length) {
+            categoryRows = dataset.groups.slice();
           } else {
             const loader = resolveSharedDataLoader();
             if (loader && loader.isDataLoaded?.()) {
               const cached = loader.getCachedData();
-              if (cached?.groups?.length) {
-                groupRows = cached.groups.slice();
+              if (cached?.categories?.length) {
+                categoryRows = cached.categories.slice();
+              } else if (cached?.groups?.length) {
+                categoryRows = cached.groups.slice();
               }
               if (cached?.nfrCodes?.length) {
                 nfrRows = cached.nfrCodes.slice();
@@ -1497,7 +1505,7 @@
           nfrRows = dataset.nfrCodes.slice();
         }
 
-        if (!groupRows.length) {
+        if (!categoryRows.length) {
           contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Unable to load category information right now. Please try again later.</p>";
           setStatus('', true);
           hideLoadingOverlay();
@@ -1505,9 +1513,9 @@
           return;
         }
 
-        const { groups, nfrMap } = buildGroupMaps(groupRows, nfrRows);
+        const { categories, nfrMap } = buildCategoryMaps(categoryRows, nfrRows);
 
-        if (!groups.length) {
+        if (!categories.length) {
           contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ No category information is available.</p>";
           setStatus('', true);
           hideLoadingOverlay();
@@ -1515,24 +1523,24 @@
           return;
         }
 
-        groupInfoState = {
-          groups,
+        categoryInfoState = {
+          categories,
           nfrMap
         };
 
         setupFilterControls();
-        applyGroupFilters();
+        applyCategoryFilters();
         setStatus('', true);
         hideLoadingOverlay();
         scheduleHeightUpdate(30);
 
-        if (groupInfoDatasetSource === 'direct-supabase') {
+        if (categoryInfoDatasetSource === 'direct-supabase') {
           requestSharedDatasetBootstrap('category-info-direct');
         }
       }
 
       document.addEventListener('DOMContentLoaded', () => {
-        loadGroupInfo().catch(error => {
+        loadCategoryInfo().catch(error => {
           console.error('Failed to load category info page:', error);
           contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Something went wrong while loading category information.</p>";
           setStatus('', true);
