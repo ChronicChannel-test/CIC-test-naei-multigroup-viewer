@@ -15,6 +15,21 @@ function sanitizeFilenameSegment(value) {
     || 'NA';
 }
 
+function formatCsvCell(value) {
+  if (window.NAEICsvUtils?.formatCsvCell) {
+    return window.NAEICsvUtils.formatCsvCell(value);
+  }
+  if (value === null || value === undefined) {
+    return '';
+  }
+  const stringValue = String(value);
+  if (stringValue === '') {
+    return '';
+  }
+  const escaped = stringValue.replace(/"/g, '""');
+  return /[",\n]/.test(stringValue) ? `"${escaped}"` : escaped;
+}
+
 function buildLineFilenameBase({ startYear, endYear, pollutantName, firstGroupName }) {
   const pollutantShort = typeof window.supabaseModule?.getPollutantShortName === 'function'
     ? window.supabaseModule.getPollutantShortName(pollutantName)
@@ -124,7 +139,9 @@ function exportData(format = 'csv') {
 
   // --- Generate and download file ---
   if (format === 'csv') {
-    const csvContent = rows.map(r => r.join(',')).join('\n');
+    const csvContent = rows
+      .map(row => row.map(cell => formatCsvCell(cell)).join(','))
+      .join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);

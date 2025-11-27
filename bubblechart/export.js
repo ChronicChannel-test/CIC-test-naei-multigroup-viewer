@@ -1319,11 +1319,26 @@ function exportData(format = 'csv') {
     maximumFractionDigits: 20
   });
 
+  const applyCsvCellFormat = (value) => {
+    if (window.NAEICsvUtils?.formatCsvCell) {
+      return window.NAEICsvUtils.formatCsvCell(value);
+    }
+    if (value === null || value === undefined) {
+      return '';
+    }
+    const stringValue = String(value);
+    if (stringValue === '') {
+      return '';
+    }
+    const escaped = stringValue.replace(/"/g, '""');
+    return /[",\n]/.test(stringValue) ? `"${escaped}"` : escaped;
+  };
+
   const formatCsvValue = (value) => {
     if (typeof value === 'number' && Number.isFinite(value)) {
-      return csvNumberFormatter.format(value);
+      return applyCsvCellFormat(csvNumberFormatter.format(value));
     }
-    return value ?? '';
+    return applyCsvCellFormat(value ?? '');
   };
 
   const toNumberOrEmpty = (value) => {
