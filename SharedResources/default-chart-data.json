@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2025-11-20T22:01:30.095Z",
+  "generatedAt": "2025-11-26T19:05:16.537Z",
   "source": "supabase",
   "defaults": {
     "lineChart": {
       "pollutant": "PM2.5",
-      "groups": [
+      "categories": [
         "All"
       ],
       "startYear": 1970,
@@ -13,7 +13,7 @@
     "bubbleChart": {
       "pollutant": "PM2.5",
       "activityPollutant": "Activity Data",
-      "groups": [
+      "categories": [
         "Ecodesign Stove - Ready To Burn",
         "Gas Boilers"
       ],
@@ -296,350 +296,350 @@
         "pollutant": "Zinc"
       }
     ],
-    "groups": [
+    "categories": [
       {
         "id": 2,
-        "group_title": "Advanced Stove - All fuels",
+        "category_title": "Advanced Stove - All fuels",
         "has_activity_data": true
       },
       {
         "id": 3,
-        "group_title": "Advanced Stove - All fuels excluding Ready To Burn",
+        "category_title": "Advanced Stove - All fuels excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 4,
-        "group_title": "Advanced Stove - All wood",
+        "category_title": "Advanced Stove - All wood",
         "has_activity_data": true
       },
       {
         "id": 67,
-        "group_title": "Advanced Stove - Dry wood",
+        "category_title": "Advanced Stove - Dry wood",
         "has_activity_data": true
       },
       {
         "id": 5,
-        "group_title": "Advanced Stove - Ready To Burn",
+        "category_title": "Advanced Stove - Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 6,
-        "group_title": "Advanced Stove - Wood excluding Ready To Burn",
+        "category_title": "Advanced Stove - Wood excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 1,
-        "group_title": "All",
+        "category_title": "All",
         "has_activity_data": true
       },
       {
         "id": 55,
-        "group_title": "All Stoves - All fuels",
+        "category_title": "All Stoves - All fuels",
         "has_activity_data": true
       },
       {
         "id": 56,
-        "group_title": "All Stoves - All fuels excluding Ready To Burn",
+        "category_title": "All Stoves - All fuels excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 57,
-        "group_title": "All Stoves - All wood",
+        "category_title": "All Stoves - All wood",
         "has_activity_data": true
       },
       {
         "id": 58,
-        "group_title": "All Stoves - Ready To Burn",
+        "category_title": "All Stoves - Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 59,
-        "group_title": "All Stoves - Wood excluding Ready To Burn",
+        "category_title": "All Stoves - Wood excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 7,
-        "group_title": "Basic Stove - All fuels",
+        "category_title": "Basic Stove - All fuels",
         "has_activity_data": true
       },
       {
         "id": 8,
-        "group_title": "Basic Stove - All fuels excluding Ready To Burn",
+        "category_title": "Basic Stove - All fuels excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 9,
-        "group_title": "Basic Stove - All wood",
+        "category_title": "Basic Stove - All wood",
         "has_activity_data": true
       },
       {
         "id": 68,
-        "group_title": "Basic Stove - Dry wood",
+        "category_title": "Basic Stove - Dry wood",
         "has_activity_data": true
       },
       {
         "id": 10,
-        "group_title": "Basic Stove - Ready To Burn",
+        "category_title": "Basic Stove - Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 11,
-        "group_title": "Basic Stove - Wood excluding Ready To Burn",
+        "category_title": "Basic Stove - Wood excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 64,
-        "group_title": "Bonfire night",
+        "category_title": "Bonfire night",
         "has_activity_data": false
       },
       {
         "id": 12,
-        "group_title": "Cigarette smoking",
+        "category_title": "Cigarette smoking",
         "has_activity_data": false
       },
       {
         "id": 61,
-        "group_title": "Crematoria",
+        "category_title": "Crematoria",
         "has_activity_data": false
       },
       {
         "id": 13,
-        "group_title": "Domestic Combustion - Residential",
+        "category_title": "Domestic Combustion - Residential",
         "has_activity_data": true
       },
       {
         "id": 14,
-        "group_title": "Domestic Outdoor - All",
+        "category_title": "Domestic Outdoor - All",
         "has_activity_data": true
       },
       {
         "id": 15,
-        "group_title": "Domestic Outdoor - Charcoal",
+        "category_title": "Domestic Outdoor - Charcoal",
         "has_activity_data": true
       },
       {
         "id": 16,
-        "group_title": "Domestic Outdoor - Coal",
+        "category_title": "Domestic Outdoor - Coal",
         "has_activity_data": true
       },
       {
         "id": 17,
-        "group_title": "Ecodesign Stove - All fuels",
+        "category_title": "Ecodesign Stove - All fuels",
         "has_activity_data": true
       },
       {
         "id": 18,
-        "group_title": "Ecodesign Stove - All fuels excluding Ready To Burn",
+        "category_title": "Ecodesign Stove - All fuels excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 19,
-        "group_title": "Ecodesign Stove - All wood",
+        "category_title": "Ecodesign Stove - All wood",
         "has_activity_data": true
       },
       {
         "id": 65,
-        "group_title": "Ecodesign Stove - Dry wood",
+        "category_title": "Ecodesign Stove - Dry wood",
         "has_activity_data": true
       },
       {
         "id": 20,
-        "group_title": "Ecodesign Stove - Ready To Burn",
+        "category_title": "Ecodesign Stove - Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 21,
-        "group_title": "Ecodesign Stove - Wood excluding Ready To Burn",
+        "category_title": "Ecodesign Stove - Wood excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 22,
-        "group_title": "Fireplace - All fuels",
+        "category_title": "Fireplace - All fuels",
         "has_activity_data": true
       },
       {
         "id": 23,
-        "group_title": "Fireplace - All fuels excluding Ready To Burn",
+        "category_title": "Fireplace - All fuels excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 24,
-        "group_title": "Fireplace - All wood",
+        "category_title": "Fireplace - All wood",
         "has_activity_data": true
       },
       {
         "id": 66,
-        "group_title": "Fireplace - Dry wood",
+        "category_title": "Fireplace - Dry wood",
         "has_activity_data": true
       },
       {
         "id": 25,
-        "group_title": "Fireplace - Ready To Burn",
+        "category_title": "Fireplace - Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 26,
-        "group_title": "Fireplace - Wood excluding Ready To Burn",
+        "category_title": "Fireplace - Wood excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 27,
-        "group_title": "Fireplace & All Stoves - All fuels",
+        "category_title": "Fireplace & All Stoves - All fuels",
         "has_activity_data": true
       },
       {
         "id": 28,
-        "group_title": "Fireplace & All Stoves - All fuels excluding Ready To Burn",
+        "category_title": "Fireplace & All Stoves - All fuels excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 29,
-        "group_title": "Fireplace & All Stoves - All wood",
+        "category_title": "Fireplace & All Stoves - All wood",
         "has_activity_data": true
       },
       {
         "id": 30,
-        "group_title": "Fireplace & All Stoves - Ready To Burn",
+        "category_title": "Fireplace & All Stoves - Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 31,
-        "group_title": "Fireplace & All Stoves - Wood excluding Ready To Burn",
+        "category_title": "Fireplace & All Stoves - Wood excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 32,
-        "group_title": "Fireplace & Stoves excluding Ecodesign - All fuels",
+        "category_title": "Fireplace & Stoves excluding Ecodesign - All fuels",
         "has_activity_data": true
       },
       {
         "id": 33,
-        "group_title": "Fireplace & Stoves excluding Ecodesign - All fuels excluding Ready To Burn",
+        "category_title": "Fireplace & Stoves excluding Ecodesign - All fuels excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 34,
-        "group_title": "Fireplace & Stoves excluding Ecodesign - All wood",
+        "category_title": "Fireplace & Stoves excluding Ecodesign - All wood",
         "has_activity_data": true
       },
       {
         "id": 35,
-        "group_title": "Fireplace & Stoves excluding Ecodesign - Ready To Burn",
+        "category_title": "Fireplace & Stoves excluding Ecodesign - Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 36,
-        "group_title": "Fireplace & Stoves excluding Ecodesign - Wood excluding Ready To Burn",
+        "category_title": "Fireplace & Stoves excluding Ecodesign - Wood excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 37,
-        "group_title": "Gas Boilers",
+        "category_title": "Gas Boilers",
         "has_activity_data": true
       },
       {
         "id": 38,
-        "group_title": "Power Stations - All fuels",
+        "category_title": "Power Stations - All fuels",
         "has_activity_data": true
       },
       {
         "id": 39,
-        "group_title": "Power Stations - All fuels excluding Natural gas",
+        "category_title": "Power Stations - All fuels excluding Natural gas",
         "has_activity_data": true
       },
       {
         "id": 62,
-        "group_title": "Power Stations - All fuels excluding Wood",
+        "category_title": "Power Stations - All fuels excluding Wood",
         "has_activity_data": true
       },
       {
         "id": 40,
-        "group_title": "Power Stations - Natural gas",
+        "category_title": "Power Stations - Natural gas",
         "has_activity_data": true
       },
       {
         "id": 41,
-        "group_title": "Power Stations - Wood",
+        "category_title": "Power Stations - Wood",
         "has_activity_data": false
       },
       {
         "id": 63,
-        "group_title": "Residential Outdoor - All Appliances",
+        "category_title": "Residential Outdoor - All Appliances",
         "has_activity_data": false
       },
       {
         "id": 60,
-        "group_title": "Residential Outdoor - Appliance including chimineas, firepits etc",
+        "category_title": "Residential Outdoor - Appliance including chimineas, firepits etc",
         "has_activity_data": true
       },
       {
         "id": 42,
-        "group_title": "Road Transport - All - Exhausts Tyre & Brake Wear",
+        "category_title": "Road Transport - All - Exhausts Tyre & Brake Wear",
         "has_activity_data": true
       },
       {
         "id": 43,
-        "group_title": "Road Transport - Buses & Coaches Exhaust",
+        "category_title": "Road Transport - Buses & Coaches Exhaust",
         "has_activity_data": true
       },
       {
         "id": 44,
-        "group_title": "Road Transport - Cars Exhaust",
+        "category_title": "Road Transport - Cars Exhaust",
         "has_activity_data": true
       },
       {
         "id": 45,
-        "group_title": "Road Transport - Exhausts Only",
+        "category_title": "Road Transport - Exhausts Only",
         "has_activity_data": true
       },
       {
         "id": 46,
-        "group_title": "Road Transport - HGV Exhaust",
+        "category_title": "Road Transport - HGV Exhaust",
         "has_activity_data": true
       },
       {
         "id": 47,
-        "group_title": "Road Transport - LGV Exhaust",
+        "category_title": "Road Transport - LGV Exhaust",
         "has_activity_data": true
       },
       {
         "id": 48,
-        "group_title": "Road Transport - Mopeds and Motorcycles Exhaust",
+        "category_title": "Road Transport - Mopeds and Motorcycles Exhaust",
         "has_activity_data": true
       },
       {
         "id": 49,
-        "group_title": "Road Transport - Tyre & Brake Wear",
+        "category_title": "Road Transport - Tyre & Brake Wear",
         "has_activity_data": false
       },
       {
         "id": 50,
-        "group_title": "Upgraded Stove - All fuels",
+        "category_title": "Upgraded Stove - All fuels",
         "has_activity_data": true
       },
       {
         "id": 51,
-        "group_title": "Upgraded Stove - All fuels excluding Ready To Burn",
+        "category_title": "Upgraded Stove - All fuels excluding Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 52,
-        "group_title": "Upgraded Stove - All wood",
+        "category_title": "Upgraded Stove - All wood",
         "has_activity_data": true
       },
       {
         "id": 69,
-        "group_title": "Upgraded Stove - Dry wood",
+        "category_title": "Upgraded Stove - Dry wood",
         "has_activity_data": true
       },
       {
         "id": 53,
-        "group_title": "Upgraded Stove - Ready To Burn",
+        "category_title": "Upgraded Stove - Ready To Burn",
         "has_activity_data": true
       },
       {
         "id": 54,
-        "group_title": "Upgraded Stove - Wood excluding Ready To Burn",
+        "category_title": "Upgraded Stove - Wood excluding Ready To Burn",
         "has_activity_data": true
       }
     ],
@@ -647,7 +647,7 @@
       {
         "id": 5,
         "pollutant_id": 5,
-        "group_id": 1,
+        "category_id": 1,
         "f1970": 625.215820341663,
         "f1971": 566.717591715661,
         "f1972": 500.468331119182,
@@ -706,25 +706,25 @@
       {
         "id": 1070,
         "pollutant_id": 5,
-        "group_id": 20,
+        "category_id": 20,
         "f2023": 0.674474743880626
       },
       {
         "id": 1118,
         "pollutant_id": 61,
-        "group_id": 20,
+        "category_id": 20,
         "f2023": 6331.21462135507
       },
       {
         "id": 2029,
         "pollutant_id": 5,
-        "group_id": 37,
+        "category_id": 37,
         "f2023": 0.154583189159025
       },
       {
         "id": 2052,
         "pollutant_id": 61,
-        "group_id": 37,
+        "category_id": 37,
         "f2023": 751230.624272879
       }
     ],

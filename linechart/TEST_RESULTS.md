@@ -69,15 +69,15 @@ All 20 required functions verified to exist:
 ### Global Variable Sharing
 Variables defined at the top level in supabase.js are accessible globally:
 - `pollutantUnits`
-- `groupedData`
+- `categorisedData`
 - `pollutantsData`
-- `groupsData`
+- `categoriesData`
 - `allPollutants`
-- `allGroups`
+- `allCategories`
 
 Variables explicitly exposed on window object:
 - `window.smoothLines` (from main.js)
-- `window.allGroupsList` (from supabase.js)
+- `window.allCategoriesList` (from supabase.js)
 - `window.allPollutants` (from supabase.js)
 - `window.globalHeaders` (from supabase.js)
 - `window.globalYears` (from supabase.js)
@@ -115,9 +115,9 @@ The following external CDN resources are required but blocked in automated testi
 1. Open v2.3-modular-CIC-testdb/index.html in a real browser
 2. Verify loading spinner appears initially
 3. Verify spinner disappears after data loads (typically 2-5 seconds)
-4. Verify default chart (PM2.5 for "All" group) renders
+4. Verify default chart (PM2.5 for "All" category) renders
 5. Test pollutant selection changes
-6. Test adding/removing groups
+6. Test adding/removing categories
 7. Test year range selection
 8. Test chart download (PNG)
 9. Test data export (CSV and Excel)

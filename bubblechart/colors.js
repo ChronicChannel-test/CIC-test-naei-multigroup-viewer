@@ -39,11 +39,11 @@ function resetColorSystem() {
 }
 
 /**
- * Get a consistent color for a group/series name
- * @param {string} name - Group or series name
+ * Get a consistent color for a category/series name
+ * @param {string} name - Category or series name
  * @returns {string} Hex color code
  */
-function getColorForGroup(name) {
+function getColorForCategory(name) {
   if (!name) return '#888888';
   if (colorCache[name]) return colorCache[name];
 
@@ -78,10 +78,10 @@ function getColorCache() {
 
 /**
  * Set a specific color for a name
- * @param {string} name - Group or series name
+ * @param {string} name - Category or series name
  * @param {string} color - Hex color code
  */
-function setColorForGroup(name, color) {
+function setColorForCategory(name, color) {
   colorCache[name] = color;
 }
 
@@ -90,7 +90,7 @@ window.Colors = {
   distinctPalette,
   categoryBaseColor,
   resetColorSystem,
-  getColorForGroup,
+  getColorForCategory,
   getColorCache,
-  setColorForGroup
+  setColorForCategory
 };

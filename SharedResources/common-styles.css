@@ -144,6 +144,42 @@ button:disabled {
   cursor: not-allowed; 
 }
 
+/* Primary control buttons (downloads, smoothing toggle, share) */
+#downloadBtn,
+#downloadCSVBtn,
+#downloadXLSXBtn,
+#toggleSmoothBtn,
+#shareBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  line-height: 1.2;
+}
+
+#downloadBtn,
+#downloadCSVBtn,
+#downloadXLSXBtn,
+#shareBtn,
+#toggleSmoothBtn {
+  justify-content: center;
+  text-align: center;
+}
+
+#downloadBtn .control-button-icon,
+#downloadCSVBtn .control-button-icon,
+#downloadXLSXBtn .control-button-icon {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+#shareBtn span {
+  display: inline-flex;
+  align-items: center;
+}
+
 /* Select dropdown styling */
 select {
   background: #fff;
@@ -340,19 +376,19 @@ button {
   max-width: unset !important;
 }
 
-/* Group management */
-#groupContainer { 
+/* Category management */
+#categoryContainer { 
   margin-top: 10px; 
 }
 
-.groupRow { 
+.categoryRow { 
   display: flex; 
   align-items: center; 
   gap: 8px; 
   margin: 4px 0; 
 }
 
-.groupRow.dragging { 
+.categoryRow.dragging { 
   opacity: 0.5; 
 }
 
@@ -364,7 +400,7 @@ button {
   border-radius: 6px; 
 }
 
-.group-control { 
+.category-control { 
   display: inline-flex; 
   align-items: center; 
   gap: 8px; 
@@ -392,8 +428,8 @@ button {
 
 .remove-icon {
   display: inline-block;
-  width: 19px;
-  height: 19px;
+  width: 20px;
+  height: 20px;
   background-image: url('images/No-Entry-Icon-200x200.svg');
   background-repeat: no-repeat;
   background-position: center;
@@ -403,8 +439,8 @@ button {
 
 .add-icon {
   display: inline-block;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   background-image: url('images/Green-Square-Button-White-Plus-Add-200x200.svg');
   background-repeat: no-repeat;
   background-position: center;
@@ -413,14 +449,42 @@ button {
 }
 
 .share-icon {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  background-image: url('images/chain-link-icon-black.svg');
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background-image: url('images/chain-link-icon-grey.svg');
   background-repeat: no-repeat;
   background-position: center;
   background-size: contain;
   flex-shrink: 0;
+}
+
+.smoothing-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+  flex-shrink: 0;
+}
+
+.smoothing-icon.smoothing-icon-enable {
+  background-image: url('images/Green-Square-Button-White-Tick-200x200.svg');
+}
+
+.smoothing-icon.smoothing-icon-disable {
+  background-image: url('images/Red-Square-Button-White-Cross-200x200.svg');
+}
+
+.smoothing-label-text {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
 }
 
 /* Modal/Dialog styles */

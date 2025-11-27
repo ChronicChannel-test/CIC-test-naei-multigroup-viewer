@@ -114,32 +114,39 @@ function ensureInitialized() {
 let globalRows = [];
 let globalHeaders = [];
 let pollutantUnits = {};
-let groupedData = {};
-let allGroupsList = [];
+let categorisedData = {};
+let allCategoriesList = [];
 let allPollutants = [];
-let allGroups = [];
-let activeActDataGroups = [];
-let activeActDataGroupIds = [];
-let inactiveActDataGroupIds = [];
+let allCategories = [];
+let activeActDataCategories = [];
+let activeActDataCategoryIds = [];
+let inactiveActDataCategoryIds = [];
 let pollutantsData = []; // Store raw pollutant data for ID lookups
-let groupsData = []; // Store raw group data for ID lookups
+let categoriesData = []; // Store raw category data for ID lookups
 let actDataPollutantId = null;
 
 const ACTIVITY_POLLUTANT_NAME = 'Activity Data';
 const DEFAULT_BUBBLE_POLLUTANT_NAME = 'PM2.5';
 const DEFAULT_BUBBLE_POLLUTANT_ID = 5;
-const DEFAULT_BUBBLE_GROUP_TITLES = [
+const DEFAULT_BUBBLE_CATEGORY_TITLES = [
   'Ecodesign Stove - Ready To Burn',
   'Gas Boilers'
 ];
-const DEFAULT_BUBBLE_GROUP_IDS = [20, 37];
+const DEFAULT_BUBBLE_CATEGORY_IDS = [20, 37];
 const DEFAULT_BUBBLE_YEAR = 2023;
 let hasFullDataset = false;
 let latestDatasetSource = null;
 const hydrationListeners = new Set();
-const urlOverrideParams = ['pollutant','pollutantId','group','groupId','groupIds','group_ids','activityGroup','actGroup','dataset','year'];
-let groupMetadataCache = null;
-let groupMetadataPromise = null;
+const urlOverrideParams = [
+  'pollutant','pollutantId',
+  'category','categoryId','categoryIds','category_ids',
+  'category','groupId','groupIds','group_ids',
+  'activityCategory','actCategory',
+  'activityGroup','actGroup',
+  'dataset','year'
+];
+let categoryMetadataCache = null;
+let categoryMetadataPromise = null;
 let sharedLoaderReference = null;
 let bubbleInitialDatasetInfo = null;
 let bubbleFullDatasetPromise = null;
@@ -181,7 +188,7 @@ function matchesNameSet(values = [], defaults = []) {
 }
 
 function isDefaultBubbleSelection(params = getEffectiveBubbleUrlParams()) {
-  const overrideExclusiveParams = ['dataset', 'activityGroup', 'actGroup'];
+  const overrideExclusiveParams = ['dataset', 'activityCategory', 'actCategory', 'activityGroup', 'actGroup'];
   if (!isBubbleChartActive(params)) {
     return true;
   }
@@ -197,32 +204,37 @@ function isDefaultBubbleSelection(params = getEffectiveBubbleUrlParams()) {
   const pollutantNames = parseNameList(
     params.get('pollutant')
   );
-  const groupIds = parseIdList(
-    params.get('group_ids')
+  const categoryIds = parseIdList(
+    params.get('category_ids')
+    || params.get('categoryIds')
+    || params.get('categoryId')
+    || params.get('group_ids')
     || params.get('groupIds')
     || params.get('groupId')
   );
-  const groupNames = parseNameList(
-    params.get('groups')
-    || params.get('group')
+  const categoryNames = parseNameList(
+    params.get('categories')
+    || params.get('category')
+    || params.get('categories')
+    || params.get('category')
   );
 
   const pollutantIdsDefault = !pollutantIds.length
     || matchesNumericSet(pollutantIds, [DEFAULT_BUBBLE_POLLUTANT_ID]);
   const pollutantNamesDefault = !pollutantNames.length
     || matchesNameSet(pollutantNames, [DEFAULT_BUBBLE_POLLUTANT_NAME]);
-  const groupIdsDefault = !groupIds.length
-    || matchesNumericSet(groupIds, DEFAULT_BUBBLE_GROUP_IDS);
-  const groupNamesDefault = !groupNames.length
-    || matchesNameSet(groupNames, DEFAULT_BUBBLE_GROUP_TITLES);
+  const categoryIdsDefault = !categoryIds.length
+    || matchesNumericSet(categoryIds, DEFAULT_BUBBLE_CATEGORY_IDS);
+  const categoryNamesDefault = !categoryNames.length
+    || matchesNameSet(categoryNames, DEFAULT_BUBBLE_CATEGORY_TITLES);
   const yearParam = params.get('year');
   const yearDefault = !yearParam || Number(yearParam) === DEFAULT_BUBBLE_YEAR;
 
   return (
     pollutantIdsDefault
     && pollutantNamesDefault
-    && groupIdsDefault
-    && groupNamesDefault
+    && categoryIdsDefault
+    && categoryNamesDefault
     && yearDefault
   );
 }
@@ -315,32 +327,36 @@ function buildBubbleHeroOptions() {
   const pollutantNames = parseNameList(
     params.get('pollutant')
   );
-  const groupIds = parseIdList(
-    params.get('group_ids')
+  const categoryIds = parseIdList(
+    params.get('category_ids')
+    || params.get('categoryIds')
+    || params.get('group_ids')
     || params.get('groupIds')
   );
-  const groupNames = parseNameList(
-    params.get('groups')
-    || params.get('group')
+  const categoryNames = parseNameList(
+    params.get('categories')
+    || params.get('category')
+    || params.get('categories')
+    || params.get('category')
   );
 
   if (!pollutantIds.length && !pollutantNames.length) {
     pollutantNames.push(DEFAULT_BUBBLE_POLLUTANT_NAME);
   }
 
-  if (!groupIds.length && !groupNames.length) {
-    groupNames.push(...DEFAULT_BUBBLE_GROUP_TITLES);
+  if (!categoryIds.length && !categoryNames.length) {
+    categoryNames.push(...DEFAULT_BUBBLE_CATEGORY_TITLES);
   }
 
   return {
     pollutantIds,
     pollutantNames,
-    groupIds,
-    groupNames,
+    categoryIds,
+    categoryNames,
     includeActivityData: true,
     activityPollutantName: ACTIVITY_POLLUTANT_NAME,
     defaultPollutantNames: [DEFAULT_BUBBLE_POLLUTANT_NAME],
-    defaultGroupNames: DEFAULT_BUBBLE_GROUP_TITLES
+    defaultCategoryNames: DEFAULT_BUBBLE_CATEGORY_TITLES
   };
 }
 
@@ -365,7 +381,7 @@ async function loadBubbleHeroDataset(sharedLoader) {
   }
   bubbleDataInfoLog('Requesting bubble hero dataset', {
     pollutants: options.pollutantIds.length || options.pollutantNames.length,
-    groups: options.groupIds.length || options.groupNames.length
+    categories: options.categoryIds.length || options.categoryNames.length
   });
   try {
     const heroDataset = await loader.loadHeroDataset(options);
@@ -403,75 +419,78 @@ async function resolveSharedLoader() {
   return window.SharedDataLoader || null;
 }
 
-function getCachedGroupMetadata(sharedLoader) {
+function getCachedCategoryMetadata(sharedLoader) {
   try {
     if (sharedLoader?.isDataLoaded()) {
       const cached = sharedLoader.getCachedData();
-      if (Array.isArray(cached?.groups) && cached.groups.length) {
-        return cached.groups;
+      if (Array.isArray(cached?.categories) && cached.categories.length) {
+        return cached.categories;
       }
     }
   } catch (error) {
   }
 
-  if (window.SharedDataCache?.data?.groups?.length) {
-    return window.SharedDataCache.data.groups;
+  if (window.SharedDataCache?.data?.categories?.length) {
+    return window.SharedDataCache.data.categories;
   }
 
   return null;
 }
 
-async function ensureAllGroupMetadata(sharedLoader) {
-  if (Array.isArray(groupMetadataCache) && groupMetadataCache.length) {
-    return groupMetadataCache;
+async function ensureAllCategoryMetadata(sharedLoader) {
+  if (Array.isArray(categoryMetadataCache) && categoryMetadataCache.length) {
+    return categoryMetadataCache;
   }
 
-  const cachedGroups = getCachedGroupMetadata(sharedLoader);
+  const cachedGroups = getCachedCategoryMetadata(sharedLoader);
   if (Array.isArray(cachedGroups) && cachedGroups.length) {
-    groupMetadataCache = cachedGroups;
-    return groupMetadataCache;
+    categoryMetadataCache = cachedGroups;
+    return categoryMetadataCache;
   }
 
-  if (!groupMetadataPromise) {
-    groupMetadataPromise = (async () => {
+  if (!categoryMetadataPromise) {
+    categoryMetadataPromise = (async () => {
       const client = ensureInitialized();
       if (!client) {
-        throw new Error('Supabase client not available for group metadata');
+        throw new Error('Supabase client not available for category metadata');
       }
-      const response = await client.from('NAEI_global_t_Group').select('*');
+      const response = await client.from('naei_global_t_category').select('*');
       if (response.error) {
         throw response.error;
       }
-      groupMetadataCache = response.data || [];
-      return groupMetadataCache;
+      categoryMetadataCache = response.data || [];
+      return categoryMetadataCache;
     })().catch(error => {
-      console.error('Failed to fetch group metadata:', error);
-      groupMetadataPromise = null;
+      console.error('Failed to fetch category metadata:', error);
+      categoryMetadataPromise = null;
       throw error;
     });
   }
 
-  return groupMetadataPromise;
+  return categoryMetadataPromise;
 }
 
-function mergeGroupCollections(primary = [], secondary = []) {
+function mergeCategoryCollections(primary = [], secondary = []) {
   const merged = [];
   const seen = new Set();
 
-  const push = (group) => {
-    if (!group || typeof group !== 'object') {
+  const push = (category) => {
+    if (!category || typeof category !== 'object') {
       return;
     }
-    const key = group.id ?? group.group_id ?? group.group_title;
+    const key = category.id
+      ?? category.category_id
+      ?? category.category_title
+      ?? category.group_name;
     if (key == null) {
-      merged.push(group);
+      merged.push(category);
       return;
     }
     if (seen.has(key)) {
       return;
     }
     seen.add(key);
-    merged.push(group);
+    merged.push(category);
   };
 
   primary.forEach(push);
@@ -530,7 +549,7 @@ function triggerBubbleFullDatasetBootstrap(sharedLoader, reason = 'bubble-chart'
     if (!payload) return payload;
     applyHydratedDataset({
       pollutants: payload.pollutants || [],
-      groups: payload.groups || [],
+      categories: payload.categories || [],
       rows: payload.timeseries || payload.rows || payload.data || []
     }, source);
     return payload;
@@ -587,10 +606,20 @@ async function loadData(options = {}) {
     });
 
     let pollutants = [];
-    let groups = [];
+    let categories = [];
     let rows = [];
     let metadataPollutants = [];
-    let metadataGroups = [];
+    let metadataCategories = [];
+    const selectCategoriesArray = (source) => {
+      if (!source) return [];
+      if (Array.isArray(source.categories)) {
+        return source.categories;
+      }
+      if (Array.isArray(source.categories)) {
+        return source.categories;
+      }
+      return [];
+    };
 
     let selectorMetadata = null;
     let selectorMetadataLoaded = false;
@@ -606,18 +635,18 @@ async function loadData(options = {}) {
       return selectorMetadata;
     };
 
-    const haveData = () => pollutants.length && groups.length && rows.length;
+    const haveData = () => pollutants.length && categories.length && rows.length;
 
     if (sharedLoader?.isDataLoaded()) {
       const cachedData = sharedLoader.getCachedData();
       pollutants = cachedData.pollutants;
-      groups = cachedData.groups;
+      categories = selectCategoriesArray(cachedData);
       rows = cachedData.timeseries;
       hasFullDataset = true;
       latestDatasetSource = 'cache';
       bubbleDataInfoLog('Bubble chart hydrated from shared cache', {
         pollutants: pollutants.length,
-        groups: groups.length,
+        categories: categories.length,
         rows: rows.length
       });
     }
@@ -675,19 +704,19 @@ async function loadData(options = {}) {
         if (initialResult?.source === 'supabase') {
           const payload = initialResult.payload || {};
           pollutants = payload.pollutants || [];
-          groups = payload.groups || [];
+          categories = selectCategoriesArray(payload);
           rows = payload.timeseries || payload.rows || payload.data || [];
           hasFullDataset = true;
           latestDatasetSource = 'shared-bootstrap';
           bubbleDataInfoLog('Bubble chart fulfilled via initial Supabase bootstrap', {
             pollutants: pollutants.length,
-            groups: groups.length,
+            categories: categories.length,
             rows: rows.length
           });
         } else if (initialResult?.source === 'snapshot') {
           const snapshot = initialResult.snapshot;
           pollutants = snapshot.data.pollutants || [];
-          groups = snapshot.data.groups || [];
+          categories = selectCategoriesArray(snapshot.data);
           rows = snapshot.data.timeseries || snapshot.data.rows || snapshot.data.data || [];
           hasFullDataset = false;
           latestDatasetSource = 'snapshot';
@@ -699,7 +728,7 @@ async function loadData(options = {}) {
             generatedAt: snapshot.generatedAt || null,
             summary: {
               pollutants: pollutants.length,
-              groups: groups.length,
+              categories: categories.length,
               rows: rows.length
             }
           });
@@ -709,15 +738,16 @@ async function loadData(options = {}) {
 
     if (!haveData()) {
       const heroDataset = await loadBubbleHeroDataset(sharedLoader);
-      if (heroDataset?.pollutants?.length && heroDataset.groups?.length) {
+      const heroCategories = selectCategoriesArray(heroDataset);
+      if (heroDataset?.pollutants?.length && heroCategories.length) {
         pollutants = heroDataset.pollutants;
-        groups = heroDataset.groups;
+        categories = heroCategories;
         rows = heroDataset.timeseries || heroDataset.rows || [];
         hasFullDataset = false;
         latestDatasetSource = 'hero';
         bubbleDataInfoLog('Bubble chart hydrated via Supabase hero dataset', {
           pollutants: pollutants.length,
-          groups: groups.length,
+          categories: categories.length,
           rows: rows.length
         });
         triggerBubbleFullDatasetBootstrap(sharedLoader, defaultChartMode ? 'snapshot-fallback' : 'hero');
@@ -729,39 +759,39 @@ async function loadData(options = {}) {
         try {
           const sharedData = await sharedLoader.loadSharedData();
           pollutants = sharedData.pollutants;
-          groups = sharedData.groups;
+          categories = selectCategoriesArray(sharedData);
           rows = sharedData.timeseries;
           hasFullDataset = true;
           latestDatasetSource = 'shared-loader';
           bubbleDataInfoLog('Bubble chart hydrated via SharedDataLoader', {
             pollutants: pollutants.length,
-            groups: groups.length,
+            categories: categories.length,
             rows: rows.length
           });
         } catch (error) {
           console.error('Shared loader failed, falling back to direct load:', error);
           const result = await loadDataDirectly();
           pollutants = result.pollutants;
-          groups = result.groups;
+          categories = selectCategoriesArray(result);
           rows = result.rows;
           hasFullDataset = true;
           latestDatasetSource = 'direct';
           bubbleDataInfoLog('Bubble chart fulfilled by direct Supabase fetch after shared loader failure', {
             pollutants: pollutants.length,
-            groups: groups.length,
+            categories: categories.length,
             rows: rows.length
           });
         }
       } else {
         const result = await loadDataDirectly();
         pollutants = result.pollutants;
-        groups = result.groups;
+        categories = selectCategoriesArray(result);
         rows = result.rows;
         hasFullDataset = true;
         latestDatasetSource = 'direct';
         bubbleDataInfoLog('Bubble chart fulfilled by direct Supabase fetch (no shared loader)', {
           pollutants: pollutants.length,
-          groups: groups.length,
+          categories: categories.length,
           rows: rows.length
         });
       }
@@ -773,9 +803,8 @@ async function loadData(options = {}) {
         metadataPollutants = Array.isArray(selectorMetadata.pollutants)
           ? selectorMetadata.pollutants
           : metadataPollutants;
-        metadataGroups = Array.isArray(selectorMetadata.groups)
-          ? selectorMetadata.groups
-          : metadataGroups;
+        const selectorCategories = selectCategoriesArray(selectorMetadata);
+        metadataCategories = selectorCategories.length ? selectorCategories : metadataCategories;
 
         if (metadataPollutants.length) {
           pollutants = mergeRecordCollections(
@@ -791,15 +820,15 @@ async function loadData(options = {}) {
           );
         }
 
-        if (metadataGroups.length) {
-          groups = mergeRecordCollections(
-            metadataGroups,
-            groups,
+        if (metadataCategories.length) {
+          categories = mergeRecordCollections(
+            metadataCategories,
+            categories,
             record => {
               if (record?.id != null) {
                 return record.id;
               }
-              const title = record?.group_title || record?.group_name || '';
+              const title = record?.category_title || record?.group_name || '';
               return title ? title.toLowerCase() : null;
             }
           );
@@ -807,26 +836,26 @@ async function loadData(options = {}) {
       }
       bubbleDataInfoLog('Applied selector metadata for bubble dropdowns', {
         metadataPollutants: metadataPollutants.length,
-        metadataGroups: metadataGroups.length,
-        groupsAfterMerge: groups.length
+        metadataCategories: metadataCategories.length,
+        categoriesAfterMerge: categories.length
       });
     }
 
-    const dataset = applyDataset({ pollutants, groups, rows }, {
+    const dataset = applyDataset({ pollutants, categories, rows }, {
       enforceActivityDataFilter: hasFullDataset,
-      activityMetadata: !hasFullDataset && metadataGroups.length ? metadataGroups : null
+      activityMetadata: !hasFullDataset && metadataCategories.length ? metadataCategories : null
     });
 
     if (!hasFullDataset) {
-      ensureAllGroupMetadata(sharedLoader)
+      ensureAllCategoryMetadata(sharedLoader)
         .then(metadata => {
           if (!Array.isArray(metadata) || !metadata.length) {
             return;
           }
-          groupMetadataCache = mergeGroupCollections(metadata, groupMetadataCache || []);
+          categoryMetadataCache = mergeCategoryCollections(metadata, categoryMetadataCache || []);
         })
         .catch(error => {
-          supabaseDebugWarn('Unable to load full group metadata before hydration:', error.message || error);
+          supabaseDebugWarn('Unable to load full category metadata before hydration:', error.message || error);
         });
     }
 
@@ -864,25 +893,25 @@ function getAvailableYears() {
 }
 
 /**
- * Get data for a specific year, pollutant, and groups
+ * Get data for a specific year, pollutant, and categories
  * @param {number} year - Year to get data for
  * @param {number} pollutantId - Pollutant ID
- * @param {Array} groupIds - Array of group IDs
- * @returns {Array} Array of data points {group, actDataValue, pollutantValue}
+ * @param {Array} categoryIds - Array of category IDs
+ * @returns {Array} Array of data points {categoryId, categoryName, actDataValue, pollutantValue}
  */
-function getScatterData(year, pollutantId, groupIds) {
+function getScatterData(year, pollutantId, categoryIds) {
   const yearColumn = `f${year}`;
   const dataPoints = [];
 
-  groupIds.forEach(groupId => {
-    // Get Activity Data for this group
+  categoryIds.forEach(categoryId => {
+    // Get Activity Data for this category
     const actDataRow = globalRows.find(row => 
-      row.pollutant_id === actDataPollutantId && row.group_id === groupId
+      row.pollutant_id === actDataPollutantId && row.category_id === categoryId
     );
     
-    // Get pollutant data for this group
+    // Get pollutant data for this category
     const pollutantRow = globalRows.find(row => 
-      row.pollutant_id === pollutantId && row.group_id === groupId
+      row.pollutant_id === pollutantId && row.category_id === categoryId
     );
 
     if (actDataRow && pollutantRow) {
@@ -893,10 +922,10 @@ function getScatterData(year, pollutantId, groupIds) {
       if (actDataValue != null && pollutantValue != null && 
           !isNaN(actDataValue) && !isNaN(pollutantValue)) {
         
-        const group = allGroups.find(g => g.id === groupId);
+        const category = allCategories.find(g => g.id === categoryId);
         dataPoints.push({
-          groupId: groupId,
-          groupName: group ? group.group_title : `Group ${groupId}`,
+          categoryId,
+          categoryName: category ? (category.category_title || category.group_name) : `Category ${categoryId}`,
           actDataValue: parseFloat(actDataValue),
           pollutantValue: parseFloat(pollutantValue)
         });
@@ -928,13 +957,13 @@ function getPollutantUnit(pollutantId) {
 }
 
 /**
- * Get group name by ID
- * @param {number} groupId - Group ID
- * @returns {string} Group name
+ * Get category name by ID
+ * @param {number} categoryId - Category ID
+ * @returns {string} Category name
  */
-function getGroupName(groupId) {
-  const group = allGroups.find(g => g.id === groupId);
-  return group ? group.group_title : `Group ${groupId}`;
+function getCategoryName(categoryId) {
+  const category = allCategories.find(g => g.id === categoryId);
+  return category ? (category.category_title || category.group_name) : `Category ${categoryId}`;
 }
 
 function getPollutantShortName(identifier) {
@@ -968,7 +997,7 @@ function getPollutantShortName(identifier) {
   return (pollutant?.pollutant || pollutant?.Pollutant || null);
 }
 
-function getGroupShortTitle(identifier) {
+function getCategoryShortTitle(identifier) {
   if (identifier === null || identifier === undefined) {
     return null;
   }
@@ -977,35 +1006,35 @@ function getGroupShortTitle(identifier) {
     ? identifier.trim().toLowerCase()
     : null;
 
-  const group = allGroups.find(g => {
+  const category = allCategories.find(g => {
     if (typeof identifier === 'number') {
       return g.id === identifier;
     }
     if (normalized) {
-      const title = (g.group_title || g.group_name || '').toLowerCase();
+      const title = (g.category_title || g.group_name || '').toLowerCase();
       return title === normalized;
     }
     return false;
   }) || null;
 
-  const shortTitle = typeof group?.short_group_title === 'string'
-    ? group.short_group_title.trim()
+  const shortTitle = typeof category?.short_category_title === 'string'
+    ? category.short_category_title.trim()
     : '';
 
   if (shortTitle) {
     return shortTitle;
   }
 
-  return (group?.group_title || group?.group_name || null);
+  return (category?.category_title || category?.group_name || null);
 }
 
-function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {}) {
+function applyDataset({ pollutants = [], categories = [], rows = [] }, options = {}) {
   const {
     enforceActivityDataFilter = true,
     activityMetadata = null
   } = options || {};
   window.allPollutantsData = pollutants;
-  window.allGroupsData = groups;
+  window.allCategoriesData = categories;
 
   pollutantUnits = {};
   pollutants.forEach(p => {
@@ -1026,15 +1055,15 @@ function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {})
   }
 
   allPollutants = pollutants;
-  allGroups = groups;
-  if (Array.isArray(groups) && groups.length) {
-    if (!Array.isArray(groupMetadataCache) || groups.length > groupMetadataCache.length) {
-      groupMetadataCache = groups;
+  allCategories = categories;
+  if (Array.isArray(categories) && categories.length) {
+    if (!Array.isArray(categoryMetadataCache) || categories.length > categoryMetadataCache.length) {
+      categoryMetadataCache = categories;
     }
   }
   globalRows = rows;
   pollutantsData = pollutants;
-  groupsData = groups;
+  categoriesData = categories;
 
   if (rows.length > 0) {
     const sample = rows[0];
@@ -1052,9 +1081,9 @@ function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {})
     window.globalYearKeys = [];
   }
 
-  activeActDataGroups = [];
-  activeActDataGroupIds = [];
-  inactiveActDataGroupIds = [];
+  activeActDataCategories = [];
+  activeActDataCategoryIds = [];
+  inactiveActDataCategoryIds = [];
 
   const metadataEntries = Array.isArray(activityMetadata)
     ? activityMetadata.filter(entry => entry && Number.isFinite(entry.id))
@@ -1085,18 +1114,18 @@ function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {})
   };
 
   if (enforceActivityDataFilter && actDataPollutantId && globalHeaders.length > 0) {
-    const actDataRowsByGroup = new Map();
+    const actDataRowsByCategory = new Map();
     globalRows.forEach(row => {
       if (row.pollutant_id === actDataPollutantId) {
-        actDataRowsByGroup.set(row.group_id, row);
+        actDataRowsByCategory.set(row.category_id, row);
       }
     });
 
-    groups.forEach(group => {
-      const actDataRow = actDataRowsByGroup.get(group.id);
+    categories.forEach(category => {
+      const actDataRow = actDataRowsByCategory.get(category.id);
 
       if (!actDataRow) {
-        inactiveActDataGroupIds.push(group.id);
+        inactiveActDataCategoryIds.push(category.id);
         return;
       }
 
@@ -1109,76 +1138,91 @@ function applyDataset({ pollutants = [], groups = [], rows = [] }, options = {})
       });
 
       if (hasActData) {
-        activeActDataGroups.push(group);
-        activeActDataGroupIds.push(group.id);
+        activeActDataCategories.push(category);
+        activeActDataCategoryIds.push(category.id);
       } else {
-        inactiveActDataGroupIds.push(group.id);
+        inactiveActDataCategoryIds.push(category.id);
       }
     });
 
-    if (activeActDataGroups.length === 0 && groups.length > 0) {
-      supabaseDebugWarn('No groups reported Activity Data; reverting to full group list.');
-      activeActDataGroups = [...groups];
-      activeActDataGroupIds = activeActDataGroups.map(g => g.id);
-      inactiveActDataGroupIds = [];
+    if (activeActDataCategories.length === 0 && categories.length > 0) {
+      supabaseDebugWarn('No categories reported Activity Data; reverting to full category list.');
+      activeActDataCategories = [...categories];
+      activeActDataCategoryIds = activeActDataCategories.map(g => g.id);
+      inactiveActDataCategoryIds = [];
     }
   } else if (!enforceActivityDataFilter && metadataById) {
-    const groupsWithActData = groups.filter(group => metadataHasActivity(metadataById.get(group.id)));
-    if (groupsWithActData.length) {
-      activeActDataGroups = groupsWithActData;
-      activeActDataGroupIds = activeActDataGroups.map(g => g.id);
-      const activeIdSet = new Set(activeActDataGroupIds);
-      inactiveActDataGroupIds = groups
-        .filter(group => !activeIdSet.has(group.id))
-        .map(group => group.id);
+    const categoriesWithActData = categories.filter(category => metadataHasActivity(metadataById.get(category.id)));
+    if (categoriesWithActData.length) {
+      activeActDataCategories = categoriesWithActData;
+      activeActDataCategoryIds = activeActDataCategories.map(g => g.id);
+      const activeIdSet = new Set(activeActDataCategoryIds);
+      inactiveActDataCategoryIds = categories
+        .filter(category => !activeIdSet.has(category.id))
+        .map(category => category.id);
     } else {
-      activeActDataGroups = [...groups];
-      activeActDataGroupIds = activeActDataGroups.map(g => g.id);
-      inactiveActDataGroupIds = [];
+      activeActDataCategories = [...categories];
+      activeActDataCategoryIds = activeActDataCategories.map(g => g.id);
+      inactiveActDataCategoryIds = [];
     }
   } else {
-    activeActDataGroups = [...groups];
-    activeActDataGroupIds = activeActDataGroups.map(g => g.id);
-    inactiveActDataGroupIds = [];
+    activeActDataCategories = [...categories];
+    activeActDataCategoryIds = activeActDataCategories.map(g => g.id);
+    inactiveActDataCategoryIds = [];
   }
 
-  const allGroupEntry = groups.find(g => typeof g.group_title === 'string' && g.group_title.trim().toLowerCase() === 'all');
-  if (allGroupEntry) {
-    const allGroupId = allGroupEntry.id;
-    activeActDataGroups = activeActDataGroups.filter(g => g.id !== allGroupId);
-    activeActDataGroupIds = activeActDataGroupIds.filter(id => id !== allGroupId);
-    if (!inactiveActDataGroupIds.includes(allGroupId)) {
-      inactiveActDataGroupIds.push(allGroupId);
+  const allCategoryEntry = categories.find(g => {
+    const title = typeof g.category_title === 'string' && g.category_title.trim()
+      ? g.category_title
+      : g.group_name;
+    return typeof title === 'string' && title.trim().toLowerCase() === 'all';
+  });
+  if (allCategoryEntry) {
+    const allCategoryId = allCategoryEntry.id;
+    activeActDataCategories = activeActDataCategories.filter(g => g.id !== allCategoryId);
+    activeActDataCategoryIds = activeActDataCategoryIds.filter(id => id !== allCategoryId);
+    if (!inactiveActDataCategoryIds.includes(allCategoryId)) {
+      inactiveActDataCategoryIds.push(allCategoryId);
     }
   }
 
-  const baseGroupsForDropdown = activeActDataGroups.length > 0 ? activeActDataGroups : groups;
-  const groupsForDropdown = baseGroupsForDropdown.filter(g => {
-    if (typeof g.group_title !== 'string') return true;
-    return g.group_title.trim().toLowerCase() !== 'all';
+  const baseCategoriesForDropdown = activeActDataCategories.length > 0 ? activeActDataCategories : categories;
+  const categoriesForDropdown = baseCategoriesForDropdown.filter(g => {
+    const title = typeof g.category_title === 'string' && g.category_title.trim()
+      ? g.category_title
+      : g.group_name;
+    if (typeof title !== 'string') return true;
+    return title.trim().toLowerCase() !== 'all';
   });
-  allGroupsList = groupsForDropdown
+  allCategoriesList = categoriesForDropdown
     .map(g => ({
       id: g.id,
-      name: g.group_title || `Group ${g.id}`
+      name: g.category_title || g.group_name || `Category ${g.id}`
     }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  if (inactiveActDataGroupIds.length > 0) {
-    const inactiveNames = inactiveActDataGroupIds
-      .map(id => groups.find(g => g.id === id)?.group_title || `Group ${id}`)
+  if (inactiveActDataCategoryIds.length > 0) {
+    const inactiveNames = inactiveActDataCategoryIds
+      .map(id => {
+        const category = categories.find(g => g.id === id);
+        return category?.category_title || category?.group_name || `Category ${id}`;
+      })
       .filter(Boolean)
       .sort();
+    window.categoriesWithoutActData = inactiveNames;
+    window.categoriesWithoutActivityData = inactiveNames;
     window.groupsWithoutActData = inactiveNames;
     window.groupsWithoutActivityData = inactiveNames;
   } else {
+    window.categoriesWithoutActData = [];
+    window.categoriesWithoutActivityData = [];
     window.groupsWithoutActData = [];
     window.groupsWithoutActivityData = [];
   }
 
   return {
     pollutants: allPollutants,
-    groups: allGroups,
+    categories: allCategories,
     data: globalRows
   };
 }
@@ -1211,7 +1255,7 @@ function applyHydratedDataset(dataset, source = 'shared-loader') {
 
   const result = applyDataset({
     pollutants: dataset.pollutants || [],
-    groups: dataset.groups || [],
+    categories: dataset.categories || [],
     rows: normalizedRows
   }, {
     enforceActivityDataFilter: true
@@ -1261,9 +1305,9 @@ async function loadDataDirectly() {
   };
 
   const [pollutantsResp, groupsResp, dataResp] = await Promise.all([
-    timedQuery('NAEI_global_Pollutants', client.from('NAEI_global_Pollutants').select('*')),
-    timedQuery('NAEI_global_t_Group', client.from('NAEI_global_t_Group').select('*')),
-    timedQuery('NAEI_2023ds_t_Group_Data', client.from('NAEI_2023ds_t_Group_Data').select('*'))
+    timedQuery('naei_global_t_pollutant', client.from('naei_global_t_pollutant').select('*')),
+    timedQuery('naei_global_t_category', client.from('naei_global_t_category').select('*')),
+    timedQuery('naei_2023ds_t_category_data', client.from('naei_2023ds_t_category_data').select('*'))
   ]);
 
   if (pollutantsResp.error) throw pollutantsResp.error;
@@ -1272,7 +1316,7 @@ async function loadDataDirectly() {
 
   const payload = {
     pollutants: pollutantsResp.data || [],
-    groups: groupsResp.data || [],
+    categories: groupsResp.data || [],
     rows: dataResp.data || []
   };
 
@@ -1280,7 +1324,7 @@ async function loadDataDirectly() {
     durationMs: Number((bubbleDataNow() - batchStart).toFixed(1)),
     summary: {
       pollutants: payload.pollutants.length,
-      groups: payload.groups.length,
+      categories: payload.categories.length,
       rows: payload.rows.length
     }
   });
@@ -1299,21 +1343,21 @@ try {
     getScatterData,
     getPollutantName,
     getPollutantUnit,
-    getGroupName,
+    getCategoryName,
     getPollutantShortName,
-    getGroupShortTitle,
+    getCategoryShortTitle,
     get allPollutants() { return allPollutants; },
-    get allGroups() { return allGroups; },
-    get allGroupsList() { return allGroupsList; },
+    get allCategories() { return allCategories; },
+    get allCategoriesList() { return allCategoriesList; },
     get actDataPollutantId() { return actDataPollutantId; },
-    get activeActDataGroups() { return activeActDataGroups; },
-    get activeActDataGroupIds() { return activeActDataGroupIds; },
-    get inactiveActDataGroupIds() { return inactiveActDataGroupIds; },
+    get activeActDataCategories() { return activeActDataCategories; },
+    get activeActDataCategoryIds() { return activeActDataCategoryIds; },
+    get inactiveActDataCategoryIds() { return inactiveActDataCategoryIds; },
     // Legacy getters maintained temporarily for backwards compatibility
     get activityDataId() { return actDataPollutantId; },
-    get activeGroups() { return activeActDataGroups; },
-    get activeGroupIds() { return activeActDataGroupIds; },
-    get inactiveActivityGroupIds() { return inactiveActDataGroupIds; },
+    get activeGroups() { return activeActDataCategories; },
+    get activeGroupIds() { return activeActDataCategoryIds; },
+    get inactiveActivityGroupIds() { return inactiveActDataCategoryIds; },
     get hasFullDataset() { return hasFullDataset; },
     get latestDatasetSource() { return latestDatasetSource; },
     scheduleFullDatasetLoad,

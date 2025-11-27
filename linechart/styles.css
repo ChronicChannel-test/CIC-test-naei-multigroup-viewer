@@ -160,7 +160,7 @@ button:disabled {
 }
 
 /* Select dropdown styling */
-select, #pollutantSelect, #startYear, #endYear, #groupContainer select {
+select, #pollutantSelect, #startYear, #endYear, #categoryContainer select {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
   padding: 6px 10px !important;
@@ -181,19 +181,19 @@ button, .add-btn, .remove-btn, .dragHandle {
   user-select: none; 
 }
 
-/* Group management */
-#groupContainer { 
+/* Category management */
+#categoryContainer { 
   margin-top: 0; 
 }
 
-.groupRow { 
+.categoryRow { 
   display: flex; 
   align-items: center; 
   gap: 8px; 
   margin: 4px 0; 
 }
 
-.groupRow.dragging { 
+.categoryRow.dragging { 
   opacity: 0.5; 
 }
 
@@ -205,7 +205,7 @@ button, .add-btn, .remove-btn, .dragHandle {
   border-radius: 6px; 
 }
 
-.group-control { 
+.category-control { 
   display: inline-flex; 
   align-items: center; 
   gap: 8px; 
@@ -235,7 +235,9 @@ button, .add-btn, .remove-btn, .dragHandle {
 }
 
 .share-icon {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
   height: 18px;
   background-image: url('../SharedResources/images/chain-link-icon-grey.svg');
@@ -307,7 +309,7 @@ button, .add-btn, .remove-btn, .dragHandle {
   margin-right: 8px; 
 }
 
-.button-row, .controls-wrapper, #groupContainer, .groupRow { 
+.button-row, .controls-wrapper, #categoryContainer, .categoryRow { 
   row-gap: 6px; 
 }
 
@@ -603,13 +605,13 @@ footer a:hover {
     margin-right: 0 !important;
   }
 
-  .groupRow { 
+  .categoryRow { 
     flex-direction: column; 
     align-items: flex-start; 
     gap: 6px; 
   }
 
-  .groupRow .remove-btn { 
+  .categoryRow .remove-btn { 
     align-self: flex-start; 
     margin-top: 4px; 
   }

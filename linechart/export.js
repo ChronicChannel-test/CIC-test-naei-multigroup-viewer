@@ -20,9 +20,11 @@ function buildLineFilenameBase({ startYear, endYear, pollutantName, firstGroupNa
     ? window.supabaseModule.getPollutantShortName(pollutantName)
     : null;
 
-  const groupShort = typeof window.supabaseModule?.getGroupShortTitle === 'function'
-    ? window.supabaseModule.getGroupShortTitle(firstGroupName)
-    : null;
+  const categoryShort = typeof window.supabaseModule?.getCategoryShortTitle === 'function'
+    ? window.supabaseModule.getCategoryShortTitle(firstGroupName)
+    : (typeof window.supabaseModule?.getGroupShortTitle === 'function'
+      ? window.supabaseModule.getGroupShortTitle(firstGroupName)
+      : null);
 
   const yearLabel = Number.isFinite(startYear) && Number.isFinite(endYear)
     ? (startYear === endYear ? `${startYear}` : `${startYear}-${endYear}`)
@@ -30,7 +32,7 @@ function buildLineFilenameBase({ startYear, endYear, pollutantName, firstGroupNa
 
   const yearSegment = sanitizeFilenameSegment(yearLabel);
   const pollutantSegment = sanitizeFilenameSegment(pollutantShort || pollutantName || 'Pollutant');
-  const groupSegment = sanitizeFilenameSegment(groupShort || firstGroupName || 'Group');
+  const groupSegment = sanitizeFilenameSegment(categoryShort || firstGroupName || 'Group');
 
   return `${yearSegment}_Line-Chart_${pollutantSegment}_${groupSegment}`;
 }
@@ -103,11 +105,13 @@ function exportData(format = 'csv') {
   rows.push(['Group', ...years]);
 
 
+  const categorisedData = window.categorisedData || window.groupedData || {};
+
   // Data rows - read values by key for robustness
   selectedGroups.forEach(group => {
     const values = keysForYears.map((k) => {
       // look up the data row for this pollutant and group
-      const dataRow = window.groupedData[pollutant] ? window.groupedData[pollutant][group] : null;
+      const dataRow = categorisedData[pollutant] ? categorisedData[pollutant][group] : null;
       const raw = dataRow ? dataRow[k] : null;
       return raw ?? '';
     });
@@ -264,6 +268,17 @@ function serializeShareQuery(queryInput) {
   return params.toString();
 }
 
+function getGroupDisplayTitle(record) {
+  if (!record || typeof record !== 'object') {
+    return '';
+  }
+  const title = record.category_title
+    || record.group_name
+    || record.title
+    || '';
+  return typeof title === 'string' ? title : '';
+}
+
 // Generate shareable URL with current configuration
 function generateShareUrl() {
   const pollutantSelect = document.getElementById('pollutantSelect');
@@ -292,8 +307,8 @@ function generateShareUrl() {
   
   // Find group IDs
   const groupIds = [];
-  selectedGroups.forEach(groupName => {
-    const groupData = groups.find(gd => gd.group_title === groupName);
+    selectedGroups.forEach(groupName => {
+      const groupData = groups.find(gd => getGroupDisplayTitle(gd) === groupName);
     if (groupData) {
       groupIds.push(groupData.id);
     }

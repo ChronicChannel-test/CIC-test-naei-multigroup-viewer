@@ -29,7 +29,12 @@ function getLineSearchParams() {
   try {
     const chartParam = params.get('chart');
     if (chartParam && chartParam !== '2') {
-      const overrideKeys = ['pollutant','pollutant_id','pollutantId','group','group_id','groupIds','group_ids','dataset','start_year','end_year','year'];
+      const overrideKeys = [
+        'pollutant','pollutant_id','pollutantId',
+        'category','categories','category_id','categoryIds','category_ids',
+        'group','group_id','groupIds','group_ids',
+        'dataset','start_year','end_year','year'
+      ];
       overrideKeys.forEach(key => params.delete(key));
     }
   } catch (error) {
@@ -88,20 +93,25 @@ function ensureInitialized() {
 let globalRows = [];
 let globalHeaders = [];
 let pollutantUnits = {};
-let groupedData = {};
-let allGroupsList = [];
+let categorisedData = {};
+let allCategoriesList = [];
 let allPollutants = [];
-let allGroups = [];
+let allCategories = [];
 let pollutantsData = []; // Store raw pollutant data for ID lookups
-let groupsData = []; // Store raw group data for ID lookups
+let categoriesData = []; // Store raw group data for ID lookups
 
 const LINE_DEFAULT_POLLUTANT_NAME = 'PM2.5';
 const LINE_DEFAULT_POLLUTANT_ID = 5;
-const LINE_DEFAULT_GROUP_TITLES = ['All'];
-const LINE_DEFAULT_GROUP_IDS = [1];
+const LINE_DEFAULT_CATEGORY_TITLES = ['All'];
+const LINE_DEFAULT_CATEGORY_IDS = [1];
 const LINE_DEFAULT_START_YEAR = 1970;
 const LINE_DEFAULT_END_YEAR = 2023;
-const lineUrlOverrideParams = ['pollutant','pollutant_id','pollutantId','group','group_id','groupIds','group_ids','dataset','start_year','end_year','year'];
+const lineUrlOverrideParams = [
+  'pollutant','pollutant_id','pollutantId',
+  'category','categories','category_id','categoryIds','category_ids',
+  'group','group_id','groupIds','group_ids',
+  'dataset','start_year','end_year','year'
+];
 let lineHasFullDataset = false;
 let lineDatasetSource = null;
 let lineFullDatasetPromise = null;
@@ -152,7 +162,7 @@ function resolvePollutantRecord(identifier) {
   }) || null;
 }
 
-function resolveGroupRecord(identifier) {
+function resolveCategoryRecord(identifier) {
   if (identifier === null || identifier === undefined) {
     return null;
   }
@@ -161,12 +171,12 @@ function resolveGroupRecord(identifier) {
     ? identifier.trim().toLowerCase()
     : null;
 
-  return groupsData.find(g => {
+  return categoriesData.find(g => {
     if (typeof identifier === 'number') {
       return g.id === identifier;
     }
     if (normalized) {
-      const title = (g.group_title || g.group_name || '').toLowerCase();
+      const title = (g.category_title || g.group_name || '').toLowerCase();
       return title === normalized;
     }
     return false;
@@ -190,21 +200,21 @@ function getPollutantShortName(identifier) {
   return record.pollutant || record.Pollutant || null;
 }
 
-function getGroupShortTitle(identifier) {
-  const record = resolveGroupRecord(identifier);
+function getCategoryShortTitle(identifier) {
+  const record = resolveCategoryRecord(identifier);
   if (!record) {
     return null;
   }
 
-  const shortTitle = typeof record.short_group_title === 'string'
-    ? record.short_group_title.trim()
+  const shortTitle = typeof record.short_category_title === 'string'
+    ? record.short_category_title.trim()
     : '';
 
   if (shortTitle) {
     return shortTitle;
   }
 
-  return record.group_title || record.group_name || null;
+  return record.category_title || record.group_name || null;
 }
 
 function lineSortNumericList(values = []) {
@@ -252,13 +262,17 @@ function lineUsesDefaultSelection() {
     || lineSupabaseUrlParams.get('pollutantId')
   );
   const pollutantNames = parseLineNameList(lineSupabaseUrlParams.get('pollutant'));
-  const groupIds = parseLineIdList(
-    lineSupabaseUrlParams.get('group_ids')
+  const categoryIds = parseLineIdList(
+    lineSupabaseUrlParams.get('category_ids')
+    || lineSupabaseUrlParams.get('categoryIds')
+    || lineSupabaseUrlParams.get('group_ids')
     || lineSupabaseUrlParams.get('groupIds')
     || lineSupabaseUrlParams.get('group_id')
   );
-  const groupNames = parseLineNameList(
-    lineSupabaseUrlParams.get('group')
+  const categoryNames = parseLineNameList(
+    lineSupabaseUrlParams.get('category')
+    || lineSupabaseUrlParams.get('categories')
+    || lineSupabaseUrlParams.get('group')
     || lineSupabaseUrlParams.get('groups')
   );
 
@@ -266,10 +280,10 @@ function lineUsesDefaultSelection() {
     || lineMatchesNumericSet(pollutantIds, [LINE_DEFAULT_POLLUTANT_ID]);
   const pollutantNamesDefault = !pollutantNames.length
     || lineMatchesNameSet(pollutantNames, [LINE_DEFAULT_POLLUTANT_NAME]);
-  const groupIdsDefault = !groupIds.length
-    || lineMatchesNumericSet(groupIds, LINE_DEFAULT_GROUP_IDS);
-  const groupNamesDefault = !groupNames.length
-    || lineMatchesNameSet(groupNames, LINE_DEFAULT_GROUP_TITLES);
+  const categoryIdsDefault = !categoryIds.length
+    || lineMatchesNumericSet(categoryIds, LINE_DEFAULT_CATEGORY_IDS);
+  const categoryNamesDefault = !categoryNames.length
+    || lineMatchesNameSet(categoryNames, LINE_DEFAULT_CATEGORY_TITLES);
 
   const startYearParam = lineSupabaseUrlParams.get('start_year');
   const endYearParam = lineSupabaseUrlParams.get('end_year');
@@ -281,8 +295,8 @@ function lineUsesDefaultSelection() {
   return (
     pollutantIdsDefault
     && pollutantNamesDefault
-    && groupIdsDefault
-    && groupNamesDefault
+    && categoryIdsDefault
+    && categoryNamesDefault
     && startYearDefault
     && endYearDefault
     && singleYearDefault
@@ -367,13 +381,17 @@ function buildLineHeroOptions() {
     || lineSupabaseUrlParams.get('pollutantId')
   );
   const pollutantNames = parseLineNameList(lineSupabaseUrlParams.get('pollutant'));
-  const groupIds = parseLineIdList(
-    lineSupabaseUrlParams.get('group_ids')
+  const categoryIds = parseLineIdList(
+    lineSupabaseUrlParams.get('category_ids')
+    || lineSupabaseUrlParams.get('categoryIds')
+    || lineSupabaseUrlParams.get('group_ids')
     || lineSupabaseUrlParams.get('groupIds')
     || lineSupabaseUrlParams.get('group_id')
   );
-  const groupNames = parseLineNameList(
-    lineSupabaseUrlParams.get('group')
+  const categoryNames = parseLineNameList(
+    lineSupabaseUrlParams.get('category')
+    || lineSupabaseUrlParams.get('categories')
+    || lineSupabaseUrlParams.get('group')
     || lineSupabaseUrlParams.get('groups')
   );
 
@@ -381,19 +399,19 @@ function buildLineHeroOptions() {
     pollutantNames.push(LINE_DEFAULT_POLLUTANT_NAME);
   }
 
-  if (!groupIds.length && !groupNames.length) {
-    groupNames.push(...LINE_DEFAULT_GROUP_TITLES);
+  if (!categoryIds.length && !categoryNames.length) {
+    categoryNames.push(...LINE_DEFAULT_CATEGORY_TITLES);
   }
 
   return {
     pollutantIds,
     pollutantNames,
-    groupIds,
-    groupNames,
+    categoryIds,
+    categoryNames,
     includeActivityData: false,
     activityPollutantName: null,
     defaultPollutantNames: [LINE_DEFAULT_POLLUTANT_NAME],
-    defaultGroupNames: LINE_DEFAULT_GROUP_TITLES
+    defaultCategoryNames: LINE_DEFAULT_CATEGORY_TITLES
   };
 }
 
@@ -416,7 +434,7 @@ async function loadLineHeroDataset(sharedLoader) {
   const options = buildLineHeroOptions();
   lineSupabaseInfoLog('Requesting line hero dataset', {
     pollutants: options.pollutantIds.length || options.pollutantNames.length,
-    groups: options.groupIds.length || options.groupNames.length
+    categories: options.categoryIds.length || options.categoryNames.length
   });
   try {
     return await loader.loadHeroDataset(options);
@@ -447,7 +465,7 @@ async function loadUnits() {
   if (!client) {
     throw new Error('Supabase client not available');
   }
-  const { data, error } = await client.from('NAEI_global_Pollutants').select('*');
+  const { data, error } = await client.from('naei_global_t_pollutant').select('*');
   if (error) throw error;
   pollutantUnits = {};
   data.forEach(r => {
@@ -463,16 +481,19 @@ function applyLineDataset(dataset = {}, options = {}) {
   const wasHydrated = lineHasFullDataset;
   const rowsInput = dataset.rows || dataset.timeseries || [];
   const pollutants = Array.isArray(dataset.pollutants) ? dataset.pollutants : [];
-  const groups = Array.isArray(dataset.groups) ? dataset.groups : [];
+  const categoriesInput = Array.isArray(dataset.categories)
+    ? dataset.categories
+    : (Array.isArray(dataset.groups) ? dataset.groups : []);
+  const categories = Array.isArray(categoriesInput) ? categoriesInput : [];
   const rows = Array.isArray(rowsInput) ? rowsInput : [];
 
   pollutantsData = pollutants.slice();
-  groupsData = groups.slice();
+  categoriesData = categories.slice();
   globalRows = rows.slice();
   pollutantUnits = {};
 
   window.allPollutantsData = pollutants;
-  window.allGroupsData = groups;
+  window.allCategoriesData = categories;
 
   const pollutantIdToName = {};
   pollutants.forEach(p => {
@@ -488,37 +509,44 @@ function applyLineDataset(dataset = {}, options = {}) {
   });
 
   const groupIdToTitle = {};
-  groups.forEach(g => {
+  categories.forEach(g => {
     const id = g.id;
-    const title = g.group_title;
+    const title = g.category_title;
     if (title) {
       groupIdToTitle[id] = title;
     }
   });
 
   allPollutants = [...new Set(Object.values(pollutantIdToName).filter(Boolean))].sort();
-  allGroups = [...new Set(Object.values(groupIdToTitle).filter(Boolean))].sort((a, b) => {
+  allCategories = [...new Set(Object.values(groupIdToTitle).filter(Boolean))].sort((a, b) => {
     if (a.toLowerCase() === 'all') return -1;
     if (b.toLowerCase() === 'all') return 1;
     return a.localeCompare(b);
   });
 
-  window.allGroupsList = allGroups;
+  window.allCategoriesList = allCategories;
   window.allPollutants = allPollutants;
 
   if (!rows.length) {
     window.globalHeaders = [];
     window.globalYears = [];
     window.globalYearKeys = [];
-    groupedData = {};
-    lineSupabaseWarnLog('No timeseries rows found in NAEI_2023ds_t_Group_Data');
+    categorisedData = {};
+    lineSupabaseWarnLog('No timeseries rows found in naei_2023ds_t_category_data');
     if (options.source) {
       lineDatasetSource = options.source;
     }
     if (options.markFullDataset) {
       lineHasFullDataset = true;
     }
-    return { pollutants, groups, yearKeys: [], pollutantUnits, groupedData };
+    return {
+      pollutants,
+      categories,
+      groups: categories,
+      yearKeys: [],
+      pollutantUnits,
+      categorisedData
+    };
   }
 
   const sample = rows[0];
@@ -529,30 +557,30 @@ function applyLineDataset(dataset = {}, options = {}) {
   window.globalYears = headers.map(h => h.slice(1));
   window.globalYearKeys = headers;
 
-  groupedData = {};
+  categorisedData = {};
   rows.forEach(r => {
     const polId = r.pollutant_id;
-    const grpId = r.group_id;
+    const grpId = r.category_id;
     const polName = pollutantIdToName[polId];
     const grpName = groupIdToTitle[grpId];
     if (!polName || !grpName) {
       return;
     }
-    if (!groupedData[polName]) {
-      groupedData[polName] = {};
+    if (!categorisedData[polName]) {
+      categorisedData[polName] = {};
     }
-    groupedData[polName][grpName] = r;
+    categorisedData[polName][grpName] = r;
   });
 
-  const groupsFromData = [...new Set(Object.values(groupedData).flatMap(pol => Object.keys(pol)))];
-  if ((!allGroups || allGroups.length === 0) && groupsFromData.length) {
-    allGroups = groupsFromData.sort((a, b) => {
+  const categoriesFromData = [...new Set(Object.values(categorisedData).flatMap(pol => Object.keys(pol)))];
+  if ((!allCategories || allCategories.length === 0) && categoriesFromData.length) {
+    allCategories = categoriesFromData.sort((a, b) => {
       if (a.toLowerCase() === 'all') return -1;
       if (b.toLowerCase() === 'all') return 1;
       return a.localeCompare(b);
     });
-    window.allGroupsList = allGroups;
-    lineSupabaseWarnLog('Groups list was empty from NAEI_global_t_Group — falling back to groups found in timeseries rows.');
+    window.allCategoriesList = allCategories;
+    lineSupabaseWarnLog('Category list was empty from naei_global_t_category — falling back to categories found in timeseries rows.');
   }
 
   if (options.source) {
@@ -566,7 +594,14 @@ function applyLineDataset(dataset = {}, options = {}) {
     dispatchLineFullDatasetEvent({ source: options.source || null });
   }
 
-  return { pollutants, groups, yearKeys: headers, pollutantUnits, groupedData };
+  return {
+    pollutants,
+    categories,
+    groups: categories,
+    yearKeys: headers,
+    pollutantUnits,
+    categorisedData
+  };
 }
 
 function triggerLineFullDatasetBootstrap(sharedLoader, reason = 'line-chart') {
@@ -583,7 +618,8 @@ function triggerLineFullDatasetBootstrap(sharedLoader, reason = 'line-chart') {
     if (!payload) return payload;
     const normalized = {
       pollutants: payload.pollutants || [],
-      groups: payload.groups || [],
+      categories: payload.categories || payload.groups || [],
+      groups: payload.groups || payload.categories || [],
       rows: payload.timeseries || payload.rows || payload.data || []
     };
     applyLineDataset(normalized, {
@@ -594,7 +630,7 @@ function triggerLineFullDatasetBootstrap(sharedLoader, reason = 'line-chart') {
       source,
       durationMs: Number((lineSupabaseNow() - start).toFixed(1)),
       pollutants: normalized.pollutants.length,
-      groups: normalized.groups.length,
+      categories: normalized.categories.length,
       rows: normalized.rows?.length || globalRows.length || 0
     });
     return normalized;
@@ -681,7 +717,7 @@ async function loadData() {
   }
 
   let pollutants = [];
-  let groups = [];
+  let categories = [];
   let rows = [];
   let datasetSource = null;
   let datasetIsFull = false;
@@ -690,7 +726,7 @@ async function loadData() {
     lineSupabaseLog("Using cached data from shared loader");
     const cachedData = sharedLoader.getCachedData();
     pollutants = cachedData.pollutants;
-    groups = cachedData.groups;
+    categories = cachedData.categories || cachedData.groups;
     rows = cachedData.timeseries;
     datasetIsFull = true;
     datasetSource = 'cache';
@@ -741,20 +777,20 @@ async function loadData() {
     if (initialResult?.source === 'supabase') {
       const payload = initialResult.payload || {};
       pollutants = payload.pollutants || [];
-      groups = payload.groups || [];
+      categories = payload.categories || payload.groups || [];
       rows = payload.timeseries || payload.rows || payload.data || [];
       datasetIsFull = true;
       datasetSource = 'shared-bootstrap';
       lineHasFullDataset = true;
       lineSupabaseInfoLog('Line chart fulfilled via initial Supabase bootstrap', {
         pollutants: pollutants.length,
-        groups: groups.length,
+        categories: categories.length,
         rows: rows.length
       });
     } else if (initialResult?.source === 'snapshot') {
       const snapshot = initialResult.snapshot;
       pollutants = snapshot.data.pollutants || [];
-      groups = snapshot.data.groups || [];
+      categories = snapshot.data.categories || snapshot.data.groups || [];
       rows = snapshot.data.timeseries || snapshot.data.rows || snapshot.data.data || [];
       datasetIsFull = false;
       datasetSource = 'snapshot';
@@ -766,33 +802,33 @@ async function loadData() {
         generatedAt: snapshot.generatedAt || null,
         summary: {
           pollutants: pollutants.length,
-          groups: groups.length,
+          categories: categories.length,
           rows: rows.length
         }
       });
     }
   }
 
-  if ((!pollutants.length || !groups.length || !rows.length) && sharedLoader?.isDataLoaded?.()) {
+  if ((!pollutants.length || !categories.length || !rows.length) && sharedLoader?.isDataLoaded?.()) {
     const cachedData = sharedLoader.getCachedData();
     pollutants = cachedData.pollutants;
-    groups = cachedData.groups;
+    categories = cachedData.categories || cachedData.groups;
     rows = cachedData.timeseries;
     datasetIsFull = true;
     datasetSource = 'cache';
   }
 
-  if (!pollutants.length || !groups.length || !rows.length) {
+  if (!pollutants.length || !categories.length || !rows.length) {
     const heroDataset = await loadLineHeroDataset(sharedLoader);
-    if (heroDataset?.pollutants?.length && heroDataset.groups?.length) {
+    if (heroDataset?.pollutants?.length && (heroDataset.categories?.length || heroDataset.groups?.length)) {
       pollutants = heroDataset.pollutants;
-      groups = heroDataset.groups;
+      categories = heroDataset.categories || heroDataset.groups;
       rows = heroDataset.timeseries || heroDataset.rows || [];
       datasetIsFull = false;
       datasetSource = 'hero';
       lineSupabaseInfoLog('Line chart hydrated via Supabase hero dataset', {
         pollutants: pollutants.length,
-        groups: groups.length,
+        categories: categories.length,
         rows: rows.length
       });
       scheduleLineFullDataset(sharedLoader, 'hero');
@@ -805,9 +841,9 @@ async function loadData() {
       const metadataPollutants = Array.isArray(selectorMetadata.pollutants)
         ? selectorMetadata.pollutants
         : [];
-      const metadataGroups = Array.isArray(selectorMetadata.groups)
-        ? selectorMetadata.groups
-        : [];
+      const metadataCategories = Array.isArray(selectorMetadata.categories)
+        ? selectorMetadata.categories
+        : (Array.isArray(selectorMetadata.groups) ? selectorMetadata.groups : []);
 
       if (metadataPollutants.length) {
         pollutants = lineMergeRecordCollections(
@@ -823,15 +859,15 @@ async function loadData() {
         );
       }
 
-      if (metadataGroups.length) {
-        groups = lineMergeRecordCollections(
-          groups,
-          metadataGroups,
+      if (metadataCategories.length) {
+        categories = lineMergeRecordCollections(
+          categories,
+          metadataCategories,
           record => {
             if (record?.id != null) {
               return record.id;
             }
-            const title = record?.group_title || record?.group_name || '';
+            const title = record?.category_title || record?.group_name || '';
             return title ? title.toLowerCase() : null;
           }
         );
@@ -839,13 +875,13 @@ async function loadData() {
     }
   }
 
-  if (!pollutants.length || !groups.length || !rows.length) {
+  if (!pollutants.length || !categories.length || !rows.length) {
     if (sharedLoader) {
       lineSupabaseLog("Loading data through shared loader");
       try {
         const sharedData = await sharedLoader.loadSharedData();
         pollutants = sharedData.pollutants;
-        groups = sharedData.groups;
+        categories = sharedData.categories || sharedData.groups;
         rows = sharedData.timeseries;
         datasetIsFull = true;
         datasetSource = 'shared-loader';
@@ -853,7 +889,7 @@ async function loadData() {
         console.error("Failed to load through shared loader, falling back to direct loading:", error);
         const result = await loadDataDirectly();
         pollutants = result.pollutants;
-        groups = result.groups;
+        categories = result.categories || result.groups;
         rows = result.rows;
         datasetIsFull = true;
         datasetSource = 'direct';
@@ -862,19 +898,19 @@ async function loadData() {
       lineSupabaseLog("No shared loader available, loading data directly");
       const result = await loadDataDirectly();
       pollutants = result.pollutants;
-      groups = result.groups;
+      categories = result.categories || result.groups;
       rows = result.rows;
       datasetIsFull = true;
       datasetSource = 'direct';
     }
   }
 
-  const processed = applyLineDataset({ pollutants, groups, rows }, {
+  const processed = applyLineDataset({ pollutants, categories, groups: categories, rows }, {
     source: datasetSource,
     markFullDataset: datasetIsFull
   });
 
-  lineSupabaseLog(`Loaded ${rows.length} timeseries rows; ${allPollutants.length} pollutants; ${allGroups.length} groups`);
+  lineSupabaseLog(`Loaded ${rows.length} timeseries rows; ${allPollutants.length} pollutants; ${allCategories.length} categories`);
   return processed;
 }
 
@@ -914,20 +950,21 @@ async function loadDataDirectly() {
     });
   };
 
-  // Fetch pollutants, groups, and the timeseries table separately
-  const [pollutantsResp, groupsResp, dataResp] = await Promise.all([
-    timedQuery('NAEI_global_Pollutants', client.from('NAEI_global_Pollutants').select('*')),
-    timedQuery('NAEI_global_t_Group', client.from('NAEI_global_t_Group').select('*')),
-    timedQuery('NAEI_2023ds_t_Group_Data', client.from('NAEI_2023ds_t_Group_Data').select('*'))
+  // Fetch pollutants, categories, and the timeseries table separately
+  const [pollutantsResp, categoriesResp, dataResp] = await Promise.all([
+    timedQuery('naei_global_t_pollutant', client.from('naei_global_t_pollutant').select('*')),
+    timedQuery('naei_global_t_category', client.from('naei_global_t_category').select('*')),
+    timedQuery('naei_2023ds_t_category_data', client.from('naei_2023ds_t_category_data').select('*'))
   ]);
 
   if (pollutantsResp.error) throw pollutantsResp.error;
-  if (groupsResp.error) throw groupsResp.error;
+  if (categoriesResp.error) throw categoriesResp.error;
   if (dataResp.error) throw dataResp.error;
 
   const payload = {
     pollutants: pollutantsResp.data || [],
-    groups: groupsResp.data || [],
+    categories: categoriesResp.data || [],
+    groups: categoriesResp.data || [],
     rows: dataResp.data || []
   };
 
@@ -935,7 +972,7 @@ async function loadDataDirectly() {
     durationMs: Number((lineSupabaseNow() - batchStart).toFixed(1)),
     summary: {
       pollutants: payload.pollutants.length,
-      groups: payload.groups.length,
+      categories: payload.categories.length,
       rows: payload.rows.length
     }
   });
@@ -951,7 +988,9 @@ try {
     loadDataDirectly,
     trackAnalytics,
     getPollutantShortName,
-    getGroupShortTitle,
+    getCategoryShortTitle,
+    // Temporary alias to avoid breaking older entry points while category rename rolls out
+    getGroupShortTitle: getCategoryShortTitle,
   };
   lineSupabaseLog('supabaseModule initialized successfully');
 } catch (error) {

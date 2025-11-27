@@ -38,6 +38,85 @@ function sanitizeFilenameSegment(value) {
     || 'NA';
 }
 
+function collectCategoryIdsFromChartData(chartData) {
+  if (!chartData) {
+    return [];
+  }
+
+  if (Array.isArray(chartData.categoryIds) && chartData.categoryIds.length) {
+    return chartData.categoryIds;
+  }
+
+  if (Array.isArray(chartData.groupIds) && chartData.groupIds.length) {
+    return chartData.groupIds;
+  }
+
+  const deduped = [];
+  (chartData.dataPoints || []).forEach(point => {
+    const id = point?.categoryId ?? point?.groupId;
+    if (id == null || deduped.includes(id)) {
+      return;
+    }
+    deduped.push(id);
+  });
+  return deduped;
+}
+
+function resolveCategoryNameById(categoryId, fallbackPoints) {
+  if (categoryId == null) {
+    return null;
+  }
+
+  if (typeof window.supabaseModule?.getCategoryName === 'function') {
+    const resolved = window.supabaseModule.getCategoryName(categoryId);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  if (typeof window.supabaseModule?.getGroupName === 'function') {
+    const legacyResolved = window.supabaseModule.getGroupName(categoryId);
+    if (legacyResolved) {
+      return legacyResolved;
+    }
+  }
+
+  if (Array.isArray(fallbackPoints) && fallbackPoints.length) {
+    const match = fallbackPoints.find(point => point?.categoryId === categoryId || point?.groupId === categoryId);
+    if (match?.categoryName || match?.groupName) {
+      return match.categoryName || match.groupName;
+    }
+  }
+
+  return null;
+}
+
+function resolveCategoryShortTitleById(categoryId) {
+  if (categoryId == null) {
+    return null;
+  }
+
+  if (typeof window.supabaseModule?.getCategoryShortTitle === 'function') {
+    const shortTitle = window.supabaseModule.getCategoryShortTitle(categoryId);
+    if (shortTitle) {
+      return shortTitle;
+    }
+  }
+
+  if (typeof window.supabaseModule?.getGroupShortTitle === 'function') {
+    const legacyShort = window.supabaseModule.getGroupShortTitle(categoryId);
+    if (legacyShort) {
+      return legacyShort;
+    }
+  }
+
+  return null;
+}
+
+function getSelectedCategoryCount(chartData) {
+  return collectCategoryIdsFromChartData(chartData).length;
+}
+
 function buildBubbleFilenameBase(chartData) {
   if (!chartData) {
     return 'Bubble-Chart';
@@ -47,23 +126,21 @@ function buildBubbleFilenameBase(chartData) {
     ? window.supabaseModule.getPollutantShortName(chartData.pollutantId)
     : null;
 
-  const firstGroupId = Array.isArray(chartData.groupIds) && chartData.groupIds.length
-    ? chartData.groupIds[0]
-    : null;
+  const categoryIds = collectCategoryIdsFromChartData(chartData);
+  const firstCategoryId = categoryIds.length ? categoryIds[0] : null;
 
-  const groupShort = firstGroupId !== null && typeof window.supabaseModule?.getGroupShortTitle === 'function'
-    ? window.supabaseModule.getGroupShortTitle(firstGroupId)
-    : null;
+  const categoryShort = resolveCategoryShortTitleById(firstCategoryId);
 
-  const groupName = firstGroupId !== null && typeof window.supabaseModule?.getGroupName === 'function'
-    ? window.supabaseModule.getGroupName(firstGroupId)
-    : (chartData.dataPoints?.[0]?.groupName || null);
+  const categoryName = resolveCategoryNameById(firstCategoryId, chartData.dataPoints)
+    || chartData.dataPoints?.[0]?.categoryName
+    || chartData.dataPoints?.[0]?.groupName
+    || null;
 
   const yearSegment = sanitizeFilenameSegment(chartData.year ?? 'Year');
   const pollutantSegment = sanitizeFilenameSegment(pollutantShort || chartData.pollutantName || 'Pollutant');
-  const groupSegment = sanitizeFilenameSegment(groupShort || groupName || 'Group');
+  const categorySegment = sanitizeFilenameSegment(categoryShort || categoryName || 'Category');
 
-  return `${yearSegment}_Bubble-Chart_${pollutantSegment}_${groupSegment}`;
+  return `${yearSegment}_Bubble-Chart_${pollutantSegment}_${categorySegment}`;
 }
 
 /**
@@ -312,22 +389,27 @@ async function generateChartImage() {
             let sourceItems = domItems;
 
             if (!sourceItems.length && chartData) {
-              const groupOrder = Array.isArray(chartData.groupIds) && chartData.groupIds.length
-                ? chartData.groupIds
-                : [...new Set((chartData.dataPoints || []).map(point => point.groupId))];
-              const pointsByGroup = new Map((chartData.dataPoints || []).map(point => [point.groupId, point]));
-              sourceItems = groupOrder.map(groupId => {
-                const point = pointsByGroup.get(groupId);
-                const groupName = point?.groupName
-                  || (typeof window.supabaseModule?.getGroupName === 'function'
-                    ? window.supabaseModule.getGroupName(groupId)
-                    : `Group ${groupId}`);
+              const categoryOrder = collectCategoryIdsFromChartData(chartData);
+              const pointsByCategoryId = new Map(
+                (chartData.dataPoints || []).map(point => {
+                  const id = point.categoryId ?? point.groupId;
+                  return [id, point];
+                })
+              );
+              sourceItems = categoryOrder.map(categoryId => {
+                const point = pointsByCategoryId.get(categoryId);
+                const categoryName = point?.categoryName
+                  || point?.groupName
+                  || resolveCategoryNameById(categoryId, chartData.dataPoints)
+                  || `Category ${categoryId}`;
                 const hasData = Boolean(point);
-                const dotColor = typeof window.Colors?.getColorForGroup === 'function'
-                  ? window.Colors.getColorForGroup(groupName)
-                  : '#000000';
+                const dotColor = typeof window.Colors?.getColorForCategory === 'function'
+                  ? window.Colors.getColorForCategory(categoryName)
+                  : (typeof window.Colors?.getColorForGroup === 'function'
+                    ? window.Colors.getColorForGroup(categoryName)
+                    : '#000000');
                 return {
-                  text: hasData ? groupName : `${groupName} (No data available)`,
+                  text: hasData ? categoryName : `${categoryName} (No data available)`,
                   dotColor,
                   faded: !hasData
                 };
@@ -505,10 +587,17 @@ async function generateChartImage() {
 
           // Get visible data points for EF calculation
           const dataPoints = chartData.dataPoints || [];
-          const visibleDataPoints = dataPoints.filter((point, index) => {
-            const uniqueGroups = [...new Set(dataPoints.map(p => p.groupName))];
-            const groupIndex = uniqueGroups.indexOf(point.groupName);
-            return window.seriesVisibility && window.seriesVisibility[groupIndex] !== false;
+          const categoryOrdering = collectCategoryIdsFromChartData(chartData);
+          const visibleDataPoints = dataPoints.filter(point => {
+            if (!categoryOrdering.length || !window.seriesVisibility) {
+              return true;
+            }
+            const categoryId = point.categoryId ?? point.groupId;
+            const categoryIndex = categoryOrdering.indexOf(categoryId);
+            if (categoryIndex === -1) {
+              return true;
+            }
+            return window.seriesVisibility[categoryIndex] !== false;
           });
 
           // Calculate all EF values for scaling
@@ -648,9 +737,12 @@ async function generateChartImage() {
             const labelText = `${efDisplay} g/GJ`;
             
             // Always place label to the right of the bubble, always black, no leader line
-            const bubbleColor = window.Colors && typeof window.Colors.getColorForGroup === 'function'
-              ? window.Colors.getColorForGroup(point.groupName)
-              : '#000000';
+            const categoryLabel = point.categoryName || point.groupName || 'Category';
+            const bubbleColor = window.Colors && typeof window.Colors.getColorForCategory === 'function'
+              ? window.Colors.getColorForCategory(categoryLabel)
+              : (window.Colors && typeof window.Colors.getColorForGroup === 'function'
+                ? window.Colors.getColorForGroup(categoryLabel)
+                : '#000000');
 
             ctx.font = '400 70px "Tiresias Infofont", sans-serif';
             ctx.textAlign = 'left';
@@ -806,6 +898,7 @@ async function downloadChartPNG() {
       alert('No chart available to download');
       return;
     }
+    const categoryCount = getSelectedCategoryCount(chartData);
 
     const imageData = await generateChartImage();
     const link = document.createElement('a');
@@ -819,7 +912,7 @@ async function downloadChartPNG() {
       window.Analytics.trackAnalytics(supabase, 'bubble_chart_downloaded', {
         year: chartData.year,
         pollutant: chartData.pollutantName,
-        group_count: chartData.groupIds.length,
+        category_count: categoryCount,
         filename: filename,
         chart_type: 'bubble_chart'
       });
@@ -848,22 +941,21 @@ function dataURLtoBlob(dataURL) {
 /**
  * Show share dialog
  */
-function resolveBubbleShareGroups(chartData) {
-  const fromSelectors = typeof window.getSelectedGroups === 'function'
-    ? window.getSelectedGroups().filter(name => !!name)
-    : [];
+function resolveBubbleShareCategories(chartData) {
+  const fromSelectors = typeof window.getSelectedCategories === 'function'
+    ? window.getSelectedCategories().filter(Boolean)
+    : (typeof window.getSelectedGroups === 'function'
+      ? window.getSelectedGroups().filter(Boolean)
+      : []);
   if (fromSelectors.length) {
     return fromSelectors;
   }
 
-  if (Array.isArray(chartData?.groupIds) && chartData.groupIds.length) {
-    const byId = chartData.groupIds.map(groupId => {
-      if (typeof window.supabaseModule?.getGroupName === 'function') {
-        return window.supabaseModule.getGroupName(groupId);
-      }
-      const point = chartData.dataPoints?.find(p => p.groupId === groupId);
-      return point?.groupName;
-    }).filter(Boolean);
+  const categoryIds = collectCategoryIdsFromChartData(chartData);
+  if (categoryIds.length) {
+    const byId = categoryIds
+      .map(categoryId => resolveCategoryNameById(categoryId, chartData?.dataPoints))
+      .filter(Boolean);
     if (byId.length) {
       return byId;
     }
@@ -872,8 +964,9 @@ function resolveBubbleShareGroups(chartData) {
   if (Array.isArray(chartData?.dataPoints) && chartData.dataPoints.length) {
     const deduped = [];
     chartData.dataPoints.forEach(point => {
-      if (point?.groupName && !deduped.includes(point.groupName)) {
-        deduped.push(point.groupName);
+      const name = point?.categoryName || point?.groupName;
+      if (name && !deduped.includes(name)) {
+        deduped.push(name);
       }
     });
     if (deduped.length) {
@@ -953,28 +1046,27 @@ function showShareDialog() {
   }
 
   // Build shareable URL with parameters matching updateURL() format
-  // Get group IDs with comparison flags ('c' suffix if checkbox is checked)
-  const groupRows = document.querySelectorAll('.groupRow');
-  
-  const groupIdsWithFlags = chartData.groupIds.map((groupId, index) => {
-    // Check if the corresponding checkbox is checked
-    const row = groupRows[index];
+  // Get category IDs with comparison flags ('c' suffix if checkbox is checked)
+  const categoryRows = document.querySelectorAll('.groupRow');
+  const selectedCategoryIds = collectCategoryIdsFromChartData(chartData);
+  const selectedCategoryCount = selectedCategoryIds.length;
+
+  const categoryIdsWithFlags = selectedCategoryIds.map((categoryId, index) => {
+    const row = categoryRows[index];
     const checkbox = row?.querySelector('.comparison-checkbox');
     const isChecked = checkbox?.checked || false;
-    
-    // Add 'c' suffix if checkbox is checked
-    return isChecked ? `${groupId}c` : `${groupId}`;
+    return isChecked ? `${categoryId}c` : `${categoryId}`;
   });
 
-  // Format: pollutant_id, group_ids, year (year at the end)
-  const query = `chart=1&pollutant_id=${chartData.pollutantId}&group_ids=${groupIdsWithFlags.join(',')}&year=${chartData.year}`;
+  // Format: pollutant_id, category_ids, year (year at the end)
+  const query = `chart=1&pollutant_id=${chartData.pollutantId}&category_ids=${categoryIdsWithFlags.join(',')}&year=${chartData.year}`;
   const shareUrl = resolveShareUrl(query);
   const displayShareUrl = formatShareUrlForDisplay(shareUrl) || shareUrl;
 
-  const shareGroupNames = resolveBubbleShareGroups(chartData);
-  const groupSummary = shareGroupNames.length ? shareGroupNames.join(', ') : 'Selected Groups';
+  const shareCategoryNames = resolveBubbleShareCategories(chartData);
+  const categorySummary = shareCategoryNames.length ? shareCategoryNames.join(', ') : 'Selected Categories';
   const yearSuffix = chartData.year ? ` (${chartData.year})` : '';
-  const title = `${chartData.pollutantName} - ${groupSummary}${yearSuffix}`;
+  const title = `${chartData.pollutantName} - ${categorySummary}${yearSuffix}`;
 
   // Create dialog
   const dialog = document.createElement('div');
@@ -1088,7 +1180,7 @@ function showShareDialog() {
         window.Analytics.trackAnalytics(supabase, 'share_url_copied', {
           year: chartData.year,
           pollutant: chartData.pollutantName,
-          group_count: chartData.groupIds.length
+          category_count: selectedCategoryCount
         });
       }
       
@@ -1122,7 +1214,7 @@ function showShareDialog() {
           window.Analytics.trackAnalytics(supabase, 'share_png_copied', {
             year: chartData.year,
             pollutant: chartData.pollutantName,
-            group_count: chartData.groupIds.length
+            category_count: selectedCategoryCount
           });
         }
         
@@ -1152,7 +1244,7 @@ function showShareDialog() {
         window.Analytics.trackAnalytics(supabase, 'email_share_copied', {
           year: chartData.year,
           pollutant: chartData.pollutantName,
-          group_count: chartData.groupIds.length
+          category_count: selectedCategoryCount
         });
       }
 
@@ -1161,7 +1253,7 @@ function showShareDialog() {
             pollutantName: chartData.pollutantName,
             singleYear: chartData.year,
             shareUrl,
-            groups: shareGroupNames
+            categories: shareCategoryNames
           })
         : null;
 
@@ -1208,7 +1300,7 @@ function exportData(format = 'csv') {
   const chartData = window.ChartRenderer.getCurrentChartData();
   
   if (!chartData || !chartData.dataPoints || chartData.dataPoints.length === 0) {
-    alert('No chart data available to export. Please select a pollutant, groups, and year first.');
+    alert('No chart data available to export. Please select a pollutant, categories, and year first.');
     return;
   }
 
@@ -1218,6 +1310,8 @@ function exportData(format = 'csv') {
   const activityUnit = window.supabaseModule.getPollutantUnit(actDataId);
   const year = chartData.year;
   const dataPoints = chartData.dataPoints;
+  const selectedCategoryIds = collectCategoryIdsFromChartData(chartData);
+  const categoryCount = selectedCategoryIds.length || dataPoints.length;
 
   const csvNumberFormatter = new Intl.NumberFormat('en-US', {
     useGrouping: false,
@@ -1243,7 +1337,7 @@ function exportData(format = 'csv') {
       format: format,
       pollutant: pollutantName,
       year: year,
-      group_count: dataPoints.length
+      category_count: categoryCount
     });
   }
 
@@ -1256,15 +1350,16 @@ function exportData(format = 'csv') {
   rows.push([]); // spacer row
   
   // Column headers - use hyphens instead of brackets to match chart formatting
-  rows.push(['Group', `Activity Data - ${activityUnit}`, `Emissions - ${pollutantUnit}`, 'Emission Factor - g/GJ']);
+  rows.push(['Category', `Activity Data - ${activityUnit}`, `Emissions - ${pollutantUnit}`, 'Emission Factor - g/GJ']);
 
   // Data rows
   dataPoints.forEach(point => {
     const emissionFactor = point.EF !== undefined ? point.EF : 
       (point.actDataValue !== 0 ? (point.pollutantValue / point.actDataValue) * 1000000 : 0);
 
+    const categoryLabel = point.categoryName || point.groupName || 'Category';
     rows.push([
-      point.groupName,
+      categoryLabel,
       toNumberOrEmpty(point.actDataValue),
       toNumberOrEmpty(point.pollutantValue),
       toNumberOrEmpty(emissionFactor)

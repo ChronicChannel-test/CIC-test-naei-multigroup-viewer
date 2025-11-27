@@ -101,9 +101,9 @@ When updating shared resources:
 ## Database Schema
 
 The shared Supabase configuration connects to these tables:
-- `NAEI_global_Pollutants` - Pollutant definitions and units
-- `NAEI_global_t_Group` - Emission source group definitions
-- `NAEI_2023ds_t_Group_Data` - Time-series data (1970-2023)
+- `naei_global_t_pollutant` - Pollutant definitions and units
+- `naei_global_t_category` - Emission source group definitions
+- `naei_2023ds_t_category_data` - Time-series data (1970-2023)
 - `analytics_events` - Usage analytics tracking (optional)
 
 ## Color Palette

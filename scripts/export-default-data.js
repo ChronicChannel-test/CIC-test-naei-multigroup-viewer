@@ -42,7 +42,7 @@ async function main() {
 
   console.log('Fetching full pollutant metadata...');
   const { data: pollutantRows, error: pollutantError } = await client
-    .from('NAEI_global_Pollutants')
+    .from('naei_global_t_pollutant')
     .select('id,pollutant,emission_unit')
     .order('pollutant', { ascending: true });
   if (pollutantError) throw pollutantError;
@@ -53,9 +53,9 @@ async function main() {
 
   console.log('Fetching full group metadata...');
   const { data: groupRows, error: groupError } = await client
-    .from('NAEI_global_t_Group')
-    .select('id,group_title')
-    .order('group_title', { ascending: true });
+    .from('naei_global_t_category')
+    .select('id,category_title')
+    .order('category_title', { ascending: true });
   if (groupError) throw groupError;
 
   if (!groupRows || groupRows.length === 0) {
@@ -63,7 +63,7 @@ async function main() {
   }
 
   const pollutantIdMap = Object.fromEntries(pollutantRows.map(row => [row.pollutant, row.id]));
-  const groupIdMap = Object.fromEntries(groupRows.map(row => [row.group_title, row.id]));
+  const groupIdMap = Object.fromEntries(groupRows.map(row => [row.category_title, row.id]));
 
   const linePollutantId = pollutantIdMap[DEFAULT_LINE_POLLUTANT];
   const bubblePollutantId = pollutantIdMap[DEFAULT_BUBBLE_POLLUTANT];
@@ -91,10 +91,10 @@ async function main() {
 
   console.log('Fetching line-chart timeseries rows...');
   const { data: lineTimeseriesRows, error: lineTimeseriesError } = await client
-    .from('NAEI_2023ds_t_Group_Data')
+    .from('naei_2023ds_t_category_data')
     .select('*')
     .eq('pollutant_id', linePollutantId)
-    .in('group_id', lineGroupIds);
+    .in('category_id', lineGroupIds);
   if (lineTimeseriesError) throw lineTimeseriesError;
 
   if (!lineTimeseriesRows || !lineTimeseriesRows.length) {
@@ -103,10 +103,10 @@ async function main() {
 
   console.log('Fetching bubble snapshot rows...');
   const { data: bubbleSnapshotRows, error: bubbleSnapshotError } = await client
-    .from('NAEI_2023ds_t_Group_Data')
-    .select('id,pollutant_id,group_id,f2023')
+    .from('naei_2023ds_t_category_data')
+    .select('id,pollutant_id,category_id,f2023')
     .in('pollutant_id', [bubblePollutantId, activityPollutantId])
-    .in('group_id', bubbleGroupIds);
+    .in('category_id', bubbleGroupIds);
   if (bubbleSnapshotError) throw bubbleSnapshotError;
 
   if (!bubbleSnapshotRows || !bubbleSnapshotRows.length) {
@@ -115,13 +115,13 @@ async function main() {
 
   console.log('Fetching activity coverage map...');
   const { data: activityCoverageRows, error: activityCoverageError } = await client
-    .from('NAEI_2023ds_t_Group_Data')
-    .select('group_id')
+    .from('naei_2023ds_t_category_data')
+    .select('category_id')
     .eq('pollutant_id', activityPollutantId);
   if (activityCoverageError) throw activityCoverageError;
 
   const activityGroupSet = new Set(
-    (activityCoverageRows || []).map(row => row.group_id)
+    (activityCoverageRows || []).map(row => row.category_id)
   );
 
   const sampleRow = lineTimeseriesRows[0] || {};
@@ -133,7 +133,7 @@ async function main() {
   const trimmedBubbleRows = bubbleSnapshotRows.map(row => ({
     id: row.id,
     pollutant_id: row.pollutant_id,
-    group_id: row.group_id,
+    category_id: row.category_id,
     f2023: row.f2023
   }));
 
@@ -169,7 +169,7 @@ async function main() {
       }),
       groups: groupRows.map(row => ({
         id: row.id,
-        group_title: row.group_title,
+        category_title: row.category_title,
         has_activity_data: activityGroupSet.has(row.id)
       })),
       timeseries: timeseriesRows,

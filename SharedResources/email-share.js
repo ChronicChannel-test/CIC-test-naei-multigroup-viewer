@@ -33,11 +33,11 @@
     return value.replace(/^(https?:\/\/)/i, '');
   }
 
-  function sanitizeGroups(groups) {
-    if (!Array.isArray(groups) || !groups.length) {
+  function sanitizeCategories(categories) {
+    if (!Array.isArray(categories) || !categories.length) {
       return [];
     }
-    return groups
+    return categories
       .map(entry => clean(entry))
       .filter(Boolean);
   }
@@ -87,7 +87,7 @@
     const yearNarrative = buildYearNarrative({ ...options, yearSummary });
     const shareUrl = clean(options.shareUrl);
     const readableShareUrl = stripProtocol(toReadableUrl(shareUrl));
-    const groups = sanitizeGroups(options.groups);
+    const categories = sanitizeCategories(options.categories || options.groups);
 
     const subjectParts = [`UK Air Pollution/Emissions Data: ${pollutantName}`];
     if (yearSummary) {
@@ -101,9 +101,9 @@
     bodyLines.push('');
     bodyLines.push('Groups included:');
 
-    if (groups.length) {
-      groups.forEach((group, index) => {
-        bodyLines.push(`${index + 1}. ${group}`);
+    if (categories.length) {
+      categories.forEach((category, index) => {
+        bodyLines.push(`${index + 1}. ${category}`);
       });
     } else {
       bodyLines.push('None specified');

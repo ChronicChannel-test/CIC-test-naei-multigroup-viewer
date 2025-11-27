@@ -1,6 +1,6 @@
 /**
  * Main Chart and UI Module
- * Handles chart rendering, UI interactions, group management, and initialization
+ * Handles chart rendering, UI interactions, category management, and initialization
  * v2.4 - Now uses shared color module
  */
 
@@ -32,6 +32,12 @@ let initialLoadComplete = false; // Track if initial chart load is done (prevent
 let initFailureNotified = false; // Ensure we only notify parent once on failure
 let hydrationRefreshPending = false;
 let hydrationRefreshTimer = null;
+const DEFAULT_LINE_SELECTIONS = {
+  pollutant: 'PM2.5',
+  categories: ['All'],
+  startYear: null,
+  endYear: null
+};
 
 function scheduleHydrationRefreshAttempt(attempt = 0) {
   if (!hydrationRefreshPending) {
@@ -85,8 +91,8 @@ if (!window.Colors) {
       colorAssignments.clear();
       nextColorIndex = 0;
     },
-    getColorForGroup(groupName) {
-      const key = groupName || `group-${nextColorIndex}`;
+    getColorForCategory(categoryName) {
+      const key = categoryName || `category-${nextColorIndex}`;
       if (colorAssignments.has(key)) {
         return colorAssignments.get(key);
       }
@@ -148,6 +154,47 @@ function beginLineChartStabilityCycle() {
 
 function waitForLineChartStability() {
   return lineChartStabilityHandle?.promise || Promise.resolve();
+}
+
+function isLineChartEmbedded() {
+  try {
+    return Boolean(window.parent && window.parent !== window);
+  } catch (error) {
+    return false;
+  }
+}
+
+function readLineSnapshotDefaults() {
+  const extractDefaults = cache => {
+    if (!cache || !cache.defaultSnapshot) {
+      return null;
+    }
+    return cache.defaultSnapshot?.defaults?.lineChart || null;
+  };
+
+  const local = extractDefaults(window.SharedDataCache);
+  if (local) {
+    return local;
+  }
+
+  try {
+    const parentDefaults = extractDefaults(window.parent?.SharedDataCache);
+    if (parentDefaults) {
+      return parentDefaults;
+    }
+  } catch (error) {}
+
+  return null;
+}
+
+function getLineDefaultSelections() {
+  const snapshotDefaults = readLineSnapshotDefaults();
+  return {
+    pollutant: snapshotDefaults?.pollutant || DEFAULT_LINE_SELECTIONS.pollutant,
+    categories: (snapshotDefaults?.categories?.length ? snapshotDefaults.categories : DEFAULT_LINE_SELECTIONS.categories),
+    startYear: snapshotDefaults?.startYear ?? DEFAULT_LINE_SELECTIONS.startYear,
+    endYear: snapshotDefaults?.endYear ?? DEFAULT_LINE_SELECTIONS.endYear
+  };
 }
 
 const LINE_MIN_CHART_CANVAS_HEIGHT = 420;
@@ -584,9 +631,42 @@ function freezeWidthForOpera(selectors = [], opts = {}) {
 }
 
 const SMOOTHING_TOGGLE_LABELS = {
-  smoothingOn: '🚫 Disable Smoothing',
-  smoothingOff: '✅ Enable Smoothing'
+  smoothingOn: {
+    text: 'Disable Smoothing',
+    iconClass: 'smoothing-icon smoothing-icon-disable'
+  },
+  smoothingOff: {
+    text: 'Enable Smoothing',
+    iconClass: 'smoothing-icon smoothing-icon-enable'
+  }
 };
+
+function populateSmoothingToggleContent(target, config) {
+  if (!target) {
+    return;
+  }
+
+  const normalized = {
+    text: (config && config.text) || '',
+    iconClass: (config && config.iconClass) || ''
+  };
+
+  while (target.firstChild) {
+    target.removeChild(target.firstChild);
+  }
+
+  if (normalized.iconClass) {
+    const iconSpan = document.createElement('span');
+    iconSpan.className = normalized.iconClass;
+    iconSpan.setAttribute('aria-hidden', 'true');
+    target.appendChild(iconSpan);
+  }
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'smoothing-label-text';
+  textSpan.textContent = normalized.text;
+  target.appendChild(textSpan);
+}
 
 function freezeSmoothingToggleWidth(options = {}) {
   const button = document.getElementById('toggleSmoothBtn');
@@ -599,13 +679,13 @@ function freezeSmoothingToggleWidth(options = {}) {
   const attemptDelay = Math.max(16, Number.isFinite(config.attemptDelay) ? Number(config.attemptDelay) : 140);
   const extraPadding = Number.isFinite(config.extraPadding) ? Number(config.extraPadding) : 6;
 
-  const measureCandidate = (label) => {
-    if (!label) {
+  const measureCandidate = (config) => {
+    if (!config) {
       return 0;
     }
     const clone = button.cloneNode(true);
     clone.removeAttribute('id');
-    clone.textContent = label;
+    populateSmoothingToggleContent(clone, config);
     clone.style.position = 'absolute';
     clone.style.visibility = 'hidden';
     clone.style.pointerEvents = 'none';
@@ -621,11 +701,16 @@ function freezeSmoothingToggleWidth(options = {}) {
 
   const freezeWidth = () => {
     const labels = [
-      button.dataset.labelOn,
-      button.dataset.labelOff,
+      button.dataset.labelOn ? {
+        text: button.dataset.labelOn,
+        iconClass: SMOOTHING_TOGGLE_LABELS.smoothingOn.iconClass
+      } : null,
+      button.dataset.labelOff ? {
+        text: button.dataset.labelOff,
+        iconClass: SMOOTHING_TOGGLE_LABELS.smoothingOff.iconClass
+      } : null,
       SMOOTHING_TOGGLE_LABELS.smoothingOn,
-      SMOOTHING_TOGGLE_LABELS.smoothingOff,
-      button.textContent
+      SMOOTHING_TOGGLE_LABELS.smoothingOff
     ].filter(Boolean);
 
     if (!labels.length) {
@@ -670,13 +755,14 @@ function updateSmoothingToggleLabel(button, isSmooth) {
     return;
   }
 
-  const nextLabel = isSmooth
+  const labelConfig = isSmooth
     ? SMOOTHING_TOGGLE_LABELS.smoothingOn
     : SMOOTHING_TOGGLE_LABELS.smoothingOff;
 
-  button.textContent = nextLabel;
+  populateSmoothingToggleContent(button, labelConfig);
   button.setAttribute('aria-pressed', isSmooth ? 'true' : 'false');
-  button.setAttribute('aria-label', nextLabel);
+  button.setAttribute('aria-label', labelConfig?.text || '');
+  button.dataset.smoothingState = isSmooth ? 'on' : 'off';
 }
 
 function getElementBottom(el) {
@@ -912,8 +998,8 @@ function selectionsReady() {
     const pollutant = document.getElementById('pollutantSelect')?.value;
     const startYear = +document.getElementById('startYear')?.value;
     const endYear = +document.getElementById('endYear')?.value;
-    const groups = getSelectedGroups();
-    return Boolean(pollutant && startYear && endYear && startYear < endYear && groups.length);
+    const categories = getSelectedCategories();
+    return Boolean(pollutant && startYear && endYear && startYear < endYear && categories.length);
   } catch (e) {
     return false;
   }
@@ -970,10 +1056,21 @@ function computeSafeExportScale(origW, origH, desiredScale) {
 }
 
 /* ---------------- Setup Functions ---------------- */
-function setupSelectors(pollutants, groups){
-  // ✅ Use pollutant list from Supabase loadData
+function getCategoryDisplayTitle(record) {
+  if (!record || typeof record !== 'object') {
+    return '';
+  }
+  const title = record.category_title
+    || record.group_name
+    || record.title
+    || '';
+  return typeof title === 'string' ? title : '';
+}
+
+function setupSelectors(pollutants, categories) {
   const sel = document.getElementById('pollutantSelect');
   sel.innerHTML = '<option value="">Select pollutant</option>';
+
   if (pollutants && pollutants.length) {
     const pollutantNames = [...new Set(pollutants.map(p => p.pollutant))]
       .filter(Boolean)
@@ -981,20 +1078,17 @@ function setupSelectors(pollutants, groups){
     pollutantNames.forEach(p => sel.add(new Option(p, p)));
   }
 
-  // Ensure we have the groups list available from the global window var
-  if (groups && groups.length) {
-    const groupNames = [...new Set(groups.map(g => g.group_title))]
+  if (categories && categories.length) {
+    const categoryNames = [...new Set(categories.map(getCategoryDisplayTitle))]
       .filter(Boolean)
       .sort((a, b) => {
         if (a.toLowerCase() === 'all') return -1;
         if (b.toLowerCase() === 'all') return 1;
         return a.localeCompare(b);
       });
-    window.allGroupsList = groupNames;
+    window.allCategoriesList = categoryNames;
   }
 
-
-  // ✅ Use precomputed globalYears instead of header slice
   const years = window.globalYears || [];
   const startSel = document.getElementById('startYear');
   const endSel = document.getElementById('endYear');
@@ -1020,9 +1114,9 @@ function setupSelectors(pollutants, groups){
     updateChart();
   });
 
-  // Group selectors will be added by the init() function after URL parameter processing
-  // This prevents double group creation that causes visual jumping
- }
+  // Category selectors will be added by the init() function after URL parameter processing
+  // This prevents double category creation that causes visual jumping
+}
 
 function updateYearDropdowns() {
   const startSel = document.getElementById('startYear');
@@ -1073,19 +1167,23 @@ function updateYearDropdowns() {
   endSel.value = endVal;
 }
 
-function getSelectedGroups(){ return [...document.querySelectorAll('#groupContainer select')].map(s => s.value).filter(Boolean); }
-function addGroupSelector(defaultValue = "", usePlaceholder = true){
-  const groupName = (defaultValue && typeof defaultValue === 'object')
-    ? defaultValue.group_title
+function getSelectedCategories(){
+  return [...document.querySelectorAll('#categoryContainer select')]
+    .map(s => s.value)
+    .filter(Boolean);
+}
+function addCategorySelector(defaultValue = "", usePlaceholder = true){
+  const categoryName = (defaultValue && typeof defaultValue === 'object')
+    ? getCategoryDisplayTitle(defaultValue)
     : defaultValue;
-  const container = document.getElementById('groupContainer');
+  const container = document.getElementById('categoryContainer');
   const div = document.createElement('div');
-  div.className = 'groupRow';
+  div.className = 'categoryRow';
   div.draggable = true;
 
-  // group control wrapper (keeps drag handle and select together)
+  // category control wrapper (keeps drag handle and select together)
   const controlWrap = document.createElement('div');
-  controlWrap.className = 'group-control';
+  controlWrap.className = 'category-control';
 
   // convert drag handle into an accessible button so it's keyboard-focusable
   const handleBtn = document.createElement('button');
@@ -1097,23 +1195,23 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   handleBtn.style.marginRight = '6px';
   controlWrap.appendChild(handleBtn);
 
-  // group select
+  // category select
   const sel = document.createElement('select');
   sel.setAttribute('aria-label', 'Group selector');
-  sel.name = 'groupSelector';
+  sel.name = 'categorySelector';
   if (usePlaceholder){
     const ph = new Option('Select group','');
     ph.disabled = true; ph.selected = true;
     sel.add(ph);
   }
-  const allGroups = window.allGroupsList || [];
+  const allCategories = window.allCategoriesList || [];
 
-  const selected = getSelectedGroups();
-  allGroups.forEach(g => {
-    if (!selected.includes(g) || g === groupName) sel.add(new Option(g,g));
+  const selected = getSelectedCategories();
+  allCategories.forEach(category => {
+    if (!selected.includes(category) || category === categoryName) sel.add(new Option(category,category));
   });
-  if (groupName) sel.value = groupName;
-  sel.addEventListener('change', () => { refreshGroupDropdowns(); updateChart(); });
+  if (categoryName) sel.value = categoryName;
+  sel.addEventListener('change', () => { refreshCategoryDropdowns(); updateChart(); });
 
   controlWrap.appendChild(sel);
   // append the control wrap first; remove button will be appended to row as a sibling
@@ -1125,10 +1223,10 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         let prev = div.previousElementSibling;
-        while (prev && !prev.classList.contains('groupRow')) prev = prev.previousElementSibling;
+        while (prev && !prev.classList.contains('categoryRow')) prev = prev.previousElementSibling;
         if (prev) {
           container.insertBefore(div, prev);
-          refreshGroupDropdowns();
+          refreshCategoryDropdowns();
           refreshButtons();
           updateChart();
           // move focus back to the handle for continued keyboard moves
@@ -1137,10 +1235,10 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         let next = div.nextElementSibling;
-        while (next && !next.classList.contains('groupRow')) next = next.nextElementSibling;
+        while (next && !next.classList.contains('categoryRow')) next = next.nextElementSibling;
         if (next) {
           container.insertBefore(div, next.nextElementSibling);
-          refreshGroupDropdowns();
+          refreshCategoryDropdowns();
           refreshButtons();
           updateChart();
           handleBtn.focus();
@@ -1156,18 +1254,18 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   refreshButtons();
 }
 
-function refreshGroupDropdowns(){
-  const selected = getSelectedGroups();
-  const all = window.allGroupsList || [];
+function refreshCategoryDropdowns(){
+  const selected = getSelectedCategories();
+  const all = window.allCategoriesList || [];
 
 
-  document.querySelectorAll('#groupContainer select').forEach(select => {
+  document.querySelectorAll('#categoryContainer select').forEach(select => {
     const current = select.value;
     Array.from(select.options).forEach(opt => { if (opt.value !== '') opt.remove(); });
-    all.forEach(g => {
-      if (!selected.includes(g) || g === current) {
-        const option = new Option(g,g);
-        if (g === current) option.selected = true;
+    all.forEach(category => {
+      if (!selected.includes(category) || category === current) {
+        const option = new Option(category,category);
+        if (category === current) option.selected = true;
         select.add(option);
       }
     });
@@ -1175,28 +1273,28 @@ function refreshGroupDropdowns(){
 }
 
 function refreshButtons() {
-  const container = document.getElementById('groupContainer');
+  const container = document.getElementById('categoryContainer');
   // Remove any existing Add/Remove buttons to rebuild cleanly
   container.querySelectorAll('.add-btn, .remove-btn').forEach(n => n.remove());
 
-  const rows = container.querySelectorAll('.groupRow');
+  const rows = container.querySelectorAll('.categoryRow');
 
   // Add remove buttons only if there are 2 or more groups
     if (rows.length >= 2) {
     rows.forEach(row => {
         if (!row.querySelector('.remove-btn')) {
-        const removeBtn = document.createElement('button');
-        removeBtn.type = 'button';
-        removeBtn.className = 'remove-btn';
-  removeBtn.innerHTML = '<span class="remove-icon" aria-hidden="true"></span> Remove Group';
+          const removeBtn = document.createElement('button');
+          removeBtn.type = 'button';
+          removeBtn.className = 'remove-btn';
+        removeBtn.innerHTML = '<span class="remove-icon" aria-hidden="true"></span> Remove Category';
         // make ARIA label include the current group name if available
         const sel = row.querySelector('select');
-        const groupName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
-        removeBtn.setAttribute('aria-label', groupName ? 'Remove group ' + groupName : 'Remove group');
+        const categoryName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
+          removeBtn.setAttribute('aria-label', categoryName ? 'Remove category ' + categoryName : 'Remove category');
         removeBtn.onclick = () => {
           row.remove();
           refreshButtons();
-          refreshGroupDropdowns();
+          refreshCategoryDropdowns();
           updateChart();
         };
         // Append remove button as a sibling to the control wrapper so it
@@ -1206,13 +1304,13 @@ function refreshButtons() {
     });
   }
 
-  // Add "Add Group" button just below the last group box
+  // Add "Add Category" button just below the last selector
   let addBtn = container.querySelector('.add-btn');
   if (!addBtn) {
     addBtn = document.createElement('button');
     addBtn.className = 'add-btn';
-    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
-    addBtn.onclick = () => addGroupSelector("", true);
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Category';
+    addBtn.onclick = () => addCategorySelector("", true);
     container.appendChild(addBtn);
   }
 
@@ -1221,7 +1319,7 @@ function refreshButtons() {
     addBtn.textContent = 'Max Groups = 10';
     addBtn.disabled = true;
   } else {
-    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Category';
     addBtn.disabled = false;
   }
 
@@ -1274,7 +1372,7 @@ function addDragAndDropHandlers(div){
   div.addEventListener('dragend', () => div.classList.remove('dragging'));
   div.addEventListener('dragover', e => {
     e.preventDefault();
-    const container = document.getElementById('groupContainer');
+    const container = document.getElementById('categoryContainer');
     const dragging = container.querySelector('.dragging');
     if (!dragging) return;
     const after = getDragAfterElement(container, e.clientY);
@@ -1282,11 +1380,11 @@ function addDragAndDropHandlers(div){
     if (!after || after === addBtn) container.insertBefore(dragging, addBtn);
     else container.insertBefore(dragging, after);
   });
-  div.addEventListener('drop', () => { refreshGroupDropdowns(); updateChart(); });
+  div.addEventListener('drop', () => { refreshCategoryDropdowns(); updateChart(); });
 }
 
 function getDragAfterElement(container, y){
-  const draggable = [...container.querySelectorAll('.groupRow:not(.dragging)')];
+  const draggable = [...container.querySelectorAll('.categoryRow:not(.dragging)')];
   return draggable.reduce((closest, child) => {
     const box = child.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -1371,9 +1469,9 @@ function addCustomXAxisLabels() {
 function updateUrlFromChartState() {
   // Ensure the data needed for ID lookups is available.
   const pollutants = window.allPollutantsData || [];
-  const groups = window.allGroupsData || [];
+  const categories = window.allCategoriesData || [];
 
-  if (!pollutants.length || !groups.length) {
+  if (!pollutants.length || !categories.length) {
     return;
   }
 
@@ -1383,9 +1481,9 @@ function updateUrlFromChartState() {
       const pollutantName = document.getElementById('pollutantSelect')?.value;
       const startYear = document.getElementById('startYear')?.value;
       const endYear = document.getElementById('endYear')?.value;
-      const groupNames = getSelectedGroups();
+      const categoryNames = getSelectedCategories();
 
-      if (!pollutantName || !startYear || !endYear || groupNames.length === 0) {
+      if (!pollutantName || !startYear || !endYear || categoryNames.length === 0) {
         return; // Not enough info to create a valid URL
       }
 
@@ -1393,15 +1491,15 @@ function updateUrlFromChartState() {
       const pollutant = pollutants.find(p => p.pollutant === pollutantName);
       const pollutantId = pollutant ? pollutant.id : null;
 
-      // Find group IDs
-      const groupIds = groupNames.map(name => {
-        const group = groups.find(g => g.group_title === name);
-        return group ? group.id : null;
+      // Find category IDs
+      const categoryIds = categoryNames.map(name => {
+        const category = categories.find(entry => getCategoryDisplayTitle(entry) === name);
+        return category ? category.id : null;
       }).filter(id => id !== null);
 
-      if (!pollutantId || groupIds.length !== groupNames.length) {
+      if (!pollutantId || categoryIds.length !== categoryNames.length) {
         console.warn("Could not map all names to IDs for URL update.");
-        console.warn('pollutantId:', pollutantId, 'groupIds:', groupIds, 'groupNames:', groupNames);
+        console.warn('pollutantId:', pollutantId, 'categoryIds:', categoryIds, 'categoryNames:', categoryNames);
         return;
       }
 
@@ -1413,7 +1511,7 @@ function updateUrlFromChartState() {
       // Build query parameters
       const queryParts = [
         `pollutant_id=${encodeURIComponent(pollutantId)}`,
-        `group_ids=${groupIds.join(',')}`,
+        `category_ids=${categoryIds.join(',')}`,
         `start_year=${encodeURIComponent(startYear)}`,
         `end_year=${encodeURIComponent(endYear)}`
       ];
@@ -1482,8 +1580,8 @@ async function updateChart(){
   const pollutant = document.getElementById('pollutantSelect').value;
   const startYear = +document.getElementById('startYear').value;
   const endYear = +document.getElementById('endYear').value;
-  const selectedGroups = getSelectedGroups();
-  if (!pollutant || !startYear || !endYear || !selectedGroups.length) return;
+  const selectedCategories = getSelectedCategories();
+  if (!pollutant || !startYear || !endYear || !selectedCategories.length) return;
 
   const preLegendEstimate = updateChartWrapperHeight('updateChart');
 
@@ -1495,25 +1593,27 @@ async function updateChart(){
     pollutant: pollutant,
     start_year: startYear,
     end_year: endYear,
-    groups: selectedGroups,
-    groups_count: selectedGroups.length,
+    categories: selectedCategories,
+    categories_count: selectedCategories.length,
     year_range: endYear - startYear + 1
   });
 
   window.Colors.resetColorSystem();
-  if (seriesVisibility.length !== selectedGroups.length) {
-    seriesVisibility = Array(selectedGroups.length).fill(true);
+  if (seriesVisibility.length !== selectedCategories.length) {
+    seriesVisibility = Array(selectedCategories.length).fill(true);
     window.seriesVisibility = seriesVisibility; // Keep export.js in sync
   }
 
-  const layeredGroups = selectedGroups.map((group, uiIndex) => ({
-    name: group,
+  const categorisedData = window.categorisedData || window.groupedData || {};
+
+  const layeredCategories = selectedCategories.map((category, uiIndex) => ({
+    name: category,
     uiIndex,
-    color: window.Colors.getColorForGroup(group)
+    color: window.Colors.getColorForCategory(category)
   }));
-  const drawingGroups = layeredGroups.slice().reverse();
+  const drawingCategories = layeredCategories.slice().reverse();
   const drawingIndexByUi = new Map();
-  drawingGroups.forEach((entry, index) => {
+  drawingCategories.forEach((entry, index) => {
     drawingIndexByUi.set(entry.uiIndex, index);
   });
 
@@ -1526,28 +1626,27 @@ async function updateChart(){
   const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
 
   // Build rows of data (year + series values). Use null for missing.
-  const chartRows = years.map((y, rowIdx) => {
-    const row = [y];
-    const key = keysForYears[rowIdx]; // e.g. 'f2015'
-    drawingGroups.forEach(({ name }) => {
-      const dataRow = groupedData[pollutant]?.[name];
-      const raw = dataRow ? dataRow[key] : null;
+  const chartRows = years.map((yearLabel, rowIdx) => {
+    const key = keysForYears[rowIdx];
+    const row = [yearLabel];
+    drawingCategories.forEach(({ name }) => {
+      const dataRow = categorisedData[pollutant]?.[name];
+      const raw = key && dataRow ? dataRow[key] : null;
       const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
       row.push(Number.isNaN(val) ? null : val);
     });
     return row;
   });
 
-  // guard against empty data
   if (chartRows.length === 0) return;
 
   stabilityHandle = beginLineChartStabilityCycle();
 
-  // --- Determine which groups actually have data ---
-  const dataPresenceByDrawingIndex = drawingGroups.map((_, seriesIndex) => (
+  // --- Determine which categories actually have data ---
+  const dataPresenceByDrawingIndex = drawingCategories.map((_, seriesIndex) => (
     chartRows.some(row => typeof row[seriesIndex + 1] === 'number')
   ));
-  const groupHasData = layeredGroups.map(entry => {
+  const categoryHasData = layeredCategories.map(entry => {
     const drawingIndex = drawingIndexByUi.get(entry.uiIndex);
     return typeof drawingIndex === 'number'
       ? dataPresenceByDrawingIndex[drawingIndex]
@@ -1560,7 +1659,7 @@ async function updateChart(){
   // Create DataTable explicitly to guarantee column types
   const dataTable = new google.visualization.DataTable();
   dataTable.addColumn('string', 'Year');           // year as string
-  drawingGroups.forEach(({ name }) => {
+  drawingCategories.forEach(({ name }) => {
     dataTable.addColumn('number', name);              // data column
     dataTable.addColumn({type: 'string', role: 'tooltip'}); // custom tooltip
   });
@@ -1576,8 +1675,8 @@ async function updateChart(){
       if (value === null || value === undefined) {
         newRow.push(null);
       } else {
-        const groupEntry = drawingGroups[i - 1];
-        const groupName = groupEntry ? groupEntry.name : '';
+        const categoryEntry = drawingCategories[i - 1];
+        const categoryName = categoryEntry ? categoryEntry.name : '';
         let formattedValue;
         
         // Use more decimals for very small values
@@ -1589,7 +1688,7 @@ async function updateChart(){
           formattedValue = value.toFixed(3).replace(/\.?0+$/, ''); // 3 decimals for normal values
         }
         
-        const tooltip = groupName + '\nYear: ' + row[0] + '\nValue: ' + formattedValue + (unit ? ' ' + unit : '');
+        const tooltip = categoryName + '\nYear: ' + row[0] + '\nValue: ' + formattedValue + (unit ? ' ' + unit : '');
         newRow.push(tooltip);
       }
     }
@@ -1597,7 +1696,7 @@ async function updateChart(){
   });
 
   const seriesOptions = {};
-  drawingGroups.forEach((entry, seriesIndex) => {
+  drawingCategories.forEach((entry, seriesIndex) => {
     const isVisible = seriesVisibility[entry.uiIndex];
     const color = entry.color;
     seriesOptions[seriesIndex] = isVisible
@@ -1648,12 +1747,12 @@ async function updateChart(){
   const legendDiv = document.getElementById('customLegend');
   legendDiv.innerHTML = '';
 
-  if (seriesVisibility.length !== selectedGroups.length) {
-    seriesVisibility = Array(selectedGroups.length).fill(true);
+  if (seriesVisibility.length !== selectedCategories.length) {
+    seriesVisibility = Array(selectedCategories.length).fill(true);
     window.seriesVisibility = seriesVisibility; // Update window reference
   }
 
-  layeredGroups.forEach((entry, i) => {
+  layeredCategories.forEach((entry, i) => {
     const item = document.createElement('span');
     const dot = document.createElement('span');
     dot.style.display = 'inline-block';
@@ -1663,15 +1762,15 @@ async function updateChart(){
     dot.style.backgroundColor = entry.color;
     item.appendChild(dot);
 
-    const labelText = document.createTextNode(entry.name + (groupHasData[i] ? '' : ' (No data available)'));
+    const labelText = document.createTextNode(entry.name + (categoryHasData[i] ? '' : ' (No data available)'));
     item.appendChild(labelText);
 
-    item.style.opacity = (!groupHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
-    if (!groupHasData[i]) {
+    item.style.opacity = (!categoryHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
+    if (!categoryHasData[i]) {
       item.title = 'No data available';
     }
 
-    if (groupHasData[i]) {
+    if (categoryHasData[i]) {
       item.addEventListener('click', () => {
         seriesVisibility[i] = !seriesVisibility[i];
         window.seriesVisibility = seriesVisibility; // Update window reference
@@ -1853,7 +1952,7 @@ async function updateChart(){
 
 
   // ensure controls reflect available choices
-  refreshGroupDropdowns();
+          refreshCategoryDropdowns();
   refreshButtons();
   } catch (error) {
     console.error('Unable to update line chart:', error);
@@ -1900,6 +1999,7 @@ window.addEventListener('resize', () => {
 async function renderInitialView() {
   return new Promise(resolve => {
     const params = parseUrlParameters();
+    const defaultSelections = getLineDefaultSelections();
     const pollutantSelect = document.getElementById('pollutantSelect');
     
     // Use a small timeout to allow the DOM to update with the options from setupSelectors
@@ -1907,32 +2007,39 @@ async function renderInitialView() {
       if (params.pollutantName) {
         pollutantSelect.value = params.pollutantName;
       } else {
-        // Default to PM2.5 if no pollutant is in the URL
-        if ([...pollutantSelect.options].some(o => o.value === 'PM2.5')) {
-          pollutantSelect.value = 'PM2.5';
+        const fallbackPollutant = defaultSelections.pollutant;
+        if ([...pollutantSelect.options].some(o => o.value === fallbackPollutant)) {
+          pollutantSelect.value = fallbackPollutant;
         }
       }
 
-      // Clear existing group selectors and add new ones based on URL
-      const groupContainer = document.getElementById('groupContainer');
-      groupContainer.innerHTML = ''; // Clear any default selectors
-
-      if (params.groupNames && params.groupNames.length > 0) {
-        params.groupNames.forEach(name => addGroupSelector(name, false));
-      } else {
-        // Add default groups if none are in the URL
-        addGroupSelector('All', false);
+      // Clear existing category selectors and add new ones based on URL
+      const categoryContainer = document.getElementById('categoryContainer');
+      if (!categoryContainer) {
+        console.error('categoryContainer element missing during renderInitialView');
+        resolve();
+        return;
       }
+      categoryContainer.innerHTML = ''; // Clear any default selectors
+
+      const resolvedCategories = (params.categoryNames && params.categoryNames.length > 0)
+        ? params.categoryNames
+        : (defaultSelections.categories?.length ? defaultSelections.categories : DEFAULT_LINE_SELECTIONS.categories);
+      const uniqueCategories = [...new Set(resolvedCategories.filter(Boolean))];
+      (uniqueCategories.length ? uniqueCategories : DEFAULT_LINE_SELECTIONS.categories)
+        .forEach(name => addCategorySelector(name, false));
 
       const startYearSelect = document.getElementById('startYear');
       const endYearSelect = document.getElementById('endYear');
       
       // Set year values from URL params (already validated in parseUrlParameters)
-      if (params.startYear && startYearSelect.querySelector('option[value="' + params.startYear + '"]')) {
-        startYearSelect.value = params.startYear;
+      const fallbackStartYear = params.startYear || defaultSelections.startYear;
+      const fallbackEndYear = params.endYear || defaultSelections.endYear;
+      if (fallbackStartYear && startYearSelect.querySelector('option[value="' + fallbackStartYear + '"]')) {
+        startYearSelect.value = fallbackStartYear;
       }
-      if (params.endYear && endYearSelect.querySelector('option[value="' + params.endYear + '"]')) {
-        endYearSelect.value = params.endYear;
+      if (fallbackEndYear && endYearSelect.querySelector('option[value="' + fallbackEndYear + '"]')) {
+        endYearSelect.value = fallbackEndYear;
       }
       
       updateYearDropdowns();
@@ -2044,25 +2151,31 @@ function parseUrlParameters() {
   
   const params = new URLSearchParams(searchParams);
   
-  // Check if this is the active chart - only parse params if chart=2 (line chart)
+  // Only honor URL overrides when the parent explicitly targets the line chart (chart=2)
   const chartParam = params.get('chart');
-  if (chartParam && chartParam !== '2') {
-    // Return empty params so defaults will be used
+  const embedded = isLineChartEmbedded();
+  const allowOverrides = chartParam === '2' || (!embedded && !chartParam);
+  if (!allowOverrides) {
     return {
       pollutantName: null,
-      groupNames: [],
+      categoryNames: [],
       startYear: null,
       endYear: null
     };
   }
   
   const pollutantId = params.get('pollutant_id');
-  const groupIds = params.get('group_ids')?.split(',').map(Number).filter(Boolean);
+  const categoryIdParam = params.get('category_ids')
+    || params.get('group_ids')
+    || params.get('group_id');
+  const categoryIds = categoryIdParam
+    ? categoryIdParam.split(',').map(Number).filter(Boolean)
+    : [];
   const startYearParam = params.get('start_year');
   const endYearParam = params.get('end_year');
 
   const pollutants = window.allPollutantsData || window.allPollutants || [];
-  const groups = window.allGroupsData || window.allGroups || [];
+  const categories = window.allCategoriesData || window.allCategories || [];
   const availableYears = window.globalYears || [];
 
   let pollutantName = null;
@@ -2073,11 +2186,11 @@ function parseUrlParameters() {
     }
   }
 
-  let groupNames = [];
-  if (groupIds && groupIds.length > 0) {
-    groupNames = groupIds.map(id => {
-      const group = groups.find(g => String(g.id) === String(id));
-      return group ? group.group_title : null;
+  let categoryNames = [];
+  if (categoryIds && categoryIds.length > 0) {
+    categoryNames = categoryIds.map(id => {
+      const category = categories.find(entry => String(entry.id) === String(id));
+      return category ? getCategoryDisplayTitle(category) : null;
     }).filter(Boolean);
   }
 
@@ -2129,7 +2242,7 @@ function parseUrlParameters() {
 
   return {
     pollutantName,
-    groupNames,
+    categoryNames,
     startYear,
     endYear
   };
@@ -2194,18 +2307,30 @@ async function init() {
     
     
     // First, load all necessary data from Supabase
-    const { pollutants, groups, yearKeys, pollutantUnits, groupedData } = await window.supabaseModule.loadData();
+    const {
+      pollutants,
+      categories,
+      groups,
+      yearKeys,
+      pollutantUnits,
+      categorisedData,
+      groupedData
+    } = await window.supabaseModule.loadData();
+    const resolvedCategories = Array.isArray(categories) ? categories : (Array.isArray(groups) ? groups : []);
+    const resolvedCategorisedData = categorisedData || groupedData || {};
 
     // Store data on the window object for global access
     window.allPollutants = pollutants;
-    window.allGroups = groups;
+    window.allCategories = resolvedCategories;
+    window.allCategoriesData = resolvedCategories;
     window.globalYearKeys = yearKeys;
     window.globalYears = yearKeys.map(key => key.substring(1));
     window.pollutantUnits = pollutantUnits;
-    window.groupedData = groupedData;
+    window.categorisedData = resolvedCategorisedData;
+    window.groupedData = resolvedCategorisedData; // Legacy alias while rename completes
     
     // Then, set up the UI selectors with the loaded data
-    setupSelectors(pollutants, groups);
+    setupSelectors(pollutants, resolvedCategories);
 
     // Group info content now lives in the dedicated tab; no need to load it inside the chart iframe.
 

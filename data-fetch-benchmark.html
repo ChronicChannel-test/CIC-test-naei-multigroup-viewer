@@ -90,12 +90,12 @@
 
       const [pollutantsRes, groupsRes] = await Promise.all([
         measure('pollutants', () => client
-          .from('NAEI_global_Pollutants')
+          .from('naei_global_t_pollutant')
           .select('id, pollutant')
         ),
         measure('groups', () => client
-          .from('NAEI_global_t_Group')
-          .select('id, group_title')
+          .from('naei_global_t_category')
+          .select('id, category_title')
         )
       ]);
 
@@ -112,7 +112,7 @@
 
       const findGroupId = (name) => {
         const target = name.toLowerCase();
-        return groups.find(g => (g.group_title || '').toLowerCase() === target)?.id;
+        return groups.find(g => (g.category_title || '').toLowerCase() === target)?.id;
       };
 
       const pm25Id = findPollutantId('PM2.5');
@@ -125,7 +125,7 @@
         throw new Error('Required pollutant/group IDs not found. Check spelling and casing.');
       }
 
-      const dataTable = 'NAEI_2023ds_t_Group_Data';
+      const dataTable = 'naei_2023ds_t_category_data';
 
       const heroGroupIds = [allGroupId, ecoGroupId, gasGroupId];
 
@@ -138,17 +138,17 @@
           .from(dataTable)
           .select('*')
           .eq('pollutant_id', pm25Id)
-          .in('group_id', heroGroupIds)
+          .in('category_id', heroGroupIds)
         ),
         measure('actdata_selected_groups', () => client
           .from(dataTable)
           .select('*')
           .eq('pollutant_id', actDataId)
-          .in('group_id', heroGroupIds)
+          .in('category_id', heroGroupIds)
         ),
         measure('actdata_all_groups shortlist', () => client
           .from(dataTable)
-          .select('group_id, pollutant_id, f1970, f1980, f1990, f2000, f2010, f2015, f2020, f2021, f2022, f2023')
+          .select('category_id, pollutant_id, f1970, f1980, f1990, f2000, f2010, f2015, f2020, f2021, f2022, f2023')
           .eq('pollutant_id', actDataId)
         )
       ]);
@@ -162,7 +162,7 @@
         throw responseErrors[0];
       }
 
-      const pickByGroup = (rows, targetId) => rows.filter(row => row.group_id === targetId);
+      const pickByGroup = (rows, targetId) => rows.filter(row => row.category_id === targetId);
 
       const pm25All = pickByGroup(pm25HeroRes.data, allGroupId);
       const pm25Eco = pickByGroup(pm25HeroRes.data, ecoGroupId);
@@ -192,9 +192,9 @@
     async function fetchFullDataset(client) {
       const start = performance.now();
       const [pollResp, groupResp, tsResp] = await Promise.all([
-        client.from('NAEI_global_Pollutants').select('*'),
-        client.from('NAEI_global_t_Group').select('*'),
-        client.from('NAEI_2023ds_t_Group_Data').select('*')
+        client.from('naei_global_t_pollutant').select('*'),
+        client.from('naei_global_t_category').select('*'),
+        client.from('naei_2023ds_t_category_data').select('*')
       ]);
 
       const firstError = pollResp.error || groupResp.error || tsResp.error;

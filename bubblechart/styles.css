@@ -93,7 +93,7 @@ body {
 select,
 #pollutantSelect,
 #yearSelect,
-#groupContainer select {
+#categoryContainer select {
   margin-top: 0 !important;
   margin-bottom: 0 !important;
 }
@@ -141,7 +141,9 @@ select,
 }
 
 .share-icon {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
   height: 18px;
   background-image: url('../SharedResources/images/chain-link-icon-grey.svg');
@@ -163,22 +165,22 @@ select,
   margin-right: 8px; 
 }
 
-.controls-wrapper, #groupContainer, .groupRow { 
+.controls-wrapper, #categoryContainer, .categoryRow { 
   row-gap: 6px; 
 }
 
-.groupRow {
+.categoryRow {
   display: flex;
   align-items: center;
   gap: 8px;
   margin: 4px 0;
 }
 
-.groupRow select {
+.categoryRow select {
   flex-shrink: 0;
 }
 
-#groupContainer {
+#categoryContainer {
   padding-right: 0; /* Remove - padding is on individual rows instead */
   margin-top: 0; /* Align with line chart spacing */
 }
@@ -604,25 +606,25 @@ body.tutorial-open {
     padding-right: 0 !important;
   }
 
-  .groupRow { 
+  .categoryRow { 
     flex-direction: column; 
     align-items: flex-start; 
     gap: 6px; 
     padding-right: 0 !important;
   }
 
-  .groupRow .remove-btn { 
+  .categoryRow .remove-btn { 
     align-self: flex-start; 
     margin-top: 4px; 
   }
 
-  #groupContainer {
+  #categoryContainer {
     margin-right: 0 !important;
   }
 
 }
 
-.group-label.disabled {
+.category-label.disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

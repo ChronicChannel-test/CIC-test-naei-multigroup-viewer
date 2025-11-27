@@ -55,8 +55,8 @@ if (!window.Colors) {
       colorAssignments.clear();
       nextColorIndex = 0;
     },
-    getColorForGroup(groupName) {
-      const key = groupName || `group-${nextColorIndex}`;
+    getColorForCategory(categoryName) {
+      const key = categoryName || `category-${nextColorIndex}`;
       if (colorAssignments.has(key)) {
         return colorAssignments.get(key);
       }
@@ -66,6 +66,9 @@ if (!window.Colors) {
       return chosen;
     }
   };
+
+  // Maintain legacy name for any scripts that still expect getColorForGroup
+  window.Colors.getColorForGroup = window.Colors.getColorForCategory;
 }
 
 function createDeferred() {
@@ -231,9 +234,9 @@ ensureGoogleChartsLoaded().catch(error => {
  * Draw bubble chart
  * @param {number} year - Selected year
  * @param {number} pollutantId - Selected pollutant ID
- * @param {Array} groupIds - Array of selected group IDs
+ * @param {Array} categoryIds - Array of selected category IDs
  */
-async function drawBubbleChart(year, pollutantId, groupIds) {
+async function drawBubbleChart(year, pollutantId, categoryIds) {
   const stabilityHandle = beginChartStabilityCycle();
   try {
     if (!googleChartsReady || !hasGoogleChartsCore()) {
@@ -246,26 +249,26 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
     }
 
     // Get data points
-    const dataPoints = window.supabaseModule.getScatterData(year, pollutantId, groupIds);
+    const dataPoints = window.supabaseModule.getScatterData(year, pollutantId, categoryIds);
     
     if (dataPoints.length === 0) {
       console.error('No data points returned!');
-      showMessage('No data available for the selected year, pollutant, and groups.', 'error');
+      showMessage('No data available for the selected year, pollutant, and categories.', 'error');
       return;
     }
 
     // Filter data points based on series visibility
     // Ensure visibility array is correctly sized
-    if (seriesVisibility.length !== groupIds.length) {
-      seriesVisibility = Array(groupIds.length).fill(true);
+    if (seriesVisibility.length !== categoryIds.length) {
+      seriesVisibility = Array(categoryIds.length).fill(true);
       window.seriesVisibility = seriesVisibility;
     }
 
-    // Get unique group names to match with visibility array
-    const uniqueGroups = [...new Set(dataPoints.map(p => p.groupName))];
+    // Get unique category names to match with visibility array
+    const uniqueCategories = [...new Set(dataPoints.map(p => p.categoryName))];
     const visibleDataPoints = dataPoints.filter(point => {
-      const groupIndex = uniqueGroups.indexOf(point.groupName);
-      return groupIndex >= 0 && seriesVisibility[groupIndex];
+      const categoryIndex = uniqueCategories.indexOf(point.categoryName);
+      return categoryIndex >= 0 && seriesVisibility[categoryIndex];
     });
 
     // Prepare Google DataTable for scatter chart with bubble-like styling
@@ -276,14 +279,14 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
   data.addColumn({type: 'string', role: 'style'});
 
   // Add data rows with emission factor calculation and sizing
-  const groupDisplayOrder = (() => {
+  const categoryDisplayOrder = (() => {
     const order = new Map();
-    if (Array.isArray(groupIds)) {
-      groupIds.forEach((rawId, index) => {
+    if (Array.isArray(categoryIds)) {
+      categoryIds.forEach((rawId, index) => {
         const numericId = Number(rawId);
-        const groupName = window.supabaseModule?.getGroupName?.(numericId) || `${rawId}`;
-        if (!order.has(groupName)) {
-          order.set(groupName, index);
+        const categoryName = window.supabaseModule?.getCategoryName?.(numericId) || `${rawId}`;
+        if (!order.has(categoryName)) {
+          order.set(categoryName, index);
         }
       });
     }
@@ -291,8 +294,8 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
   })();
 
   const orderedVisiblePoints = [...visibleDataPoints].sort((a, b) => {
-    const orderA = groupDisplayOrder.has(a.groupName) ? groupDisplayOrder.get(a.groupName) : Number.POSITIVE_INFINITY;
-    const orderB = groupDisplayOrder.has(b.groupName) ? groupDisplayOrder.get(b.groupName) : Number.POSITIVE_INFINITY;
+    const orderA = categoryDisplayOrder.has(a.categoryName) ? categoryDisplayOrder.get(a.categoryName) : Number.POSITIVE_INFINITY;
+    const orderB = categoryDisplayOrder.has(b.categoryName) ? categoryDisplayOrder.get(b.categoryName) : Number.POSITIVE_INFINITY;
     // Draw higher index first so lower index (top of selector) renders last and stays on top visually
     return orderB - orderA;
   });
@@ -361,7 +364,7 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
     // No debug log for routine linear scaling
   }  
   orderedVisiblePoints.forEach((point, index) => {
-    const color = window.Colors.getColorForGroup(point.groupName);
+    const color = window.Colors.getColorForCategory(point.categoryName);
 
     // Use Emission Factor (EF) directly for bubble size
     // If EF is already provided in point, use it; otherwise, calculate
@@ -392,7 +395,7 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
     // All EF values are converted to g/GJ
     // Use more decimal places for very small values
     const efDisplay = emissionFactor < 0.01 ? emissionFactor.toFixed(8) : emissionFactor.toFixed(2);
-    const tooltip = `${point.groupName}\nActivity: ${point.actDataValue.toLocaleString()} TJ\nEmissions: ${point.pollutantValue.toLocaleString()} ${pollutantUnit}\nEmission Factor: ${efDisplay} g/GJ`;
+    const tooltip = `${point.categoryName}\nActivity: ${point.actDataValue.toLocaleString()} TJ\nEmissions: ${point.pollutantValue.toLocaleString()} ${pollutantUnit}\nEmission Factor: ${efDisplay} g/GJ`;
 
     data.addRow([
       point.actDataValue, // X-axis
@@ -446,7 +449,7 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
     }
 
     // Build legend before sizing so its height is accounted for
-    createCustomLegend(chart, data, groupIds, dataPoints);
+    createCustomLegend(chart, data, categoryIds, dataPoints);
     const customLegendEl = document.getElementById('customLegend');
     await waitForChromeStability([chartTitleElement, customLegendEl]);
 
@@ -519,11 +522,11 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
     || (wrapperRect ? Math.round(wrapperRect.height) : null);
 
 
-  // Prepare colors for each group (use visible data points only)
+  // Prepare colors for each category (use visible data points only)
   const colors = [];
-  const uniqueGroupsForColors = [...new Set(visibleDataPoints.map(point => point.groupName))];
-  uniqueGroupsForColors.forEach(groupName => {
-    colors.push(window.Colors.getColorForGroup(groupName));
+  const uniqueCategoriesForColors = [...new Set(visibleDataPoints.map(point => point.categoryName))];
+  uniqueCategoriesForColors.forEach(categoryName => {
+    colors.push(window.Colors.getColorForCategory(categoryName));
   });
 
   // Calculate axis ranges with padding for bubbles (use visible data points only)
@@ -620,7 +623,7 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
     pollutantId: pollutantId,
     pollutantName: pollutantName,
     pollutantUnit: pollutantUnit,
-    groupIds: groupIds,
+    categoryIds,
     dataPoints: dataPoints
   };
 
@@ -695,9 +698,9 @@ async function drawBubbleChart(year, pollutantId, groupIds) {
  * Create a custom legend for the scatter chart
  * @param {Object} chart - Google Chart instance
  * @param {Object} data - Google DataTable instance
- * @param {Array} groupIds - Array of selected group IDs
+ * @param {Array} categoryIds - Array of selected category IDs
  */
-function createCustomLegend(chart, data, groupIds, dataPoints) {
+function createCustomLegend(chart, data, categoryIds, dataPoints) {
   const legendContainer = document.getElementById('customLegend');
   if (!legendContainer) {
     console.error('Missing #customLegend element');
@@ -710,89 +713,103 @@ function createCustomLegend(chart, data, groupIds, dataPoints) {
   legendContainer.style.flexWrap = 'wrap';
   legendContainer.style.gap = '10px';
 
-  // Ensure visibility array is correctly sized
-  if (seriesVisibility.length !== groupIds.length) {
-    seriesVisibility = Array(groupIds.length).fill(true);
-    window.seriesVisibility = seriesVisibility; // Update window reference
-  }
-
-  const pointsByGroupId = new Map();
-  dataPoints.forEach(point => {
-    if (!pointsByGroupId.has(point.groupId)) {
-      pointsByGroupId.set(point.groupId, point);
+    // Ensure visibility array is correctly sized
+    if (seriesVisibility.length !== categoryIds.length) {
+      seriesVisibility = Array(categoryIds.length).fill(true);
+      window.seriesVisibility = seriesVisibility; // Update window reference
     }
-  });
 
-  groupIds.forEach((groupId, index) => {
-    const pointForGroup = pointsByGroupId.get(groupId);
-    const groupName = pointForGroup?.groupName
-      || (typeof window.supabaseModule?.getGroupName === 'function'
-        ? window.supabaseModule.getGroupName(groupId)
-        : `Group ${groupId}`);
-    const hasData = Boolean(pointForGroup);
-    const legendItem = document.createElement('span');
-    legendItem.style.display = 'inline-flex';
-    legendItem.style.alignItems = 'center';
-    legendItem.style.cursor = 'pointer';
-    legendItem.style.fontWeight = '600';
-    legendItem.style.margin = '5px 10px';
-    const baseColor = window.Colors.getColorForGroup(groupName);
-
-    const colorCircle = document.createElement('span');
-    colorCircle.style.display = 'inline-block';
-    colorCircle.style.backgroundColor = baseColor;
-    colorCircle.style.width = '12px';
-    colorCircle.style.height = '12px';
-    colorCircle.style.borderRadius = '50%';
-    colorCircle.style.marginRight = '8px';
-
-    const displayName = hasData ? groupName : `${groupName} (No data available)`;
-    const label = document.createTextNode(displayName);
-
-    legendItem.appendChild(colorCircle);
-    legendItem.appendChild(label);
-
-    const updateLegendAppearance = (isVisible) => {
-      const isActive = hasData && isVisible;
-      legendItem.style.opacity = isActive ? '1' : '0.4';
-      legendItem.style.color = isActive ? '#000' : '#666';
-      legendItem.style.cursor = hasData ? 'pointer' : 'default';
-      colorCircle.style.backgroundColor = baseColor;
-
-      if (!hasData) {
-        legendItem.title = 'No data available';
-      } else {
-        legendItem.removeAttribute('title');
+    const pointsByCategoryId = new Map();
+    dataPoints.forEach(point => {
+      if (!pointsByCategoryId.has(point.categoryId)) {
+        pointsByCategoryId.set(point.categoryId, point);
       }
-    };
+    });
 
-    updateLegendAppearance(seriesVisibility[index]);
+    categoryIds.forEach((categoryId, index) => {
+      const pointForCategory = pointsByCategoryId.get(categoryId);
+      const categoryName = pointForCategory?.categoryName
+        || (typeof window.supabaseModule?.getCategoryName === 'function'
+          ? window.supabaseModule.getCategoryName(categoryId)
+          : `Category ${categoryId}`);
+      const hasData = Boolean(pointForCategory);
 
-    if (hasData) {
-      legendItem.addEventListener('click', () => {
-        seriesVisibility[index] = !seriesVisibility[index];
-        window.seriesVisibility = seriesVisibility; // Update window reference
-        
-        updateLegendAppearance(seriesVisibility[index]);
-        
-        if (!seriesVisibility.some(Boolean)) {
-          seriesVisibility[index] = true;
-          updateLegendAppearance(true);
+      const legendItem = document.createElement('span');
+      legendItem.style.display = 'inline-flex';
+      legendItem.style.alignItems = 'center';
+      legendItem.style.cursor = 'pointer';
+      legendItem.style.fontWeight = '600';
+      legendItem.style.margin = '5px 10px';
+      const baseColor = window.Colors.getColorForCategory(categoryName);
+
+      const colorCircle = document.createElement('span');
+      colorCircle.style.display = 'inline-block';
+      colorCircle.style.backgroundColor = baseColor;
+      colorCircle.style.width = '12px';
+      colorCircle.style.height = '12px';
+      colorCircle.style.borderRadius = '50%';
+      colorCircle.style.marginRight = '8px';
+
+      const displayName = hasData ? categoryName : `${categoryName} (No data available)`;
+      const label = document.createTextNode(displayName);
+
+      legendItem.appendChild(colorCircle);
+      legendItem.appendChild(label);
+
+      const updateLegendAppearance = (isVisible) => {
+        const isActive = hasData && isVisible;
+        legendItem.style.opacity = isActive ? '1' : '0.4';
+        legendItem.style.color = isActive ? '#000' : '#666';
+        legendItem.style.cursor = hasData ? 'pointer' : 'default';
+        colorCircle.style.backgroundColor = baseColor;
+
+        if (!hasData) {
+          legendItem.title = 'No data available';
+        } else {
+          legendItem.removeAttribute('title');
         }
-        
-        const currentData = window.ChartRenderer.getCurrentChartData();
-        if (currentData) {
-          window.ChartRenderer.drawBubbleChart(
-            currentData.year,
-            currentData.pollutantId,
-            currentData.groupIds
-          );
-        }
-      });
-    }
+      };
 
-    legendContainer.appendChild(legendItem);
-  });
+      legendItem.dataset.categoryId = categoryId;
+
+      updateLegendAppearance(seriesVisibility[index]);
+
+      if (hasData) {
+        const handleToggle = () => {
+          seriesVisibility[index] = !seriesVisibility[index];
+          window.seriesVisibility = seriesVisibility; // Update window reference
+
+          updateLegendAppearance(seriesVisibility[index]);
+
+          if (!seriesVisibility.some(Boolean)) {
+            seriesVisibility[index] = true;
+            updateLegendAppearance(true);
+          }
+
+          const currentData = window.ChartRenderer.getCurrentChartData();
+          if (currentData) {
+            window.ChartRenderer.drawBubbleChart(
+              currentData.year,
+              currentData.pollutantId,
+              currentData.categoryIds
+            );
+          }
+        };
+
+        legendItem.addEventListener('click', handleToggle);
+        legendItem.addEventListener('keypress', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleToggle();
+          }
+        });
+      } else {
+        legendItem.classList.add('legend-disabled');
+        legendItem.style.cursor = 'not-allowed';
+      }
+
+      legendContainer.appendChild(legendItem);
+    });
 }
 
 function registerTooltipPositionHandlers(chartInstance, dataTable) {

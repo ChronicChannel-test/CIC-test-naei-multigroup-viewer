@@ -134,7 +134,7 @@
           <label for="pollutantSelect">Pollutant:</label>
           <select id="pollutantSelect" name="pollutantSelect"><option value="">Select pollutant</option></select>
         </div>
-        <div id="groupContainer"></div>
+        <div id="categoryContainer"></div>
         <!-- Group info content now lives in the dedicated tab within the parent experience -->
       </div>
 
@@ -148,7 +148,10 @@
             <label for="endYear">End Year:</label>
             <select id="endYear" name="endYear"></select>
           </span>
-          <button id="toggleSmoothBtn">🚫 Disable Smoothing</button>
+          <button id="toggleSmoothBtn">
+            <span class="smoothing-icon smoothing-icon-disable" aria-hidden="true"></span>
+            <span class="smoothing-label-text">Disable Smoothing</span>
+          </button>
           <button id="downloadBtn" class="control-button">
             <img src="../SharedResources/images/download-icon1-alpha.svg" alt="" aria-hidden="true" class="control-button-icon">
             <span>Download Chart Image – PNG</span>

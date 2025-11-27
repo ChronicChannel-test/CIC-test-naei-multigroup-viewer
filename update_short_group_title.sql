@@ -1,20 +1,20 @@
 with tokens as (
   select
     g.id,
-    g.group_title,
+    g.category_title,
     w.idx,
     w.token
-  from public."NAEI_global_t_Group" g
+  from public.naei_global_t_category g
   cross join lateral (
     select w as token, idx
-    from regexp_split_to_table(coalesce(g.group_title, ''), E'[^A-Za-z0-9]+') with ordinality as w(w, idx)
+    from regexp_split_to_table(coalesce(g.category_title, ''), E'[^A-Za-z0-9]+') with ordinality as w(w, idx)
   ) w
   where w.token <> ''
 ),
 rtb_scan as (
   select
     tok.id,
-    tok.group_title,
+    tok.category_title,
     tok.idx,
     tok.token,
     case
@@ -35,7 +35,7 @@ rtb_marks as (
 mapped as (
   select
     r.id,
-    r.group_title,
+    r.category_title,
     r.idx,
     r.token,
     m.replacement,
@@ -54,7 +54,7 @@ mapped as (
 capitalized as (
   select
     id,
-    group_title,
+    category_title,
     idx,
     case when chosen_raw is null then null else initcap(lower(chosen_raw)) end as piece
   from mapped
@@ -62,22 +62,22 @@ capitalized as (
 assembled as (
   select
     id,
-    group_title,
+    category_title,
     string_agg(piece, '' order by idx) as proposed_short
   from capitalized
   where piece is not null
-  group by id, group_title
+  group by id, category_title
 ),
 with_special as (
   select
     a.id,
     case
-      when lower(trim(a.group_title)) = lower('Ecodesign Stove - Ready To Burn') then 'EcoRtB'
+      when lower(trim(a.category_title)) = lower('Ecodesign Stove - Ready To Burn') then 'EcoRtB'
       else a.proposed_short
     end as short_name
   from assembled a
 )
-update public."NAEI_global_t_Group" g
-set short_group_title = ws.short_name
+update public.naei_global_t_category g
+set short_category_title = ws.short_name
 from with_special ws
 where ws.id = g.id;

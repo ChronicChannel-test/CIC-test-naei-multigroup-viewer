@@ -101,7 +101,7 @@ function debounce(func, wait) {
 let selectedYear = null;
 let selectedPollutantId = null;
 let chartRenderCallback = null; // Callback for when chart finishes rendering
-let selectedGroupIds = [];
+let selectedCategoryIds = [];
 let initialComparisonFlags = []; // Store comparison flags from URL for initial checkbox state
 const MIN_CHART_WRAPPER_HEIGHT = 480;
 const MIN_CHART_CANVAS_HEIGHT = 420;
@@ -472,12 +472,23 @@ function dedupeByKey(collection = [], resolver = () => null) {
   return results;
 }
 
-function sortGroupTitles(a = '', b = '') {
+function sortCategoryTitles(a = '', b = '') {
   const aName = a.toLowerCase();
   const bName = b.toLowerCase();
   if (aName === 'all') return -1;
   if (bName === 'all') return 1;
   return a.localeCompare(b);
+}
+
+function getCategoryDisplayTitle(record) {
+  if (!record || typeof record !== 'object') {
+    return '';
+  }
+  const title = record.category_title
+    || record.group_name
+    || record.title
+    || '';
+  return typeof title === 'string' ? title : '';
 }
 
 async function fetchSelectorSnapshotFallback() {
@@ -519,8 +530,8 @@ function normalizeSelectorOptions(snapshotData) {
   const rawPollutants = Array.isArray(snapshotData?.pollutants)
     ? snapshotData.pollutants
     : [];
-  const rawGroups = Array.isArray(snapshotData?.groups)
-    ? snapshotData.groups
+  const rawGroups = Array.isArray(snapshotData?.categories)
+    ? snapshotData.categories
     : [];
 
   const pollutants = dedupeByKey(
@@ -533,21 +544,21 @@ function normalizeSelectorOptions(snapshotData) {
     item => `${item.id}-${item.pollutant.toLowerCase()}`
   ).sort((a, b) => a.pollutant.localeCompare(b.pollutant));
 
-  const groups = dedupeByKey(
+  const categories = dedupeByKey(
     rawGroups
       .map(item => ({
         id: item?.id,
-        group_title: item?.group_title || item?.group_name || item?.title || '',
+        category_title: item?.category_title || item?.group_name || item?.title || '',
         has_activity_data: item?.has_activity_data !== false
       }))
-      .filter(item => item.id != null && item.group_title && item.has_activity_data),
-    item => item.group_title.toLowerCase()
-  ).sort((a, b) => sortGroupTitles(a.group_title, b.group_title));
+      .filter(item => item.id != null && item.category_title && item.has_activity_data),
+    item => item.category_title.toLowerCase()
+  ).sort((a, b) => sortCategoryTitles(a.category_title, b.category_title));
 
   return {
     pollutants,
-    groups,
-    groupNames: groups.map(group => group.group_title)
+    categories,
+    categoryNames: categories.map(category => category.category_title)
   };
 }
 
@@ -563,8 +574,8 @@ async function ensureBubbleSelectorOptions() {
         console.warn('Bubble selector metadata unavailable; falling back to Supabase data');
         return {
           pollutants: [],
-          groups: [],
-          groupNames: []
+          categories: [],
+          categoryNames: []
         };
       }
       const normalized = normalizeSelectorOptions(snapshotData);
@@ -589,12 +600,12 @@ function applySelectorOptionsToGlobals(selectorOptions) {
   }
 
   window.__bubbleSelectorOptions = selectorOptions;
-  const { groups, groupNames } = selectorOptions;
-  if (Array.isArray(groups) && groups.length) {
-    window.allGroups = groups.slice();
-    window.allGroupsList = (Array.isArray(groupNames) && groupNames.length)
-      ? groupNames.slice()
-      : groups.map(group => group.group_title).sort(sortGroupTitles);
+  const { categories, categoryNames } = selectorOptions;
+  if (Array.isArray(categories) && categories.length) {
+    window.allCategories = categories.slice();
+    window.allCategoriesList = (Array.isArray(categoryNames) && categoryNames.length)
+      ? categoryNames.slice()
+      : categories.map(category => category.category_title).sort(sortCategoryTitles);
   }
 }
 
@@ -634,7 +645,7 @@ async function init() {
 
     // Create window data stores EXACTLY like linechart v2.3
     window.allPollutants = window.supabaseModule.allPollutants;
-    window.allGroupsRaw = window.supabaseModule.allGroups;
+    window.allCategoriesRaw = window.supabaseModule.allCategories;
     const selectorOptions = await selectorOptionsPromise
       .catch(error => {
         console.error('Falling back to Supabase selectors after snapshot failure:', error);
@@ -642,32 +653,32 @@ async function init() {
       });
     applySelectorOptionsToGlobals(selectorOptions);
 
-    if (!Array.isArray(window.allGroupsList) || !window.allGroupsList.length) {
-      const activeGroupsForSelectors = window.supabaseModule.activeActDataGroups
+    if (!Array.isArray(window.allCategoriesList) || !window.allCategoriesList.length) {
+      const activeCategoriesForSelectors = window.supabaseModule.activeActDataCategories
+        || window.supabaseModule.activeActDataGroups
+        || window.supabaseModule.activeCategories
         || window.supabaseModule.activeGroups
+        || window.supabaseModule.allCategories
         || window.supabaseModule.allGroups
         || [];
-      window.allGroups = activeGroupsForSelectors;
+      window.allCategories = activeCategoriesForSelectors;
 
-      // Create allGroupsList EXACTLY like linechart setupSelectors function
-      const groups = window.supabaseModule.activeActDataGroups
-        || window.supabaseModule.activeGroups
-        || window.supabaseModule.allGroups
-        || [];
-      const groupNames = [...new Set(groups.map(g => g.group_title))]
+      // Create allCategoriesList EXACTLY like linechart setupSelectors function
+      const categories = activeCategoriesForSelectors;
+      const categoryNames = [...new Set(categories.map(getCategoryDisplayTitle))]
         .filter(Boolean)
         .sort((a, b) => {
           if (a.toLowerCase() === 'all') return -1;
           if (b.toLowerCase() === 'all') return 1;
           return a.localeCompare(b);
         });
-      window.allGroupsList = groupNames;
+      window.allCategoriesList = categoryNames;
     }
 
     // Setup UI
     setupYearSelector();
     setupPollutantSelector();
-    setupGroupSelector();
+    setupCategorySelector();
     setupEventListeners();
     setupTutorialOverlay();
     updateChartWrapperHeight('post-setup');
@@ -1342,56 +1353,56 @@ async function renderInitialView() {
         }
       }
 
-      // Clear existing group selectors and add new ones based on URL or defaults
-      const groupContainer = document.getElementById('groupContainer');
-      groupContainer.innerHTML = '';
+      // Clear existing category selectors and add new ones based on URL or defaults
+      const categoryContainer = document.getElementById('categoryContainer');
+      categoryContainer.innerHTML = '';
 
-      if (params.groupNames && params.groupNames.length > 0) {
+      if (params.categoryNames && params.categoryNames.length > 0) {
         // Store comparison flags from URL for use in refreshButtons
         initialComparisonFlags = params.comparisonFlags || [];
-        params.groupNames.forEach(name => addGroupSelector(name, false));
+        params.categoryNames.forEach(name => addCategorySelector(name, false));
       } else {
-        // Clear comparison flags for default groups (will be set to checked by default)
+        // Clear comparison flags for default categories (will be set to checked by default)
         initialComparisonFlags = [];
-        // Add default groups if none are in the URL
-      const allGroups = window.allGroupsList || [];
+        // Add default categories if none are in the URL
+      const allCategories = window.allCategoriesList || [];
         
-        // Find specific "Ecodesign Stove - Ready To Burn" group
-        const ecodesignGroup = allGroups.find(g => 
+        // Find specific "Ecodesign Stove - Ready To Burn" category
+        const ecodesignCategory = allCategories.find(g => 
           g === 'Ecodesign Stove - Ready To Burn'
         );
         
         // Find "Gas Boilers"  
-        const gasBoilerGroup = allGroups.find(g => 
+        const gasBoilerCategory = allCategories.find(g => 
           g.toLowerCase().includes('gas boiler')
         );
         
-        // Always try to add both default groups
-        if (ecodesignGroup) {
-          addGroupSelector(ecodesignGroup, false);
+        // Always try to add both default categories
+        if (ecodesignCategory) {
+          addCategorySelector(ecodesignCategory, false);
         }
         
-        if (gasBoilerGroup) {
-          addGroupSelector(gasBoilerGroup, false);
+        if (gasBoilerCategory) {
+          addCategorySelector(gasBoilerCategory, false);
         }
         
-        // If we didn't find either specific group, add first 2 available groups
-        if (!ecodesignGroup && !gasBoilerGroup && allGroups.length > 0) {
-          addGroupSelector(allGroups[0], false);
-          if (allGroups.length > 1) {
-            addGroupSelector(allGroups[1], false);
+        // If we didn't find either specific category, add first 2 available categories
+        if (!ecodesignCategory && !gasBoilerCategory && allCategories.length > 0) {
+          addCategorySelector(allCategories[0], false);
+          if (allCategories.length > 1) {
+            addCategorySelector(allCategories[1], false);
           }
-        } else if (!ecodesignGroup && gasBoilerGroup && allGroups.length > 0) {
-          // If we only found Gas Boilers, add first available group as well
-          const firstGroup = allGroups[0];
-          if (firstGroup !== gasBoilerGroup) {
-            addGroupSelector(firstGroup, false);
+        } else if (!ecodesignCategory && gasBoilerCategory && allCategories.length > 0) {
+          // If we only found Gas Boilers, add first available category as well
+          const firstCategory = allCategories[0];
+          if (firstCategory !== gasBoilerCategory) {
+            addCategorySelector(firstCategory, false);
           }
-        } else if (ecodesignGroup && !gasBoilerGroup && allGroups.length > 1) {
-          // If we only found Ecodesign, add second available group as well
-          const secondGroup = allGroups.find(g => g !== ecodesignGroup);
-          if (secondGroup) {
-            addGroupSelector(secondGroup, false);
+        } else if (ecodesignCategory && !gasBoilerCategory && allCategories.length > 1) {
+          // If we only found Ecodesign, add second available category as well
+          const secondCategory = allCategories.find(g => g !== ecodesignCategory);
+          if (secondCategory) {
+            addCategorySelector(secondCategory, false);
           }
         }
       }
@@ -1415,8 +1426,8 @@ async function renderInitialView() {
       }
       
       
-      // Refresh group dropdowns and buttons after adding default groups
-      refreshGroupDropdowns();
+      // Refresh category dropdowns and buttons after adding default categories
+      refreshCategoryDropdowns();
       refreshButtons();
       
       resolve();
@@ -1450,21 +1461,30 @@ function parseUrlParameters() {
     // Return empty params so defaults will be used
     return {
       pollutantName: null,
-      groupNames: [],
+      categoryNames: [],
       comparisonFlags: [],
       year: null
     };
   }
   
   const pollutantId = params.get('pollutant_id');
-  const groupIdsParam = params.get('group_ids')?.split(',') || [];
+  const categoryIdsRaw = params.get('category_ids')
+    || params.get('categoryIds')
+    || params.get('categoryId')
+    || params.get('group_ids')
+    || params.get('groupIds')
+    || params.get('groupId')
+    || '';
+  const categoryIdsParam = categoryIdsRaw ? categoryIdsRaw.split(',') : [];
   const yearParamRaw = params.get('year');
   const yearParam = yearParamRaw ? parseInt(yearParamRaw, 10) : null;
 
   const pollutants = window.supabaseModule.allPollutants || [];
-  const groups = window.supabaseModule.allGroups || [];
-  const activeGroupIdSet = new Set(
-    window.supabaseModule.activeActDataGroupIds
+  const categories = window.supabaseModule.allCategories || [];
+  const activeCategoryIdSet = new Set(
+    window.supabaseModule.activeActDataCategoryIds
+    || window.supabaseModule.activeCategoryIds
+    || window.supabaseModule.activeActDataGroupIds
     || window.supabaseModule.activeGroupIds
     || []
   );
@@ -1478,22 +1498,22 @@ function parseUrlParameters() {
     }
   }
 
-  // Parse group IDs and comparison flags (e.g., "20c" means group 20 with comparison checked)
-  let groupNames = [];
-  let comparisonFlags = []; // Track which groups should have comparison checkbox checked
+  // Parse category IDs and comparison flags (e.g., "20c" means category 20 with comparison checked)
+  let categoryNames = [];
+  let comparisonFlags = []; // Track which categories should have comparison checkbox checked
   
-  if (groupIdsParam && groupIdsParam.length > 0) {
-    groupIdsParam.forEach(idStr => {
+  if (categoryIdsParam && categoryIdsParam.length > 0) {
+    categoryIdsParam.forEach(idStr => {
       const hasComparisonFlag = idStr.endsWith('c');
       const id = parseInt(hasComparisonFlag ? idStr.slice(0, -1) : idStr);
       
       if (id) {
-        const group = groups.find(g => g.id === id);
-        if (group) {
-          if (activeGroupIdSet.size && !activeGroupIdSet.has(group.id)) {
+        const category = categories.find(g => g.id === id);
+        if (category) {
+          if (activeCategoryIdSet.size && !activeCategoryIdSet.has(category.id)) {
             return;
           }
-          groupNames.push(group.group_title);
+          categoryNames.push(getCategoryDisplayTitle(category));
           comparisonFlags.push(hasComparisonFlag);
         }
       }
@@ -1518,7 +1538,7 @@ function parseUrlParameters() {
 
   return {
     pollutantName,
-    groupNames,
+    categoryNames,
     comparisonFlags,
     year
   };
@@ -1572,9 +1592,9 @@ function setupPollutantSelector() {
   });
 }
 
-// Get selected groups from dropdown selectors (like linechart)
-function getSelectedGroups(){ 
-  const selects = document.querySelectorAll('#groupContainer select');
+// Get selected categories from dropdown selectors (like linechart)
+function getSelectedCategories(){ 
+  const selects = document.querySelectorAll('#categoryContainer select');
   
   const values = [...selects].map((s, i) => {
     return s.value;
@@ -1583,14 +1603,14 @@ function getSelectedGroups(){
   return values;
 }
 
-// Add group selector dropdown (adapted from linechart)
-function addGroupSelector(defaultValue = "", usePlaceholder = true){
-  const groupName = (defaultValue && typeof defaultValue === 'object')
-    ? defaultValue.group_title
+// Add category selector dropdown (adapted from linechart)
+function addCategorySelector(defaultValue = "", usePlaceholder = true){
+  const categoryName = (defaultValue && typeof defaultValue === 'object')
+    ? getCategoryDisplayTitle(defaultValue)
     : defaultValue;
-  const container = document.getElementById('groupContainer');
+  const container = document.getElementById('categoryContainer');
   const div = document.createElement('div');
-  div.className = 'groupRow';
+  div.className = 'categoryRow';
   div.draggable = true; // Make row draggable
 
   // drag handle (like linechart)
@@ -1599,15 +1619,15 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   dragHandle.textContent = '⠿';
   dragHandle.style.marginRight = '6px';
   
-  // group control wrapper (keeps drag handle and select together)
+  // category control wrapper (keeps drag handle and select together)
   const controlWrap = document.createElement('div');
-  controlWrap.className = 'group-control';
+  controlWrap.className = 'category-control';
 
   // convert drag handle into an accessible button so it's keyboard-focusable
   const handleBtn = document.createElement('button');
   handleBtn.type = 'button';
   handleBtn.className = 'dragHandle';
-  handleBtn.setAttribute('aria-label', 'Reorder group (use arrow keys)');
+  handleBtn.setAttribute('aria-label', 'Reorder category (use arrow keys)');
   handleBtn.title = 'Drag to reorder (or focus and use Arrow keys)';
   handleBtn.textContent = '⠿';
   handleBtn.style.marginRight = '6px';
@@ -1618,10 +1638,10 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         let prev = div.previousElementSibling;
-        while (prev && !prev.classList.contains('groupRow')) prev = prev.previousElementSibling;
+        while (prev && !prev.classList.contains('categoryRow')) prev = prev.previousElementSibling;
         if (prev) {
           container.insertBefore(div, prev);
-          refreshGroupDropdowns();
+          refreshCategoryDropdowns();
           refreshButtons();
           updateChart();
           // Move focus back to the handle for continued keyboard moves
@@ -1630,10 +1650,10 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         let next = div.nextElementSibling;
-        while (next && !next.classList.contains('groupRow')) next = next.nextElementSibling;
+        while (next && !next.classList.contains('categoryRow')) next = next.nextElementSibling;
         if (next) {
           container.insertBefore(div, next.nextElementSibling);
-          refreshGroupDropdowns();
+          refreshCategoryDropdowns();
           refreshButtons();
           updateChart();
           handleBtn.focus();
@@ -1646,34 +1666,34 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   
   controlWrap.appendChild(handleBtn);
 
-  // group select
+  // category select
   const sel = document.createElement('select');
-  sel.setAttribute('aria-label', 'Group selector');
-  sel.name = 'groupSelector';
+  sel.setAttribute('aria-label', 'Category selector');
+  sel.name = 'categorySelector';
   if (usePlaceholder){
-    const ph = new Option('Select group','');
+    const ph = new Option('Select category','');
     ph.disabled = true; ph.selected = true;
     sel.add(ph);
   }
   
-  const allGroups = window.allGroupsList || [];
+  const allCategories = window.allCategoriesList || [];
 
-  const selected = getSelectedGroups();
-  allGroups.forEach(groupTitle => {
-    if (!selected.includes(groupTitle) || groupTitle === groupName) {
-      sel.add(new Option(groupTitle, groupTitle));
+  const selected = getSelectedCategories();
+  allCategories.forEach(categoryTitle => {
+    if (!selected.includes(categoryTitle) || categoryTitle === categoryName) {
+      sel.add(new Option(categoryTitle, categoryTitle));
     }
   });
   
   
-  if (groupName) {
-    sel.value = groupName;
+  if (categoryName) {
+    sel.value = categoryName;
     
     // Verify the option exists
-    const optionExists = [...sel.options].some(opt => opt.value === groupName);
+    const optionExists = [...sel.options].some(opt => opt.value === categoryName);
   }
   sel.addEventListener('change', () => { 
-    refreshGroupDropdowns(); 
+    refreshCategoryDropdowns(); 
     refreshButtons();
     updateChart(); 
   });
@@ -1686,35 +1706,35 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   
   // Delay the refresh to avoid conflicts during initialization
   setTimeout(() => {
-    refreshGroupDropdowns();
+    refreshCategoryDropdowns();
     refreshButtons();
     // alignComparisonHeader();
   }, 10);
 }
 
-// Refresh group dropdown options (like linechart)
-function refreshGroupDropdowns() {
-  const allGroupNames = (window.allGroupsList || [])
+// Refresh category dropdown options (like linechart)
+function refreshCategoryDropdowns() {
+  const allCategoryNames = (window.allCategoriesList || [])
     .filter(Boolean)
-    .sort((a, b) => sortGroupTitles(a, b));
-  const selected = getSelectedGroups();
+    .sort((a, b) => sortCategoryTitles(a, b));
+  const selected = getSelectedCategories();
   
-  document.querySelectorAll('#groupContainer select').forEach(select => {
+  document.querySelectorAll('#categoryContainer select').forEach(select => {
     const currentValue = select.value;
     // Clear and rebuild options
     select.innerHTML = '';
     
     // Add placeholder
-    const ph = new Option('Select group','');
+    const ph = new Option('Select category','');
     ph.disabled = true;
     if (!currentValue) ph.selected = true;
     select.add(ph);
     
-    // Add available groups
-    allGroupNames.forEach(groupTitle => {
-      if (!selected.includes(groupTitle) || groupTitle === currentValue) {
-        const option = new Option(groupTitle, groupTitle);
-        if (groupTitle === currentValue) option.selected = true;
+    // Add available categories
+    allCategoryNames.forEach(categoryTitle => {
+      if (!selected.includes(categoryTitle) || categoryTitle === currentValue) {
+        const option = new Option(categoryTitle, categoryTitle);
+        if (categoryTitle === currentValue) option.selected = true;
         select.add(option);
       }
     });
@@ -1723,11 +1743,11 @@ function refreshGroupDropdowns() {
 
 // Add button management like linechart
 function refreshButtons() {
-  const container = document.getElementById('groupContainer');
+  const container = document.getElementById('categoryContainer');
   // Remove any existing Add/Remove buttons to rebuild cleanly
   container.querySelectorAll('.add-btn, .remove-btn').forEach(n => n.remove());
 
-  const rows = container.querySelectorAll('.groupRow');
+  const rows = container.querySelectorAll('.categoryRow');
 
   // Process all rows to add remove buttons and checkboxes
   rows.forEach(row => {
@@ -1736,25 +1756,25 @@ function refreshButtons() {
     const wasChecked = existingCheckbox ? existingCheckbox.checked : false;
     
     // Remove all existing checkboxes and buttons to rebuild them cleanly
-    const existingCheckboxes = row.querySelectorAll('.group-checkbox');
+    const existingCheckboxes = row.querySelectorAll('.category-checkbox');
     existingCheckboxes.forEach(checkbox => checkbox.remove());
     const existingRemoveButtons = row.querySelectorAll('.remove-btn');
     existingRemoveButtons.forEach(btn => btn.remove());
 
-    // Add remove button only if there are 2 or more groups
+    // Add remove button only if there are 2 or more categories
     if (rows.length >= 2) {
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'remove-btn';
-      removeBtn.innerHTML = '<span class="remove-icon" aria-hidden="true"></span> Remove Group';
-      // make ARIA label include the current group name if available
+      removeBtn.innerHTML = '<span class="remove-icon" aria-hidden="true"></span> Remove Category';
+      // make ARIA label include the current category name if available
       const sel = row.querySelector('select');
-      const groupName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
-      removeBtn.setAttribute('aria-label', groupName ? `Remove group ${groupName}` : 'Remove group');
+      const categoryName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
+      removeBtn.setAttribute('aria-label', categoryName ? `Remove category ${categoryName}` : 'Remove category');
       removeBtn.onclick = () => {
         row.remove();
         refreshButtons();
-        refreshGroupDropdowns();
+        refreshCategoryDropdowns();
         updateChart();
       };
       row.appendChild(removeBtn);
@@ -1764,7 +1784,7 @@ function refreshButtons() {
     // if (rows.length >= 2) {
     //   const comparisonCheckbox = document.createElement('input');
     //   comparisonCheckbox.type = 'checkbox';
-    //   comparisonCheckbox.className = 'group-checkbox comparison-checkbox';
+    //   comparisonCheckbox.className = 'category-checkbox comparison-checkbox';
     //   
     //   // Determine checked state
     //   const rowIndex = Array.from(rows).indexOf(row);
@@ -1777,7 +1797,7 @@ function refreshButtons() {
     //     // Use comparison flag from URL (on initial load only)
     //     comparisonCheckbox.checked = initialComparisonFlags[rowIndex];
     //   } else {
-    //     // Default to unchecked for new groups
+    //     // Default to unchecked for new categories
     //     comparisonCheckbox.checked = false;
     //   }
     //   
@@ -1801,28 +1821,28 @@ function refreshButtons() {
   // Apply checkbox limit logic (disable unchecked boxes if 2 are already checked)
   refreshCheckboxes();
 
-  // Add "Add Group" button just below the last group box
+  // Add "Add Category" button just below the last category box
   let addBtn = container.querySelector('.add-btn');
   if (!addBtn) {
     addBtn = document.createElement('button');
     addBtn.className = 'add-btn';
-    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
-    addBtn.onclick = () => addGroupSelector("", true);
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Category';
+    addBtn.onclick = () => addCategorySelector("", true);
     container.appendChild(addBtn);
   }
 
-  // Disable button if 10 groups are present
+  // Disable button if 10 categories are present
   if (rows.length >= 10) {
     addBtn.disabled = true;
-    addBtn.textContent = 'Maximum 10 groups';
+    addBtn.textContent = 'Maximum 10 categories';
   } else {
     addBtn.disabled = false;
-    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Category';
   }
   
 }
 
-// Ensure checkboxes are only checked for two groups at once
+// Ensure checkboxes are only checked for two categories at once
 function refreshCheckboxes() {
   const checkboxes = document.querySelectorAll('.comparison-checkbox');
   const checkedBoxes = Array.from(checkboxes).filter(checkbox => checkbox.checked);
@@ -1857,46 +1877,46 @@ function refreshCheckboxes() {
   drawChart();
 }
 
-// Update checkbox behavior when adding a new group
-function addGroup() {
-  const container = document.getElementById('groupContainer');
-  const newGroupRow = document.createElement('div');
-  newGroupRow.className = 'groupRow';
+// Update checkbox behavior when adding a new category
+function addCategoryRow() {
+  const container = document.getElementById('categoryContainer');
+  const newCategoryRow = document.createElement('div');
+  newCategoryRow.className = 'categoryRow';
 
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
-  checkbox.className = 'group-checkbox';
-  checkbox.checked = false; // Default unchecked for new groups
+  checkbox.className = 'category-checkbox';
+  checkbox.checked = false; // Default unchecked for new categories
 
-  newGroupRow.appendChild(checkbox);
-  container.appendChild(newGroupRow);
+  newCategoryRow.appendChild(checkbox);
+  container.appendChild(newCategoryRow);
 
   refreshCheckboxes();
 }
 
 /**
- * Setup group selector with dropdown approach like linechart
+ * Setup category selector with dropdown approach like linechart
  */
-function setupGroupSelector() {
-  const container = document.getElementById('groupContainer');
+function setupCategorySelector() {
+  const container = document.getElementById('categoryContainer');
   container.innerHTML = '';
   
-  // Don't add initial group here - let renderInitialView handle defaults
-  // addGroupSelector();
+  // Don't add initial category here - let renderInitialView handle defaults
+  // addCategorySelector();
 }
 
 /**
  * Update chart when selections change
  */
 function updateChart() {
-  // This will be called automatically when groups change
+  // This will be called automatically when categories change
 
   // Reset the color system to ensure consistent color assignments
   window.Colors.resetColorSystem();
 
-  // Get selected groups and assign colors
-  const selectedGroupNames = getSelectedGroups();
-  const colors = selectedGroupNames.map(groupName => window.Colors.getColorForGroup(groupName));
+  // Get selected categories and assign colors
+  const selectedCategoryNames = getSelectedCategories();
+  const colors = selectedCategoryNames.map(categoryName => window.Colors.getColorForGroup(categoryName));
 
   // Redraw the chart to reflect the new selections
   drawChart();
@@ -2001,25 +2021,25 @@ async function drawChart(skipHeightUpdate = false) {
     return;
   }
 
-  // Get selected groups from dropdowns
-  const selectedGroupNames = getSelectedGroups();
+  // Get selected categories from dropdowns
+  const selectedCategoryNames = getSelectedCategories();
   
-  if (selectedGroupNames.length === 0) {
-    window.ChartRenderer.showMessage('Please select at least one group', 'warning');
+  if (selectedCategoryNames.length === 0) {
+    window.ChartRenderer.showMessage('Please select at least one category', 'warning');
     return;
   }
 
-  // Convert group names to IDs
-  const allGroups = window.supabaseModule.allGroups || [];
+  // Convert category names to IDs
+  const allCategories = window.supabaseModule.allCategories || [];
   
-  const selectedGroupIds = selectedGroupNames.map(name => {
-    const group = allGroups.find(g => g.group_title === name);
-    return group ? group.id : null;
+  const selectedCategoryIds = selectedCategoryNames.map(name => {
+    const category = allCategories.find(g => getCategoryDisplayTitle(g) === name);
+    return category ? category.id : null;
   }).filter(id => id !== null);
 
 
-  if (selectedGroupIds.length === 0) {
-    window.ChartRenderer.showMessage('Selected groups not found', 'warning');
+  if (selectedCategoryIds.length === 0) {
+    window.ChartRenderer.showMessage('Selected categories not found', 'warning');
     return;
   }
 
@@ -2034,7 +2054,7 @@ async function drawChart(skipHeightUpdate = false) {
 
   // Draw chart
   try {
-    await window.ChartRenderer.drawBubbleChart(selectedYear, selectedPollutantId, selectedGroupIds);
+    await window.ChartRenderer.drawBubbleChart(selectedYear, selectedPollutantId, selectedCategoryIds);
   } catch (error) {
     console.error('Bubble chart render failed:', error);
     window.ChartRenderer.showMessage('Unable to render the chart right now. Please try again.', 'error');
@@ -2046,21 +2066,21 @@ async function drawChart(skipHeightUpdate = false) {
   
   
   if (checkedCount >= 2) {
-    const dataPoints = window.supabaseModule.getScatterData(selectedYear, selectedPollutantId, selectedGroupIds);
-    const group1 = dataPoints[0];
-    const group2 = dataPoints[1];
+    const dataPoints = window.supabaseModule.getScatterData(selectedYear, selectedPollutantId, selectedCategoryIds);
+    const category1 = dataPoints[0];
+    const category2 = dataPoints[1];
 
-    const higherPolluter = group1.pollutantValue > group2.pollutantValue ? group1 : group2;
-    const lowerPolluter = group1.pollutantValue > group2.pollutantValue ? group2 : group1;
+    const higherPolluter = category1.pollutantValue > category2.pollutantValue ? category1 : category2;
+    const lowerPolluter = category1.pollutantValue > category2.pollutantValue ? category2 : category1;
 
     const pollutionRatio = lowerPolluter.pollutantValue !== 0 ? higherPolluter.pollutantValue / lowerPolluter.pollutantValue : Infinity;
     const heatRatio = higherPolluter.actDataValue !== 0 ? lowerPolluter.actDataValue / higherPolluter.actDataValue : Infinity;
 
     const pollutantName = window.supabaseModule.getPollutantName(selectedPollutantId);
 
-    // Get display names for groups
-    const higherPolluter_displayName = getGroupDisplayName(higherPolluter.groupName);
-    const lowerPolluter_displayName = getGroupDisplayName(lowerPolluter.groupName);
+    // Get display names for categories
+    const higherPolluter_displayName = getCategoryDisplayName(higherPolluter.groupName);
+    const lowerPolluter_displayName = getCategoryDisplayName(lowerPolluter.groupName);
 
     // Create enhanced comparison statement with arrows and calculated values
     const statement = {
@@ -2083,7 +2103,7 @@ async function drawChart(skipHeightUpdate = false) {
   window.supabaseModule.trackAnalytics('bubble_chart_drawn', {
     year: selectedYear,
     pollutant: window.supabaseModule.getPollutantName(selectedPollutantId),
-    group_count: selectedGroupIds.length
+    category_count: selectedCategoryIds.length
   });
 
   // Only send height update if not triggered by resize (prevents growing gap)
@@ -2120,12 +2140,12 @@ function ensureComparisonDivExists() {
 }
 
 // Get custom display name for comparison statements
-function getGroupDisplayName(groupName) {
+function getCategoryDisplayName(categoryName) {
   const displayNames = {
     'Ecodesign Stove - Ready To Burn': 'Ecodesign stoves burning Ready to Burn wood',
     'Gas Boilers': 'gas boilers'
   };
-  return displayNames[groupName] || groupName.toLowerCase();
+  return displayNames[categoryName] || categoryName.toLowerCase();
 }
 
 function updateComparisonStatement(statement) {
@@ -2244,32 +2264,32 @@ function showNotification(message, type) {
  * Update URL with current parameters
  */
 function updateURL() {
-  const selectedGroupNames = getSelectedGroups();
-  if (!selectedYear || !selectedPollutantId || selectedGroupNames.length === 0) {
+  const selectedCategoryNames = getSelectedCategories();
+  if (!selectedYear || !selectedPollutantId || selectedCategoryNames.length === 0) {
     return;
   }
 
-  // Convert group names to IDs for URL
-  const allGroups = window.supabaseModule.allGroups || [];
-  const groupRows = document.querySelectorAll('.groupRow');
+  // Convert category names to IDs for URL
+  const allCategories = window.supabaseModule.allCategories || [];
+  const categoryRows = document.querySelectorAll('.categoryRow');
   
-  const groupIdsWithFlags = selectedGroupNames.map((name, index) => {
-    const group = allGroups.find(g => g.group_title === name);
-    if (!group) return null;
+  const categoryIdsWithFlags = selectedCategoryNames.map((name, index) => {
+    const category = allCategories.find(g => getCategoryDisplayTitle(g) === name);
+    if (!category) return null;
     
     // Check if the corresponding checkbox is checked
-    const row = groupRows[index];
+    const row = categoryRows[index];
     const checkbox = row?.querySelector('.comparison-checkbox');
     const isChecked = checkbox?.checked || false;
     
     // Add 'c' suffix if checkbox is checked
-    return isChecked ? `${group.id}c` : `${group.id}`;
+    return isChecked ? `${category.id}c` : `${category.id}`;
   }).filter(id => id !== null);
 
   // Build params array - use raw strings to avoid encoding commas
   const params = [
     `pollutant_id=${selectedPollutantId}`,
-    `group_ids=${groupIdsWithFlags.join(',')}`,  // Comma NOT encoded
+    `category_ids=${categoryIdsWithFlags.join(',')}`,  // Comma NOT encoded
     `year=${selectedYear}`
   ];
   
@@ -2311,26 +2331,38 @@ function loadFromURLParameters() {
   
   const year = params.get('year');
   const pollutantId = params.get('pollutant_id');
-  const groupIds = params.get('group_ids');
+  const categoryIdsParam = params.get('category_ids')
+    || params.get('categoryIds')
+    || params.get('categoryId')
+    || params.get('group_ids')
+    || params.get('groupIds')
+    || params.get('groupId');
 
-  if (year && pollutantId && groupIds) {
+  if (year && pollutantId && categoryIdsParam) {
     selectedYear = parseInt(year);
     selectedPollutantId = parseInt(pollutantId);
-    selectedGroupIds = groupIds.split(',').map(id => parseInt(id));
+    selectedCategoryIds = categoryIdsParam.split(',').map(id => parseInt(id));
 
     // Update UI
     document.getElementById('yearSelect').value = selectedYear;
     document.getElementById('pollutantSelect').value = selectedPollutantId;
+
+    // Rebuild category selectors to match URL-provided IDs
+    const categories = window.supabaseModule.allCategories || [];
+    const selectedCategoryNames = selectedCategoryIds
+      .map(id => categories.find(category => category.id === id))
+      .filter(Boolean)
+      .map(getCategoryDisplayTitle);
+
+    const categoryContainer = document.getElementById('categoryContainer');
+    if (categoryContainer && selectedCategoryNames.length) {
+      categoryContainer.innerHTML = '';
+      selectedCategoryNames.forEach(name => addCategorySelector(name, false));
+      refreshCategoryDropdowns();
+      refreshButtons();
+    }
     
-    // Check appropriate group checkboxes
-    selectedGroupIds.forEach(groupId => {
-      const checkbox = document.getElementById(`group_${groupId}`);
-      if (checkbox) {
-        checkbox.checked = true;
-      }
-    });
-    
-    updateGroupCheckboxes();
+    refreshCheckboxes();
 
     // Draw chart automatically
     setTimeout(() => {
@@ -2348,7 +2380,7 @@ function addDragAndDropHandlers(div){
   div.addEventListener('dragend', () => div.classList.remove('dragging'));
   div.addEventListener('dragover', e => {
     e.preventDefault();
-    const container = document.getElementById('groupContainer');
+    const container = document.getElementById('categoryContainer');
     const dragging = container.querySelector('.dragging');
     if (!dragging) return;
     const after = getDragAfterElement(container, e.clientY);
@@ -2357,14 +2389,14 @@ function addDragAndDropHandlers(div){
     else container.insertBefore(dragging, after);
   });
   div.addEventListener('drop', () => { 
-    refreshGroupDropdowns(); 
+    refreshCategoryDropdowns(); 
     refreshButtons();
     updateChart(); 
   });
 }
 
 function getDragAfterElement(container, y){
-  const draggable = [...container.querySelectorAll('.groupRow:not(.dragging)')];
+  const draggable = [...container.querySelectorAll('.categoryRow:not(.dragging)')];
   return draggable.reduce((closest, child) => {
     const box = child.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -2402,8 +2434,8 @@ function alignComparisonHeader() {
   const header = document.getElementById('comparisonHeader');
   const checkboxes = document.querySelectorAll('.comparison-checkbox');
   
-  // Hide header if there are fewer than 2 groups
-  const rows = document.querySelectorAll('.groupRow');
+  // Hide header if there are fewer than 2 categories
+  const rows = document.querySelectorAll('.categoryRow');
   
   if (!header) {
     return;

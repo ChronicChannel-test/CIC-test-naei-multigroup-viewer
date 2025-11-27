@@ -511,8 +511,8 @@
         directGroupDatasetPromise = (async () => {
           try {
             const [groupsResp, nfrResp] = await Promise.all([
-              client.from('NAEI_global_t_Group').select('*'),
-              client.from('NAEI_global_t_NFRCode').select('*')
+              client.from('naei_global_t_category').select('*'),
+              client.from('naei_global_t_nfrcode').select('*')
             ]);
 
             if (groupsResp.error) {
@@ -693,12 +693,38 @@
 
       async function ensureSharedDataLoaded() {
         const loader = resolveSharedDataLoader();
-        if (loader?.isDataLoaded?.()) {
+        if (loader) {
+          if (loader.isDataLoaded?.()) {
+            try {
+              groupInfoDatasetSource = 'shared-cache';
+              return loader.getCachedData();
+            } catch (error) {
+              console.warn('Unable to read cached shared data:', error);
+            }
+          }
+
           try {
-            groupInfoDatasetSource = 'shared-cache';
-            return loader.getCachedData();
+            if (typeof loader.loadSharedData === 'function') {
+              const payload = await loader.loadSharedData();
+              if (payload) {
+                groupInfoDatasetSource = 'shared-loader';
+                return payload;
+              }
+            }
           } catch (error) {
-            console.warn('Unable to read cached shared data:', error);
+            console.warn('Shared data loader failed while preparing category info page:', error);
+          }
+
+          if (loader.isDataLoaded?.()) {
+            try {
+              const cached = loader.getCachedData();
+              if (cached) {
+                groupInfoDatasetSource = 'shared-cache-fallback';
+                return cached;
+              }
+            } catch (error) {
+              console.warn('Shared data cache unavailable after load attempt:', error);
+            }
           }
         }
 
@@ -715,30 +741,6 @@
 
         if (!loader) {
           console.warn('Shared data loader unavailable when preparing category info page.');
-          groupInfoDatasetSource = 'unavailable';
-          return null;
-        }
-
-        try {
-          const cached = loader.getCachedData();
-          if (cached) {
-            groupInfoDatasetSource = 'shared-cache-fallback';
-            return cached;
-          }
-        } catch (error) {
-          console.warn('Shared data cache unavailable after direct fetch attempt:', error);
-        }
-
-        try {
-          if (typeof loader.loadSharedData === 'function') {
-            const payload = await loader.loadSharedData();
-            if (payload) {
-              groupInfoDatasetSource = 'shared-loader';
-              return payload;
-            }
-          }
-        } catch (error) {
-          console.warn('Shared data loader failed while preparing category info page:', error);
         }
 
         groupInfoDatasetSource = 'unavailable';
@@ -818,7 +820,7 @@
             }
             timeseries.forEach(row => {
               if (row?.pollutant_id === actDataPollutant.id) {
-                actDataRowsByGroup.set(row.group_id, row);
+                actDataRowsByGroup.set(row.category_id, row);
               }
             });
           }
@@ -837,7 +839,11 @@
         const missingNamesSet = new Set();
 
         groups.forEach(group => {
-          const rawName = normalizeValue(group?.group_title || group?.group_name || group?.name);
+          const rawName = normalizeValue(
+            group?.category_title
+            || group?.group_name
+            || group?.name
+          );
           if (!rawName) {
             return;
           }
@@ -1042,7 +1048,7 @@
 
         const groupMap = {};
         groupRows.forEach(row => {
-          const rawTitle = row?.group_title || row?.group_name || row?.name;
+          const rawTitle = row?.category_title || row?.group_name || row?.name;
           const groupTitle = normalizeValue(rawTitle);
           if (isNullToken(groupTitle)) return;
 

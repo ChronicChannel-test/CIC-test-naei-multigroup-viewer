@@ -1,6 +1,6 @@
 /**
  * Main Chart and UI Module
- * Handles chart rendering, UI interactions, group management, and initialization
+ * Handles chart rendering, UI interactions, category management, and initialization
  * v2.4 - Now uses shared color module
  */
 
@@ -35,10 +35,6 @@ const EXPORT_MIN_SCALE = 16;
 const EXPORT_MAX_DIM = 16000;
 const EXPORT_MAX_PIXELS = 100_000_000;
 
-// Chart options
-let smoothLines = true; // default to smooth (curved) lines
-window.smoothLines = smoothLines; // Expose for export.js
-
 // Listen for messages from parent
 window.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'overlayHidden') {
@@ -71,8 +67,8 @@ function selectionsReady() {
     const pollutant = document.getElementById('pollutantSelect')?.value;
     const startYear = +document.getElementById('startYear')?.value;
     const endYear = +document.getElementById('endYear')?.value;
-    const groups = getSelectedGroups();
-    return Boolean(pollutant && startYear && endYear && startYear < endYear && groups.length);
+    const categories = getSelectedCategories();
+    return Boolean(pollutant && startYear && endYear && startYear < endYear && categories.length);
   } catch (e) {
     return false;
   }
@@ -129,7 +125,18 @@ function computeSafeExportScale(origW, origH, desiredScale) {
 }
 
 /* ---------------- Setup Functions ---------------- */
-function setupSelectors(pollutants, groups){
+function getCategoryDisplayTitle(record) {
+  if (!record || typeof record !== 'object') {
+    return '';
+  }
+  const title = record.category_title
+    || record.group_name
+    || record.title
+    || '';
+  return typeof title === 'string' ? title : '';
+}
+
+function setupSelectors(pollutants, categories){
   // ✅ Use pollutant list from Supabase loadData
   const sel = document.getElementById('pollutantSelect');
   sel.innerHTML = '<option value="">Select pollutant</option>';
@@ -140,16 +147,16 @@ function setupSelectors(pollutants, groups){
     pollutantNames.forEach(p => sel.add(new Option(p, p)));
   }
 
-  // Ensure we have the groups list available from the global window var
-  if (groups && groups.length) {
-    const groupNames = [...new Set(groups.map(g => g.group_title))]
+  // Ensure we have the categories list available from the global window var
+  if (categories && categories.length) {
+    const categoryNames = [...new Set(categories.map(getCategoryDisplayTitle))]
       .filter(Boolean)
       .sort((a, b) => {
         if (a.toLowerCase() === 'all') return -1;
         if (b.toLowerCase() === 'all') return 1;
         return a.localeCompare(b);
       });
-    window.allGroupsList = groupNames;
+    window.allCategoriesList = categoryNames;
   }
 
 
@@ -179,8 +186,8 @@ function setupSelectors(pollutants, groups){
     updateChart();
   });
 
-  // Group selectors will be added by the init() function after URL parameter processing
-  // This prevents double group creation that causes visual jumping
+  // Category selectors will be added by the init() function after URL parameter processing
+  // This prevents double category creation that causes visual jumping
  }
 
 function updateYearDropdowns() {
@@ -232,14 +239,14 @@ function updateYearDropdowns() {
   endSel.value = endVal;
 }
 
-function getSelectedGroups(){ return [...document.querySelectorAll('#groupContainer select')].map(s => s.value).filter(Boolean); }
-function addGroupSelector(defaultValue = "", usePlaceholder = true){
-  const groupName = (defaultValue && typeof defaultValue === 'object')
-    ? defaultValue.group_title
+function getSelectedCategories(){ return [...document.querySelectorAll('#categoryContainer select')].map(s => s.value).filter(Boolean); }
+function addCategorySelector(defaultValue = "", usePlaceholder = true){
+  const categoryName = (defaultValue && typeof defaultValue === 'object')
+    ? getCategoryDisplayTitle(defaultValue)
     : defaultValue;
-  const container = document.getElementById('groupContainer');
+  const container = document.getElementById('categoryContainer');
   const div = document.createElement('div');
-  div.className = 'groupRow';
+  div.className = 'categoryRow';
   div.draggable = true;
 
   // drag handle
@@ -247,37 +254,37 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   dragHandle.className = 'dragHandle';
   dragHandle.textContent = '⠿';
   dragHandle.style.marginRight = '6px';
-  // group control wrapper (keeps drag handle and select together)
+  // category control wrapper (keeps drag handle and select together)
   const controlWrap = document.createElement('div');
-  controlWrap.className = 'group-control';
+  controlWrap.className = 'category-control';
 
   // convert drag handle into an accessible button so it's keyboard-focusable
   const handleBtn = document.createElement('button');
   handleBtn.type = 'button';
   handleBtn.className = 'dragHandle';
-  handleBtn.setAttribute('aria-label', 'Reorder group (use arrow keys)');
+  handleBtn.setAttribute('aria-label', 'Reorder category (use arrow keys)');
   handleBtn.title = 'Drag to reorder (or focus and use Arrow keys)';
   handleBtn.textContent = '⠿';
   handleBtn.style.marginRight = '6px';
   controlWrap.appendChild(handleBtn);
 
-  // group select
+  // category select
   const sel = document.createElement('select');
-  sel.setAttribute('aria-label', 'Group selector');
-  sel.name = 'groupSelector';
+  sel.setAttribute('aria-label', 'Category selector');
+  sel.name = 'categorySelector';
   if (usePlaceholder){
-    const ph = new Option('Select group','');
+    const ph = new Option('Select category','');
     ph.disabled = true; ph.selected = true;
     sel.add(ph);
   }
-  const allGroups = window.allGroupsList || [];
+  const allCategories = window.allCategoriesList || [];
 
-  const selected = getSelectedGroups();
-  allGroups.forEach(g => {
-    if (!selected.includes(g) || g === groupName) sel.add(new Option(g,g));
+  const selected = getSelectedCategories();
+  allCategories.forEach(g => {
+    if (!selected.includes(g) || g === categoryName) sel.add(new Option(g,g));
   });
-  if (groupName) sel.value = groupName;
-  sel.addEventListener('change', () => { refreshGroupDropdowns(); updateChart(); });
+  if (categoryName) sel.value = categoryName;
+  sel.addEventListener('change', () => { refreshCategoryDropdowns(); updateChart(); });
 
   controlWrap.appendChild(sel);
   // append the control wrap first; remove button will be appended to row as a sibling
@@ -289,10 +296,10 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         let prev = div.previousElementSibling;
-        while (prev && !prev.classList.contains('groupRow')) prev = prev.previousElementSibling;
+        while (prev && !prev.classList.contains('categoryRow')) prev = prev.previousElementSibling;
         if (prev) {
           container.insertBefore(div, prev);
-          refreshGroupDropdowns();
+          refreshCategoryDropdowns();
           refreshButtons();
           updateChart();
           // move focus back to the handle for continued keyboard moves
@@ -301,10 +308,10 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
       } else if (e.key === 'ArrowDown') {
         e.preventDefault();
         let next = div.nextElementSibling;
-        while (next && !next.classList.contains('groupRow')) next = next.nextElementSibling;
+        while (next && !next.classList.contains('categoryRow')) next = next.nextElementSibling;
         if (next) {
           container.insertBefore(div, next.nextElementSibling);
-          refreshGroupDropdowns();
+          refreshCategoryDropdowns();
           refreshButtons();
           updateChart();
           handleBtn.focus();
@@ -320,12 +327,12 @@ function addGroupSelector(defaultValue = "", usePlaceholder = true){
   refreshButtons();
 }
 
-function refreshGroupDropdowns(){
-  const selected = getSelectedGroups();
-  const all = window.allGroupsList || [];
+function refreshCategoryDropdowns(){
+  const selected = getSelectedCategories();
+  const all = window.allCategoriesList || [];
 
 
-  document.querySelectorAll('#groupContainer select').forEach(select => {
+  document.querySelectorAll('#categoryContainer select').forEach(select => {
     const current = select.value;
     Array.from(select.options).forEach(opt => { if (opt.value !== '') opt.remove(); });
     all.forEach(g => {
@@ -339,28 +346,28 @@ function refreshGroupDropdowns(){
 }
 
 function refreshButtons() {
-  const container = document.getElementById('groupContainer');
+  const container = document.getElementById('categoryContainer');
   // Remove any existing Add/Remove buttons to rebuild cleanly
   container.querySelectorAll('.add-btn, .remove-btn').forEach(n => n.remove());
 
-  const rows = container.querySelectorAll('.groupRow');
+  const rows = container.querySelectorAll('.categoryRow');
 
-  // Add remove buttons only if there are 2 or more groups
+  // Add remove buttons only if there are 2 or more categories
     if (rows.length >= 2) {
     rows.forEach(row => {
         if (!row.querySelector('.remove-btn')) {
         const removeBtn = document.createElement('button');
         removeBtn.type = 'button';
         removeBtn.className = 'remove-btn';
-  removeBtn.innerHTML = '<span class="remove-icon">−</span> Remove Group';
-        // make ARIA label include the current group name if available
+  removeBtn.innerHTML = '<span class="remove-icon">−</span> Remove Category';
+        // make ARIA label include the current category name if available
         const sel = row.querySelector('select');
-        const groupName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
-        removeBtn.setAttribute('aria-label', groupName ? `Remove group ${groupName}` : 'Remove group');
+        const categoryName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
+        removeBtn.setAttribute('aria-label', categoryName ? `Remove category ${categoryName}` : 'Remove category');
         removeBtn.onclick = () => {
           row.remove();
           refreshButtons();
-          refreshGroupDropdowns();
+          refreshCategoryDropdowns();
           updateChart();
         };
         // Append remove button as a sibling to the control wrapper so it
@@ -370,22 +377,22 @@ function refreshButtons() {
     });
   }
 
-  // Add "Add Group" button just below the last group box
+  // Add "Add Category" button just below the last category box
   let addBtn = container.querySelector('.add-btn');
   if (!addBtn) {
     addBtn = document.createElement('button');
     addBtn.className = 'add-btn';
-    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
-    addBtn.onclick = () => addGroupSelector("", true);
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Category';
+    addBtn.onclick = () => addCategorySelector("", true);
     container.appendChild(addBtn);
   }
 
-  // Disable button if 10 groups are present
+  // Disable button if 10 categories are present
   if (rows.length >= 10) {
-    addBtn.textContent = 'Max Groups = 10';
+    addBtn.textContent = 'Max Categories = 10';
     addBtn.disabled = true;
   } else {
-    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Group';
+    addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Category';
     addBtn.disabled = false;
   }
 }
@@ -464,7 +471,7 @@ function addDragAndDropHandlers(div){
   div.addEventListener('dragend', () => div.classList.remove('dragging'));
   div.addEventListener('dragover', e => {
     e.preventDefault();
-    const container = document.getElementById('groupContainer');
+    const container = document.getElementById('categoryContainer');
     const dragging = container.querySelector('.dragging');
     if (!dragging) return;
     const after = getDragAfterElement(container, e.clientY);
@@ -472,11 +479,11 @@ function addDragAndDropHandlers(div){
     if (!after || after === addBtn) container.insertBefore(dragging, addBtn);
     else container.insertBefore(dragging, after);
   });
-  div.addEventListener('drop', () => { refreshGroupDropdowns(); updateChart(); });
+  div.addEventListener('drop', () => { refreshCategoryDropdowns(); updateChart(); });
 }
 
 function getDragAfterElement(container, y){
-  const draggable = [...container.querySelectorAll('.groupRow:not(.dragging)')];
+  const draggable = [...container.querySelectorAll('.categoryRow:not(.dragging)')];
   return draggable.reduce((closest, child) => {
     const box = child.getBoundingClientRect();
     const offset = y - box.top - box.height / 2;
@@ -567,8 +574,8 @@ function addCustomXAxisLabels() {
 function updateUrlFromChartState() {
   // Ensure the data needed for ID lookups is available.
   const pollutants = window.allPollutantsData || [];
-  const groups = window.allGroupsData || [];
-  if (!pollutants.length || !groups.length) {
+  const categories = window.allCategoriesData || [];
+  if (!pollutants.length || !categories.length) {
     console.log("URL update skipped: lookup data not yet available.");
     return;
   }
@@ -579,9 +586,9 @@ function updateUrlFromChartState() {
       const pollutantName = document.getElementById('pollutantSelect').value;
       const startYear = document.getElementById('startYear').value;
       const endYear = document.getElementById('endYear').value;
-      const groupNames = getSelectedGroups();
+      const categoryNames = getSelectedCategories();
 
-      if (!pollutantName || !startYear || !endYear || groupNames.length === 0) {
+      if (!pollutantName || !startYear || !endYear || categoryNames.length === 0) {
         return; // Not enough info to create a valid URL
       }
 
@@ -589,13 +596,13 @@ function updateUrlFromChartState() {
       const pollutant = pollutants.find(p => p.pollutant === pollutantName);
       const pollutantId = pollutant ? pollutant.id : null;
 
-      // Find group IDs
-      const groupIds = groupNames.map(name => {
-        const group = groups.find(g => g.group_title === name);
-        return group ? group.id : null;
+      // Find category IDs
+      const categoryIds = categoryNames.map(name => {
+        const category = categories.find(g => getCategoryDisplayTitle(g) === name);
+        return category ? category.id : null;
       }).filter(id => id !== null);
 
-      if (!pollutantId || groupIds.length !== groupNames.length) {
+      if (!pollutantId || categoryIds.length !== categoryNames.length) {
         console.warn("Could not map all names to IDs for URL update.");
         return;
       }
@@ -607,7 +614,7 @@ function updateUrlFromChartState() {
 
       const queryParts = [
         `pollutant_id=${encodeURIComponent(pollutantId)}`,
-        `group_ids=${groupIds.join(',')}`,
+        `group_ids=${categoryIds.join(',')}`,
         `start_year=${encodeURIComponent(startYear)}`,
         `end_year=${encodeURIComponent(endYear)}`
       ];
@@ -652,16 +659,16 @@ function updateChart(){
   const pollutant = document.getElementById('pollutantSelect').value;
   const startYear = +document.getElementById('startYear').value;
   const endYear = +document.getElementById('endYear').value;
-  const selectedGroups = getSelectedGroups();
+  const selectedCategories = getSelectedCategories();
 
   // If essential selections aren’t ready yet, retry briefly (handles race with URL parsing/DOM updates)
-  if (!pollutant || !startYear || !endYear || !selectedGroups.length) {
+  if (!pollutant || !startYear || !endYear || !selectedCategories.length) {
     window.__updateRetryCount = (window.__updateRetryCount || 0) + 1;
     const missing = [];
     if (!pollutant) missing.push('pollutant');
     if (!startYear) missing.push('startYear');
     if (!endYear) missing.push('endYear');
-    if (!selectedGroups.length) missing.push('groups');
+    if (!selectedCategories.length) missing.push('categories');
     console.log(`⏳ updateChart deferred (${window.__updateRetryCount}) – waiting for: ${missing.join(', ')}`);
     if (window.__updateRetryCount <= 20) {
       setTimeout(updateChart, 75);
@@ -683,8 +690,8 @@ function updateChart(){
     pollutant: pollutant,
     start_year: startYear,
     end_year: endYear,
-    groups: selectedGroups,
-    groups_count: selectedGroups.length,
+    categories: selectedCategories,
+    categories_count: selectedCategories.length,
     year_range: endYear - startYear + 1
   });
 
@@ -696,13 +703,13 @@ function updateChart(){
   const endIdx = yearsAll.indexOf(String(endYear));
   const years = yearsAll.slice(startIdx, endIdx + 1);
   const keysForYears = yearKeys.slice(startIdx, endIdx + 1);
-  const colors = selectedGroups.map(g => window.Colors.getColorForGroup(g));
+  const colors = selectedCategories.map(g => window.Colors.getColorForCategory(g));
 
   // Build rows of data (year + series values). Use null for missing.
   const chartRows = years.map((y, rowIdx) => {
     const row = [y];
     const key = keysForYears[rowIdx]; // e.g. 'f2015'
-    selectedGroups.forEach(g => {
+    selectedCategories.forEach(g => {
       const dataRow = groupedData[pollutant]?.[g];
       const raw = dataRow ? dataRow[key] : null;
       const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
@@ -714,8 +721,8 @@ function updateChart(){
   // guard against empty data
   if (chartRows.length === 0) return;
 
-  // --- Determine which groups actually have data ---
-  const groupHasData = selectedGroups.map((g, i) => {
+  // --- Determine which categories actually have data ---
+  const categoryHasData = selectedCategories.map((g, i) => {
     return chartRows.some(row => typeof row[i + 1] === 'number');
   });
 
@@ -725,7 +732,7 @@ function updateChart(){
   // Create DataTable explicitly to guarantee column types
   const dataTable = new google.visualization.DataTable();
   dataTable.addColumn('string', 'Year');           // year as string
-  selectedGroups.forEach(g => {
+  selectedCategories.forEach(g => {
     dataTable.addColumn('number', g);              // data column
     dataTable.addColumn({type: 'string', role: 'tooltip'}); // custom tooltip
   });
@@ -741,7 +748,7 @@ function updateChart(){
       if (value === null || value === undefined) {
         newRow.push(null);
       } else {
-        const groupName = selectedGroups[i - 1];
+        const categoryName = selectedCategories[i - 1];
         let formattedValue;
         
         // Use more decimals for very small values
@@ -753,7 +760,7 @@ function updateChart(){
           formattedValue = value.toFixed(3).replace(/\.?0+$/, ''); // 3 decimals for normal values
         }
         
-        const tooltip = `${groupName}\nYear: ${row[0]}\nValue: ${formattedValue}${unit ? ' ' + unit : ''}`;
+        const tooltip = `${categoryName}\nYear: ${row[0]}\nValue: ${formattedValue}${unit ? ' ' + unit : ''}`;
         newRow.push(tooltip);
       }
     }
@@ -761,11 +768,11 @@ function updateChart(){
   });
 
   const seriesOptions = {};
-  selectedGroups.forEach((g, i) => {
+  selectedCategories.forEach((g, i) => {
     // Use the global seriesVisibility state to determine visibility
-    // Ensure the array is initialized if this is the first run or group count changed
-    if (seriesVisibility.length !== selectedGroups.length) {
-      seriesVisibility = Array(selectedGroups.length).fill(true);
+    // Ensure the array is initialized if this is the first run or category count changed
+    if (seriesVisibility.length !== selectedCategories.length) {
+      seriesVisibility = Array(selectedCategories.length).fill(true);
       window.seriesVisibility = seriesVisibility; // Update window reference
     }
     seriesOptions[i] = seriesVisibility[i]
@@ -866,7 +873,7 @@ function updateChart(){
       textPosition: 'out', // Ensure title is positioned outside to avoid overlap
     },
     series: seriesOptions,
-    curveType: smoothLines ? 'function' : 'none',
+    curveType: 'function',
     lineWidth: 3,
     pointSize: 4,
     chartArea: {
@@ -984,12 +991,12 @@ function updateChart(){
   legendDiv.innerHTML = '';
 
   // Ensure visibility array is correctly sized before building the legend
-  if (seriesVisibility.length !== selectedGroups.length) {
-    seriesVisibility = Array(selectedGroups.length).fill(true);
+  if (seriesVisibility.length !== selectedCategories.length) {
+    seriesVisibility = Array(selectedCategories.length).fill(true);
     window.seriesVisibility = seriesVisibility; // Update window reference
   }
 
-  selectedGroups.forEach((g, i) => {
+  selectedCategories.forEach((g, i) => {
     const item = document.createElement('span');
     const dot = document.createElement('span');
     dot.style.display = 'inline-block';
@@ -999,17 +1006,17 @@ function updateChart(){
     dot.style.backgroundColor = colors[i];
     item.appendChild(dot);
 
-    const labelText = document.createTextNode(g + (groupHasData[i] ? '' : ' (No data available)'));
+    const labelText = document.createTextNode(g + (categoryHasData[i] ? '' : ' (No data available)'));
     item.appendChild(labelText);
 
     // Fade if no data, or if the series is toggled off
-    item.style.opacity = (!groupHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
-    if (!groupHasData[i]) {
+    item.style.opacity = (!categoryHasData[i] || !seriesVisibility[i]) ? '0.4' : '1';
+    if (!categoryHasData[i]) {
       item.title = 'No data available';
     }
 
     // Toggle visibility only if data exists
-    if (groupHasData[i]) {
+    if (categoryHasData[i]) {
       item.addEventListener('click', () => {
         // Toggle the visibility state for the clicked series
         seriesVisibility[i] = !seriesVisibility[i];
@@ -1023,7 +1030,7 @@ function updateChart(){
   });
 
   // ensure controls reflect available choices
-  refreshGroupDropdowns();
+  refreshCategoryDropdowns();
   refreshButtons();
 }
 
@@ -1118,15 +1125,15 @@ async function renderInitialView() {
         }
       }
 
-      // Clear existing group selectors and add new ones based on URL
-      const groupContainer = document.getElementById('groupContainer');
-      groupContainer.innerHTML = ''; // Clear any default selectors
+      // Clear existing category selectors and add new ones based on URL
+      const categoryContainer = document.getElementById('categoryContainer');
+      categoryContainer.innerHTML = ''; // Clear any default selectors
 
-      if (params.groupNames && params.groupNames.length > 0) {
-        params.groupNames.forEach(name => addGroupSelector(name, false));
+      if (params.categoryNames && params.categoryNames.length > 0) {
+        params.categoryNames.forEach(name => addCategorySelector(name, false));
       } else {
-        // Add default groups if none are in the URL
-        addGroupSelector('All', false);
+        // Add default categories if none are in the URL
+        addCategorySelector('All', false);
       }
 
       const startYearSelect = document.getElementById('startYear');
@@ -1211,12 +1218,12 @@ async function revealMainContent() {
                   pollutantSelect: document.getElementById('pollutantSelect')?.value || null,
                   startYear: document.getElementById('startYear')?.value || null,
                   endYear: document.getElementById('endYear')?.value || null,
-                  groupSelectCount: document.querySelectorAll('#groupContainer select').length,
-                  selectedGroups: (function(){ try { return getSelectedGroups(); } catch(e){ return []; } })(),
+                  categorySelectCount: document.querySelectorAll('#categoryContainer select').length,
+                  selectedCategories: (function(){ try { return getSelectedCategories(); } catch(e){ return []; } })(),
                   globalYearsCount: (window.globalYears || []).length
                 };
                 if (window.groupedData && dbg.pollutantSelect) {
-                  dbg.groupedDataPresence = (dbg.selectedGroups || []).map(g => ({ group: g, hasRow: !!(groupedData[dbg.pollutantSelect] && groupedData[dbg.pollutantSelect][g]) }));
+                  dbg.groupedDataPresence = (dbg.selectedCategories || []).map(g => ({ category: g, hasRow: !!(groupedData[dbg.pollutantSelect] && groupedData[dbg.pollutantSelect][g]) }));
                 }
                 console.log('🧪 Pre-render diagnostics:', dbg);
                 if (window.parent && window.parent !== window) {
@@ -1306,12 +1313,12 @@ async function revealMainContent() {
 function parseUrlParameters() {
   const params = new URLSearchParams(window.location.search);
   const pollutantId = params.get('pollutant_id');
-  const groupIds = params.get('group_ids')?.split(',').map(Number).filter(Boolean);
+  const categoryIds = params.get('group_ids')?.split(',').map(Number).filter(Boolean);
   const startYearParam = params.get('start_year');
   const endYearParam = params.get('end_year');
 
   const pollutants = window.allPollutantsData || window.allPollutants || [];
-  const groups = window.allGroupsData || window.allGroups || [];
+  const categories = window.allCategoriesData || window.allCategories || [];
   const availableYears = window.globalYears || [];
 
   let pollutantName = null;
@@ -1322,11 +1329,11 @@ function parseUrlParameters() {
     }
   }
 
-  let groupNames = [];
-  if (groupIds && groupIds.length > 0) {
-    groupNames = groupIds.map(id => {
-      const group = groups.find(g => String(g.id) === String(id));
-      return group ? group.group_title : null;
+  let categoryNames = [];
+  if (categoryIds && categoryIds.length > 0) {
+    categoryNames = categoryIds.map(id => {
+      const category = categories.find(g => String(g.id) === String(id));
+      return category ? getCategoryDisplayTitle(category) : null;
     }).filter(Boolean);
   }
 
@@ -1378,7 +1385,7 @@ function parseUrlParameters() {
 
   return {
     pollutantName,
-    groupNames,
+    categoryNames,
     startYear,
     endYear
   };
@@ -1388,17 +1395,6 @@ function parseUrlParameters() {
  * Setup event listeners for interactive controls
  */
 function setupEventListeners() {
-  // Smoothing toggle button
-  const toggleSmoothBtn = document.getElementById('toggleSmoothBtn');
-  if (toggleSmoothBtn) {
-    toggleSmoothBtn.addEventListener('click', () => {
-      smoothLines = !smoothLines;
-      window.smoothLines = smoothLines; // Keep window.smoothLines in sync
-      toggleSmoothBtn.textContent = smoothLines ? '🚫 Disable Smoothing' : '✅ Enable Smoothing';
-      updateChart();
-    });
-  }
-
   // CSV download button
   const downloadCSVBtn = document.getElementById('downloadCSVBtn');
   if (downloadCSVBtn) {
@@ -1433,18 +1429,18 @@ async function init() {
     console.log('supabaseModule found, proceeding with initialization...');
     
     // First, load all necessary data from Supabase
-    const { pollutants, groups, yearKeys, pollutantUnits, groupedData } = await window.supabaseModule.loadData();
+    const { pollutants, categories, yearKeys, pollutantUnits, groupedData } = await window.supabaseModule.loadData();
 
     // Store data on the window object for global access
     window.allPollutants = pollutants;
-    window.allGroups = groups;
+    window.allCategories = categories;
     window.globalYearKeys = yearKeys;
     window.globalYears = yearKeys.map(key => key.substring(1));
     window.pollutantUnits = pollutantUnits;
     window.groupedData = groupedData;
     
     // Then, set up the UI selectors with the loaded data
-    setupSelectors(pollutants, groups);
+    setupSelectors(pollutants, categories);
 
     // Set up event listeners for buttons
     setupEventListeners();

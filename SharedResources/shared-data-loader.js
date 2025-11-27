@@ -104,15 +104,15 @@ window.SharedDataCache = resolveExistingSharedCache() || {
   heroCache: new Map(),
   data: {
     pollutants: [],
-    groups: [],
+    categories: [],
     timeseries: [],
     nfrCodes: []
   },
   maps: {
     pollutantIdToName: {},
     pollutantNameToId: {},
-    groupIdToName: {},
-    groupNameToId: {},
+    categoryIdToName: {},
+    categoryNameToId: {},
     pollutantUnits: {}
   }
 };
@@ -188,7 +188,7 @@ async function loadDefaultSnapshot() {
           const counts = snapshot?.data
             ? {
                 pollutants: snapshot.data.pollutants?.length || 0,
-                groups: snapshot.data.groups?.length || 0,
+                categories: snapshot.data.categories?.length || 0,
                 rows: snapshot.data.timeseries?.length || snapshot.data.rows?.length || 0,
                 years: snapshot.data.years?.length || 0
               }
@@ -225,12 +225,12 @@ function normalizeHeroOptions(rawOptions = {}) {
   const normalized = {
     pollutantIds: uniqNumbers(rawOptions.pollutantIds || []),
     pollutantNames: uniqStrings(rawOptions.pollutantNames || []),
-    groupIds: uniqNumbers(rawOptions.groupIds || []),
-    groupNames: uniqStrings(rawOptions.groupNames || []),
+    categoryIds: uniqNumbers(rawOptions.categoryIds || rawOptions.groupIds || []),
+    categoryNames: uniqStrings(rawOptions.categoryNames || rawOptions.groupNames || []),
     includeActivityData: Boolean(rawOptions.includeActivityData),
     activityPollutantName: rawOptions.activityPollutantName || HERO_DEFAULT_ACTIVITY_NAME,
     defaultPollutantNames: uniqStrings(rawOptions.defaultPollutantNames || []),
-    defaultGroupNames: uniqStrings(rawOptions.defaultGroupNames || [])
+    defaultCategoryNames: uniqStrings(rawOptions.defaultCategoryNames || rawOptions.defaultGroupNames || [])
   };
 
   if (normalized.includeActivityData && normalized.activityPollutantName) {
@@ -241,28 +241,28 @@ function normalizeHeroOptions(rawOptions = {}) {
     normalized.pollutantNames = normalized.defaultPollutantNames.slice();
   }
 
-  if (!normalized.groupIds.length && !normalized.groupNames.length && normalized.defaultGroupNames.length) {
-    normalized.groupNames = normalized.defaultGroupNames.slice();
+  if (!normalized.categoryIds.length && !normalized.categoryNames.length && normalized.defaultCategoryNames.length) {
+    normalized.categoryNames = normalized.defaultCategoryNames.slice();
   }
 
   normalized.pollutantIds = uniqNumbers(normalized.pollutantIds);
   normalized.pollutantNames = uniqStrings(normalized.pollutantNames);
-  normalized.groupIds = uniqNumbers(normalized.groupIds);
-  normalized.groupNames = uniqStrings(normalized.groupNames);
+  normalized.categoryIds = uniqNumbers(normalized.categoryIds);
+  normalized.categoryNames = uniqStrings(normalized.categoryNames);
 
   if (!normalized.pollutantIds.length && !normalized.pollutantNames.length) {
     throw new Error('Hero dataset requires at least one pollutant identifier');
   }
 
-  if (!normalized.groupIds.length && !normalized.groupNames.length) {
-    throw new Error('Hero dataset requires at least one group identifier');
+  if (!normalized.categoryIds.length && !normalized.categoryNames.length) {
+    throw new Error('Hero dataset requires at least one category identifier');
   }
 
   normalized.cacheKey = JSON.stringify({
     pollutantIds: normalized.pollutantIds,
     pollutantNames: normalized.pollutantNames.map(name => name.toLowerCase()),
-    groupIds: normalized.groupIds,
-    groupNames: normalized.groupNames.map(name => name.toLowerCase())
+    categoryIds: normalized.categoryIds,
+    categoryNames: normalized.categoryNames.map(name => name.toLowerCase())
   });
 
   return normalized;
@@ -285,7 +285,7 @@ async function loadHeroDataset(options = {}) {
     if (cached && typeof cached.then !== 'function') {
       sharedDataInfoLog('Hero dataset fulfilled from cache', {
         pollutants: cached.pollutants?.length || 0,
-        groups: cached.groups?.length || 0,
+        categories: cached.categories?.length || 0,
         rows: cached.timeseries?.length || cached.rows?.length || 0
       });
       return cached;
@@ -337,19 +337,19 @@ async function loadHeroDataset(options = {}) {
     };
 
     const pollutantRows = await runLookup({
-      table: 'NAEI_global_Pollutants',
+      table: 'naei_global_t_pollutant',
       idColumn: 'id',
       idValues: normalized.pollutantIds,
       nameColumn: 'pollutant',
       nameValues: normalized.pollutantNames
     });
 
-    const groupRows = await runLookup({
-      table: 'NAEI_global_t_Group',
+    const categoryRows = await runLookup({
+      table: 'naei_global_t_category',
       idColumn: 'id',
-      idValues: normalized.groupIds,
-      nameColumn: 'group_title',
-      nameValues: normalized.groupNames
+      idValues: normalized.categoryIds,
+      nameColumn: 'category_title',
+      nameValues: normalized.categoryNames
     });
 
     const pollutantIdSet = new Set(normalized.pollutantIds);
@@ -359,37 +359,37 @@ async function loadHeroDataset(options = {}) {
       }
     });
 
-    const groupIdSet = new Set(normalized.groupIds);
-    groupRows.forEach(row => {
+    const categoryIdSet = new Set(normalized.categoryIds);
+    categoryRows.forEach(row => {
       if (Number.isFinite(row.id)) {
-        groupIdSet.add(row.id);
+        categoryIdSet.add(row.id);
       }
     });
 
-    if (!pollutantIdSet.size || !groupIdSet.size) {
-      throw new Error('Hero dataset lacked resolved pollutant or group IDs');
+    if (!pollutantIdSet.size || !categoryIdSet.size) {
+      throw new Error('Hero dataset lacked resolved pollutant or category IDs');
     }
 
     const timeseriesResp = await client
-      .from('NAEI_2023ds_t_Group_Data')
+      .from('naei_2023ds_t_category_data')
       .select('*')
       .in('pollutant_id', Array.from(pollutantIdSet))
-      .in('group_id', Array.from(groupIdSet));
+      .in('category_id', Array.from(categoryIdSet));
     if (timeseriesResp.error) throw timeseriesResp.error;
 
     const payload = {
       pollutants: pollutantRows,
-      groups: groupRows,
+      categories: categoryRows,
       timeseries: timeseriesResp.data || [],
       metadata: {
         pollutantIds: Array.from(pollutantIdSet),
-        groupIds: Array.from(groupIdSet)
+        categoryIds: Array.from(categoryIdSet)
       }
     };
 
     sharedDataInfoLog('Hero dataset fetch completed', {
       pollutants: payload.pollutants.length,
-      groups: payload.groups.length,
+      categories: payload.categories.length,
       rows: payload.timeseries.length
     });
 
@@ -502,39 +502,39 @@ async function loadDataFromSupabase() {
   };
   
   // Fetch all required data in parallel
-  const [pollutantsResp, groupsResp, dataResp, nfrResp] = await Promise.all([
-    timedQuery('NAEI_global_Pollutants', client.from('NAEI_global_Pollutants').select('*')),
-    timedQuery('NAEI_global_t_Group', client.from('NAEI_global_t_Group').select('*')),
-    timedQuery('NAEI_2023ds_t_Group_Data', client.from('NAEI_2023ds_t_Group_Data').select('*')),
-    timedQuery('NAEI_global_t_NFRCode', client.from('NAEI_global_t_NFRCode').select('*'))
+  const [pollutantsResp, categoriesResp, dataResp, nfrResp] = await Promise.all([
+    timedQuery('naei_global_t_pollutant', client.from('naei_global_t_pollutant').select('*')),
+    timedQuery('naei_global_t_category', client.from('naei_global_t_category').select('*')),
+    timedQuery('naei_2023ds_t_category_data', client.from('naei_2023ds_t_category_data').select('*')),
+    timedQuery('naei_global_t_nfrcode', client.from('naei_global_t_nfrcode').select('*'))
   ]);
 
   if (pollutantsResp.error) throw pollutantsResp.error;
-  if (groupsResp.error) throw groupsResp.error;
+  if (categoriesResp.error) throw categoriesResp.error;
   if (dataResp.error) throw dataResp.error;
   if (nfrResp.error) throw nfrResp.error;
 
   const pollutants = pollutantsResp.data || [];
-  const groups = groupsResp.data || [];
+  const categories = categoriesResp.data || [];
   const timeseries = dataResp.data || [];
   const nfrCodes = nfrResp.data || [];
   
   // Store data in cache
-  cache.data = { pollutants, groups, timeseries, nfrCodes };
-  cache.snapshotData = cache.snapshotData || { pollutants, groups };
+  cache.data = { pollutants, categories, timeseries, nfrCodes };
+  cache.snapshotData = cache.snapshotData || { pollutants, categories };
   
   // Build lookup maps for performance
-  buildLookupMaps(pollutants, groups);
+  buildLookupMaps(pollutants, categories);
   
   // Store globally for backwards compatibility
   window.allPollutantsData = pollutants;
-  window.allGroupsData = groups;
+  window.allCategoriesData = categories;
   
   sharedDataInfoLog('Shared Supabase fetch completed', {
     totalDurationMs: Number((sharedDataNow() - batchStart).toFixed(1)),
     summary: {
       pollutants: pollutants.length,
-      groups: groups.length,
+      categories: categories.length,
       rows: timeseries.length,
       nfrCodes: nfrCodes.length
     }
@@ -546,7 +546,7 @@ async function loadDataFromSupabase() {
 /**
  * Build lookup maps for fast data access
  */
-function buildLookupMaps(pollutants, groups) {
+function buildLookupMaps(pollutants, categories) {
   const maps = window.SharedDataCache.maps;
   
   // Clear existing maps
@@ -569,12 +569,12 @@ function buildLookupMaps(pollutants, groups) {
     }
   });
   
-  // Build group maps
-  groups.forEach(g => {
-    const name = g.group_title || g.group_name;
-    if (g.id && name) {
-      maps.groupIdToName[g.id] = name;
-      maps.groupNameToId[name.toLowerCase()] = g.id;
+  // Build category maps
+  categories.forEach(category => {
+    const name = category.category_title || category.group_name;
+    if (category.id && name) {
+      maps.categoryIdToName[category.id] = name;
+      maps.categoryNameToId[name.toLowerCase()] = category.id;
     }
   });
 }
@@ -600,12 +600,12 @@ function getPollutantId(name) {
   return window.SharedDataCache.maps.pollutantNameToId[name.toLowerCase()];
 }
 
-function getGroupName(id) {
-  return window.SharedDataCache.maps.groupIdToName[id] || `Group ${id}`;
+function getCategoryName(id) {
+  return window.SharedDataCache.maps.categoryIdToName[id] || `Category ${id}`;
 }
 
-function getGroupId(name) {
-  return window.SharedDataCache.maps.groupNameToId[name.toLowerCase()];
+function getCategoryId(name) {
+  return window.SharedDataCache.maps.categoryNameToId[name.toLowerCase()];
 }
 
 function getPollutantUnit(name) {
@@ -616,8 +616,8 @@ function getAllPollutants() {
   return getCachedData().pollutants;
 }
 
-function getAllGroups() {
-  return getCachedData().groups;
+function getAllCategories() {
+  return getCachedData().categories;
 }
 
 function getAllTimeseries() {
@@ -643,7 +643,7 @@ function clearCache() {
   cache.isLoaded = false;
   cache.isLoading = false;
   cache.loadPromise = null;
-  cache.data = { pollutants: [], groups: [], timeseries: [] };
+  cache.data = { pollutants: [], categories: [], timeseries: [] };
   
   Object.keys(cache.maps).forEach(key => {
     if (typeof cache.maps[key] === 'object') {
@@ -662,11 +662,11 @@ window.SharedDataLoader = {
   hasDefaultSnapshot: () => Boolean(window.SharedDataCache.defaultSnapshot),
   getPollutantName,
   getPollutantId,
-  getGroupName,
-  getGroupId,
+  getCategoryName,
+  getCategoryId,
   getPollutantUnit,
   getAllPollutants,
-  getAllGroups,
+  getAllCategories,
   getAllTimeseries,
   getAllNfrCodes,
   isDataLoaded,
