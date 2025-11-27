@@ -13,9 +13,9 @@
   <meta name="twitter:description" content="Interactive charts using UK Government data">
   <link rel="stylesheet" href="../dist/tailwind.css">
   <link rel="stylesheet" href="../SharedResources/common-styles.css">
-  <link rel="preload" as="image" href="../SharedResources/images/GAP-CAN-Logo-Jan2026.svg">
-  <link rel="preload" as="image" href="../SharedResources/images/awair-logo-699x200.svg">
-  <link rel="preload" as="image" href="../SharedResources/images/ERF logo.svg">
+  <link rel="preload" as="image" href="../SharedResources/images/resource-images/GAP-CAN-Logo-Jan2026.svg">
+  <link rel="preload" as="image" href="../SharedResources/images/resource-images/awair-logo-699x200.svg">
+  <link rel="preload" as="image" href="../SharedResources/images/resource-images/ERF logo.svg">
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -220,18 +220,18 @@
     .resource-stories-buttons {
       display: flex;
       flex-wrap: wrap;
-      gap: 0.5rem;
+      gap: 0.375rem;
     }
 
     .resource-stories-button {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      padding: 10px 18px;
-      border-radius: 10px;
-      border: 2px solid #98daf7;
+      padding: 6px 10px;
+      border-radius: 6px;
+      border: 1.5px solid #97BBCF;
       background: #ffffff;
-      color: #1f5d82;
+      color: #2978A3;
       font-weight: 600;
       font-size: 0.95rem;
       cursor: pointer;
@@ -252,14 +252,16 @@
     }
 
     .resource-stories-button-icon {
+      width: 38px;
       height: 20px;
-      width: auto;
+      object-fit: contain;
       flex-shrink: 0;
     }
 
-    .resource-stories-button-icon--fixed {
-      width: 28px;
-      object-fit: contain;
+    .resource-stories-button-icon--tall {
+      height: 24px;
+      margin-top: -2px;
+      margin-bottom: -2px;
     }
 
     @media (max-width: 900px) {
@@ -304,7 +306,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.communitiesagainstwoodsmoke.com/" target="_blank" rel="noopener" aria-label="Visit Communities Against Woodsmoke">
-                <img src="../SharedResources/images/CAW-logo-alpha.svg" alt="Communities Against Woodsmoke logo" class="resource-logo resource-logo--caw">
+                <img src="../SharedResources/images/resource-images/CAW-logo-alpha.svg" alt="Communities Against Woodsmoke logo" class="resource-logo resource-logo--caw">
               </a>
             </div>
             <div class="resource-info">
@@ -316,21 +318,21 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.dsawsp.org/" target="_blank" rel="noopener" aria-label="Visit Doctors and Scientists Against Wood Smoke Pollution">
-                <img src="../SharedResources/images/DSAWSP-2018.svg" alt="Doctors and Scientists Against Wood Smoke Pollution logo" class="resource-logo resource-logo--dsawsp">
+                <img src="../SharedResources/images/resource-images/DSAWSP-2018.svg" alt="Doctors and Scientists Against Wood Smoke Pollution logo" class="resource-logo resource-logo--dsawsp">
               </a>
             </div>
             <div class="resource-info">
               <a class="resource-info-name" href="https://www.dsawsp.org/" target="_blank" rel="noopener">Doctors and Scientists Against Wood Smoke Pollution (DSAWSP)</a>
-              <p class="resource-info-desc">Formed in 2016, DSAWSP is an international coalition of doctors, scientists and others dedicated to reducing harm to human health and the climate by decreasing wood burning. Their Stories section shares testimonies from people worldwide whose health has been affected by wood smoke pollution.</p>
+              <p class="resource-info-desc">Formed in 2016, DSAWSP is an international coalition of doctors, scientists and others dedicated to reducing harm to human health and the climate by decreasing wood burning. The Stories section shares personal accounts from people around the world whose health has been affected by wood smoke pollution.</p>
               <div class="resource-stories-filter" aria-label="Browse DSAWSP stories">
                 <div class="resource-stories-buttons" role="group" aria-label="Wood smoke story regions">
                   <a class="resource-stories-button" href="https://www.dsawsp.org/personal-stories" target="_blank" rel="noopener" data-region="all">All Wood Smoke Stories</a>
                   <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/united-kingdom" target="_blank" rel="noopener" data-region="united-kingdom">
-                    <img src="../SharedResources/images/flags/Flag_of_the_United_Kingdom.svg" alt="" aria-hidden="true" class="resource-stories-button-icon">
+                    <img src="../SharedResources/images/flags/Flag_of_the_United_Kingdom_(3-5).svg" alt="" aria-hidden="true" class="resource-stories-button-icon">
                     <span>United Kingdom</span>
                   </a>
                   <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/europe" target="_blank" rel="noopener" data-region="europe">
-                    <img src="../SharedResources/images/flags/Flag_of_Europe.svg" alt="" aria-hidden="true" class="resource-stories-button-icon resource-stories-button-icon--fixed">
+                    <img src="../SharedResources/images/flags/Flag_of_Europe.svg" alt="" aria-hidden="true" class="resource-stories-button-icon resource-stories-button-icon--tall">
                     <span>Europe</span>
                   </a>
                   <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/united-states" target="_blank" rel="noopener" data-region="united-states">
@@ -350,7 +352,7 @@
                     <span>New Zealand</span>
                   </a>
                   <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/japan" target="_blank" rel="noopener" data-region="japan">
-                    <img src="../SharedResources/images/flags/Flag_of_Japan_border.svg" alt="" aria-hidden="true" class="resource-stories-button-icon resource-stories-button-icon--fixed">
+                    <img src="../SharedResources/images/flags/Flag_of_Japan_border.svg" alt="" aria-hidden="true" class="resource-stories-button-icon resource-stories-button-icon--tall">
                     <span>Japan</span>
                   </a>
                 </div>
@@ -366,7 +368,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.asthmaandlung.org.uk/support-us/campaign-with-us/clean-air-campaigns" target="_blank" rel="noopener" aria-label="Visit Asthma plus Lung UK">
-                <img src="../SharedResources/images/asthma%2Blung-logo2.svg" alt="Asthma plus Lung UK logo" class="resource-logo resource-logo--asthma-lung">
+                <img src="../SharedResources/images/resource-images/asthma%2Blung-logo2.svg" alt="Asthma plus Lung UK logo" class="resource-logo resource-logo--asthma-lung">
               </a>
             </div>
             <div class="resource-info">
@@ -378,7 +380,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.awairproject.co.uk/" target="_blank" rel="noopener" aria-label="Visit the AWAIR Project">
-                <img src="../SharedResources/images/awair-logo-699x200.svg" alt="AWAIR Project logo" class="resource-logo resource-logo--awair">
+                <img src="../SharedResources/images/resource-images/awair-logo-699x200.svg" alt="AWAIR Project logo" class="resource-logo resource-logo--awair">
               </a>
             </div>
             <div class="resource-info">
@@ -390,7 +392,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.cleanairfund.org/" target="_blank" rel="noopener" aria-label="Visit Clean Air Fund">
-                <img src="../SharedResources/images/clean_air_fund-logo-820x483.svg" alt="Clean Air Fund logo" class="resource-logo resource-logo--clean-air-fund">
+                <img src="../SharedResources/images/resource-images/clean_air_fund-logo-820x483.svg" alt="Clean Air Fund logo" class="resource-logo resource-logo--clean-air-fund">
               </a>
             </div>
             <div class="resource-info">
@@ -402,7 +404,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://cleanair.london/" target="_blank" rel="noopener" aria-label="Visit Clean Air London">
-                <img src="../SharedResources/images/clean-air-london-logo.svg" alt="Clean Air London logo" class="resource-logo resource-logo--clean-air-london">
+                <img src="../SharedResources/images/resource-images/clean-air-london-logo.svg" alt="Clean Air London logo" class="resource-logo resource-logo--clean-air-london">
               </a>
             </div>
             <div class="resource-info">
@@ -414,7 +416,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.clientearth.org/" target="_blank" rel="noopener" aria-label="Visit ClientEarth">
-                <img src="../SharedResources/images/ClientEarth-logo-alpha.svg" alt="ClientEarth logo" class="resource-logo resource-logo--clientearth">
+                <img src="../SharedResources/images/resource-images/ClientEarth-logo-alpha.svg" alt="ClientEarth logo" class="resource-logo resource-logo--clientearth">
               </a>
             </div>
             <div class="resource-info">
@@ -426,7 +428,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://ellaroberta.org/" target="_blank" rel="noopener" aria-label="Visit the Ella Roberta Foundation">
-                <img src="../SharedResources/images/ERF logo.svg" alt="Ella Roberta Foundation logo" class="resource-logo resource-logo--ella-roberta">
+                <img src="../SharedResources/images/resource-images/ERF logo.svg" alt="Ella Roberta Foundation logo" class="resource-logo resource-logo--ella-roberta">
               </a>
             </div>
             <div class="resource-info">
@@ -438,7 +440,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://friendsoftheearth.uk/climate/air-pollution" target="_blank" rel="noopener" aria-label="Visit Friends of the Earth">
-                <img src="../SharedResources/images/Friends-of-the-earth-logo-720x279.svg" alt="Friends of the Earth logo" class="resource-logo resource-logo--friends-earth">
+                <img src="../SharedResources/images/resource-images/Friends-of-the-earth-logo-720x279.svg" alt="Friends of the Earth logo" class="resource-logo resource-logo--friends-earth">
               </a>
             </div>
             <div class="resource-info">
@@ -450,7 +452,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell resource-logo-cell--wide">
               <a class="resource-logo-link" href="https://www.actionforcleanair.org.uk/campaigns/clean-air-night" target="_blank" rel="noopener" aria-label="Visit Global Action Plan">
-                <img src="../SharedResources/images/GAP-CAN-Logo-Jan2026.svg" alt="Global Action Plan logo" class="resource-logo resource-logo--global-action-plan">
+                <img src="../SharedResources/images/resource-images/GAP-CAN-2026.svg" alt="Global Action Plan logo" class="resource-logo resource-logo--global-action-plan">
               </a>
             </div>
             <div class="resource-info">
@@ -462,7 +464,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.greenpeace.org.uk/news/topic/air-pollution/" target="_blank" rel="noopener" aria-label="Visit Greenpeace">
-                <img src="../SharedResources/images/Greenpeace_logo.svg" alt="Greenpeace logo" class="resource-logo resource-logo--greenpeace">
+                <img src="../SharedResources/images/resource-images/Greenpeace_logo.svg" alt="Greenpeace logo" class="resource-logo resource-logo--greenpeace">
               </a>
             </div>
             <div class="resource-info">
@@ -474,7 +476,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.healthyair.org.uk/" target="_blank" rel="noopener" aria-label="Visit Healthy Air Coalition">
-                <img src="../SharedResources/images/Heathly%20Air%20Coalition%20Logo.svg" alt="Healthy Air Coalition logo" class="resource-logo resource-logo--healthy-air">
+                <img src="../SharedResources/images/resource-images/Heathly%20Air%20Coalition%20Logo.svg" alt="Healthy Air Coalition logo" class="resource-logo resource-logo--healthy-air">
               </a>
             </div>
             <div class="resource-info">
@@ -486,7 +488,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://urbanhealth.org.uk/insights/health-effects-of-air-pollution" target="_blank" rel="noopener" aria-label="Visit Impact on Urban Health">
-                <img src="../SharedResources/images/IoUH%20Logo-alpha.svg" alt="Impact on Urban Health logo" class="resource-logo resource-logo--iouh">
+                <img src="../SharedResources/images/resource-images/IoUH%20Logo-alpha.svg" alt="Impact on Urban Health logo" class="resource-logo resource-logo--iouh">
               </a>
             </div>
             <div class="resource-info">
@@ -498,7 +500,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.mumsforlungs.org/about-air-pollution" target="_blank" rel="noopener" aria-label="Visit Mums for Lungs">
-                <img src="../SharedResources/images/mums-for-lungs-logo.svg" alt="Mums for Lungs logo" class="resource-logo resource-logo--mums">
+                <img src="../SharedResources/images/resource-images/mums-for-lungs-logo.svg" alt="Mums for Lungs logo" class="resource-logo resource-logo--mums">
               </a>
             </div>
             <div class="resource-info">
@@ -510,7 +512,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.rcpch.ac.uk/resources/air-pollution-uk-position-statement" target="_blank" rel="noopener" aria-label="Visit the Royal College of Paediatrics and Child Health">
-                <img src="../SharedResources/images/RCPCH-logo-desktop.svg" alt="Royal College of Paediatrics and Child Health logo" class="resource-logo resource-logo--rcpch">
+                <img src="../SharedResources/images/resource-images/RCPCH-logo-desktop.svg" alt="Royal College of Paediatrics and Child Health logo" class="resource-logo resource-logo--rcpch">
               </a>
             </div>
             <div class="resource-info">
@@ -522,7 +524,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.rcp.ac.uk/news-and-media/news-and-opinion/air-pollution-linked-to-30-000-uk-deaths-in-2025-and-costs-the-economy-and-nhs-billions-warns-rcp/" target="_blank" rel="noopener" aria-label="Visit the Royal College of Physicians">
-                <img src="../SharedResources/images/RCP-logo-blue-200h-alpha.svg" alt="Royal College of Physicians logo" class="resource-logo resource-logo--rcp">
+                <img src="../SharedResources/images/resource-images/RCP-logo-blue-200h-alpha.svg" alt="Royal College of Physicians logo" class="resource-logo resource-logo--rcp">
               </a>
             </div>
             <div class="resource-info">
@@ -534,7 +536,7 @@
           <article class="resource-card" role="listitem">
             <div class="resource-logo-cell">
               <a class="resource-logo-link" href="https://www.who.int/health-topics/air-pollution" target="_blank" rel="noopener" aria-label="Visit the World Health Organization">
-                <img src="../SharedResources/images/World_Health_Organization_Logo.svg" alt="World Health Organization logo" class="resource-logo resource-logo--who">
+                <img src="../SharedResources/images/resource-images/World_Health_Organization_Logo.svg" alt="World Health Organization logo" class="resource-logo resource-logo--who">
               </a>
             </div>
             <div class="resource-info">
