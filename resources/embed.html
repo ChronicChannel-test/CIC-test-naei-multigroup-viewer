@@ -213,6 +213,55 @@
       max-width: 140px;
     }
 
+    .resource-stories-filter {
+      margin-top: 1.25rem;
+    }
+
+    .resource-stories-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .resource-stories-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 10px 18px;
+      border-radius: 10px;
+      border: 2px solid #98daf7;
+      background: #ffffff;
+      color: #1f5d82;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+      text-decoration: none;
+    }
+
+    .resource-stories-button:hover,
+    .resource-stories-button:focus-visible {
+      background: #eef5fb;
+      border-color: #7bc8ef;
+      color: #174966;
+    }
+
+    .resource-stories-button:focus-visible {
+      outline: 3px solid rgba(31, 93, 130, 0.35);
+      outline-offset: 2px;
+    }
+
+    .resource-stories-button-icon {
+      height: 20px;
+      width: auto;
+      flex-shrink: 0;
+    }
+
+    .resource-stories-button-icon--fixed {
+      width: 28px;
+      object-fit: contain;
+    }
+
     @media (max-width: 900px) {
       .resources-frame {
         padding-right: 0;
@@ -273,6 +322,39 @@
             <div class="resource-info">
               <a class="resource-info-name" href="https://www.dsawsp.org/" target="_blank" rel="noopener">Doctors and Scientists Against Wood Smoke Pollution (DSAWSP)</a>
               <p class="resource-info-desc">Formed in 2016, DSAWSP is an international coalition of doctors, scientists and others dedicated to reducing harm to human health and the climate by decreasing wood burning. Their Stories section shares testimonies from people worldwide whose health has been affected by wood smoke pollution.</p>
+              <div class="resource-stories-filter" aria-label="Browse DSAWSP stories">
+                <div class="resource-stories-buttons" role="group" aria-label="Wood smoke story regions">
+                  <a class="resource-stories-button" href="https://www.dsawsp.org/personal-stories" target="_blank" rel="noopener" data-region="all">All Wood Smoke Stories</a>
+                  <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/united-kingdom" target="_blank" rel="noopener" data-region="united-kingdom">
+                    <img src="../SharedResources/images/flags/Flag_of_the_United_Kingdom.svg" alt="" aria-hidden="true" class="resource-stories-button-icon">
+                    <span>United Kingdom</span>
+                  </a>
+                  <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/europe" target="_blank" rel="noopener" data-region="europe">
+                    <img src="../SharedResources/images/flags/Flag_of_Europe.svg" alt="" aria-hidden="true" class="resource-stories-button-icon resource-stories-button-icon--fixed">
+                    <span>Europe</span>
+                  </a>
+                  <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/united-states" target="_blank" rel="noopener" data-region="united-states">
+                    <img src="../SharedResources/images/flags/Flag_of_the_United_States.svg" alt="" aria-hidden="true" class="resource-stories-button-icon">
+                    <span>United States</span>
+                  </a>
+                  <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/canada" target="_blank" rel="noopener" data-region="canada">
+                    <img src="../SharedResources/images/flags/Flag_of_Canada.svg" alt="" aria-hidden="true" class="resource-stories-button-icon">
+                    <span>Canada</span>
+                  </a>
+                  <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/australia" target="_blank" rel="noopener" data-region="australia">
+                    <img src="../SharedResources/images/flags/Flag_of_Australia.svg" alt="" aria-hidden="true" class="resource-stories-button-icon">
+                    <span>Australia</span>
+                  </a>
+                  <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/new-zealand" target="_blank" rel="noopener" data-region="new-zealand">
+                    <img src="../SharedResources/images/flags/Flag_of_New_Zealand.svg" alt="" aria-hidden="true" class="resource-stories-button-icon">
+                    <span>New Zealand</span>
+                  </a>
+                  <a class="resource-stories-button" href="https://www.dsawsp.org/stories-categories/japan" target="_blank" rel="noopener" data-region="japan">
+                    <img src="../SharedResources/images/flags/Flag_of_Japan_border.svg" alt="" aria-hidden="true" class="resource-stories-button-icon resource-stories-button-icon--fixed">
+                    <span>Japan</span>
+                  </a>
+                </div>
+              </div>
             </div>
           </article>
         </div>
