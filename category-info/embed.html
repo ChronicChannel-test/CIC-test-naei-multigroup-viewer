@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="../SharedResources/common-styles.css">
   <style>
     body {
-      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       background: #ffffff;
       color: #1f2937;
       margin: 0;
@@ -154,33 +154,27 @@
       padding: 20px;
     }
 
+    .category-info-shell .main-title {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin: 0 0 20px 0;
+      padding-right: 0;
+    }
+
     .category-info-frame {
-      width: calc(100% - 140px);
-      margin: 0 auto 0 0;
+      width: 100%;
+      margin: 0;
       border-radius: 6px;
       background: #ffffff;
       box-sizing: border-box;
-      padding: 0 32px 32px 0;
-      overflow: hidden;
+      padding: 4px 4px 12px 4px;
+      overflow: visible;
       box-shadow: none;
       border: none;
       position: relative;
-    }
-
-    .category-info-header {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      text-align: left;
-      gap: 10px;
-      margin-bottom: 6px;
-    }
-
-    .category-info-title-main {
-      line-height: 1.25;
-      color: #0f172a;
-      padding-right: 0;
-      margin: 0 0 6px 0;
     }
 
     .category-info-filter-block {
@@ -257,52 +251,6 @@
       overflow-x: auto;
     }
 
-    .category-info-overlay {
-      position: absolute;
-      inset: 0;
-      background: rgba(255, 255, 255, 0.94);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      backdrop-filter: blur(2px);
-      transition: opacity 220ms ease, visibility 220ms ease;
-      z-index: 5;
-    }
-
-    .category-info-overlay--hidden {
-      opacity: 0;
-      visibility: hidden;
-      pointer-events: none;
-    }
-
-    .category-info-overlay-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      color: #1f2937;
-      font-weight: 600;
-    }
-
-    .category-info-spinner {
-      width: 32px;
-      height: 32px;
-      border: 3px solid #ffe0b2;
-      border-top-color: #ff9301;
-      border-radius: 50%;
-      animation: category-info-spin 0.9s linear infinite;
-    }
-
-    @keyframes category-info-spin {
-      from {
-        transform: rotate(0deg);
-      }
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
     .status-text {
       font-size: 0.75rem;
       color: #6b7280;
@@ -318,7 +266,6 @@
 
     @media (max-width: 620px) {
       .category-info-frame {
-        width: 100%;
         padding: 0 24px 32px 0;
       }
 
@@ -351,17 +298,11 @@
   <script src="../SharedResources/shared-data-loader.js"></script>
 </head>
 <body>
-  <main class="category-info-shell">
+  <main class="chart-shell category-info-shell">
+    <div class="title-row">
+      <h2 class="main-title" id="category-info-heading">Pollution Category Information</h2>
+    </div>
     <section class="category-info-frame" aria-labelledby="category-info-heading">
-      <div id="category-info-overlay" class="category-info-overlay" aria-hidden="true">
-        <div class="category-info-overlay-content">
-          <div class="category-info-spinner" role="status" aria-live="polite" aria-label="Loading category information"></div>
-          <p class="category-info-overlay-message">Loading Category Information…</p>
-        </div>
-      </div>
-      <header class="category-info-header">
-        <h1 class="main-title category-info-title-main" id="category-info-heading">Pollution Category Information</h1>
-      </header>
 
       <div class="category-info-filter-block">
         <label for="category-info-filter-input" class="category-info-filter-label">Filter:</label>
@@ -412,9 +353,18 @@
       const highlightMatchesEnabled = true;
       let filterInputActive = true;
       const MIN_HEIGHT_DELTA = 8;
+      const MIN_CONTENT_HEIGHT = 320;
+      const FALLBACK_MIN_CONTENT_HEIGHT = 1100;
+      const IS_EMBEDDED = Boolean(window.parent && window.parent !== window);
       let sharedLoaderRef = null;
       let lastSentHeight = 0;
       let contentResizeObserver = null;
+      let pendingHeightUpdateId = null;
+      let hasPostedInitialHeight = false;
+      let initialLayoutReadyPromise = null;
+      let initialContentReady = false;
+      let chartReadyPosted = false;
+      let parentHeightRequestPending = false;
       const overlayHiddenClass = 'category-info-overlay--hidden';
       let overlayVisible = false;
       const actDataStatus = {
@@ -620,6 +570,7 @@
       function setStatus(message, persist = false) {
         if (!statusEl) return;
         statusEl.textContent = message || '';
+
         if (!persist) {
           clearTimeout(statusTimer);
           statusTimer = setTimeout(() => {
@@ -628,32 +579,134 @@
         }
       }
 
-      function measureHeight() {
-        const shell = document.querySelector('.category-info-shell');
-        const frame = document.querySelector('.category-info-frame');
-        const frameRect = frame ? frame.getBoundingClientRect() : null;
-        const frameHeight = frameRect?.height || frame?.offsetHeight || frame?.scrollHeight || 0;
-        const shellStyles = shell ? window.getComputedStyle(shell) : null;
-        const paddingTop = shellStyles ? parseFloat(shellStyles.paddingTop) || 0 : 0;
-        const paddingBottom = shellStyles ? parseFloat(shellStyles.paddingBottom) || 0 : 0;
-        let measured = frameHeight + paddingTop + paddingBottom;
-        if (!Number.isFinite(measured) || measured <= 0) {
-          measured = Math.max(document.body?.scrollHeight || 0, 320);
+      function markInitialContentReady() {
+        if (initialContentReady) {
+          return;
         }
-
-        return Math.max(Math.ceil(measured), 320);
+        initialContentReady = true;
+        notifyParentChartReady();
+        if (parentHeightRequestPending) {
+          parentHeightRequestPending = false;
+          scheduleHeightUpdate(120, { force: true, awaitInitialSettlement: true });
+        }
       }
 
-      function sendHeightToParent(force = false) {
+      function notifyParentChartReady() {
+        if (!IS_EMBEDDED || chartReadyPosted) {
+          return;
+        }
+        chartReadyPosted = true;
         try {
-          if (!(window.parent && window.parent !== window)) {
+          window.parent.postMessage({
+            type: 'chartReady',
+            chart: 'category-info'
+          }, '*');
+        } catch (error) {
+          console.warn('Unable to notify parent frame that category info is ready:', error);
+        }
+      }
+
+      function getElementBottom(el) {
+        if (!el) {
+          return 0;
+        }
+        const rect = el.getBoundingClientRect();
+        const scrollOffset = window.scrollY || window.pageYOffset || 0;
+        return Math.max(0, Math.round((rect.bottom || 0) + scrollOffset));
+      }
+
+      function measureHeight() {
+        const body = document.body;
+        const html = document.documentElement;
+        const documentHeight = Math.max(
+          body?.scrollHeight || 0,
+          body?.offsetHeight || 0,
+          html?.scrollHeight || 0,
+          html?.offsetHeight || 0
+        );
+
+        const shell = document.querySelector('.category-info-shell');
+        const frame = document.querySelector('.category-info-frame');
+        const content = document.getElementById('category-info-content');
+        const overlayActive = overlayEl && !overlayEl.classList.contains(overlayHiddenClass) ? overlayEl : null;
+
+        const candidates = [
+          { label: 'shell', value: getElementBottom(shell) },
+          { label: 'frame', value: getElementBottom(frame) },
+          { label: 'content', value: getElementBottom(content) }
+        ];
+
+        if (overlayActive) {
+          candidates.push({ label: 'overlay', value: getElementBottom(overlayActive) });
+        }
+
+        const validCandidates = candidates.filter(entry => Number.isFinite(entry.value) && entry.value > 0);
+        let measuredHeight = 0;
+
+        if (validCandidates.length) {
+          const bestCandidate = validCandidates.reduce((prev, next) => (next.value > prev.value ? next : prev));
+          measuredHeight = bestCandidate.value;
+        }
+
+        const fallbackEstimate = Math.max(MIN_CONTENT_HEIGHT, documentHeight || 0);
+
+        if (!measuredHeight && documentHeight) {
+          measuredHeight = documentHeight;
+        }
+
+        if (!measuredHeight) {
+          measuredHeight = fallbackEstimate;
+        }
+
+        if (measuredHeight < 300) {
+          measuredHeight = Math.max(FALLBACK_MIN_CONTENT_HEIGHT, fallbackEstimate);
+        }
+
+        return Math.max(Math.ceil(measuredHeight), MIN_CONTENT_HEIGHT);
+      }
+
+      function waitForInitialLayoutSettlement() {
+        if (initialLayoutReadyPromise) {
+          return initialLayoutReadyPromise;
+        }
+
+        const waits = [];
+
+        if (document.fonts?.ready && typeof document.fonts.ready.then === 'function') {
+          waits.push(document.fonts.ready.catch(() => undefined));
+        }
+
+        waits.push(new Promise(resolve => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(resolve);
+          });
+        }));
+
+        initialLayoutReadyPromise = Promise.all(waits).then(() => {
+          initialLayoutReadyPromise = Promise.resolve();
+        });
+
+        return initialLayoutReadyPromise;
+      }
+
+      async function sendHeightToParent(force = false, options = {}) {
+        try {
+          if (!IS_EMBEDDED) {
             return;
           }
-          const height = measureHeight();
+          if (options.awaitInitialSettlement && !hasPostedInitialHeight) {
+            try {
+              await waitForInitialLayoutSettlement();
+            } catch (settleError) {
+              console.warn('Initial layout settlement wait failed:', settleError);
+            }
+          }
+          const height = Math.max(MIN_CONTENT_HEIGHT, measureHeight());
           if (!force && lastSentHeight && Math.abs(height - lastSentHeight) < MIN_HEIGHT_DELTA) {
             return;
           }
           lastSentHeight = height;
+          hasPostedInitialHeight = true;
           window.parent.postMessage({
             type: 'contentHeight',
             chart: 'category-info',
@@ -664,10 +717,26 @@
         }
       }
 
-      function scheduleHeightUpdate(delay = 50) {
-        setTimeout(() => {
-          requestAnimationFrame(() => sendHeightToParent(false));
-        }, delay);
+      function scheduleHeightUpdate(delay = 50, options = {}) {
+        if (!IS_EMBEDDED) {
+          return;
+        }
+        const force = Boolean(options.force);
+        const awaitInitialSettlement = Boolean(options.awaitInitialSettlement);
+        if (!hasPostedInitialHeight && !force) {
+          return;
+        }
+        if (pendingHeightUpdateId) {
+          clearTimeout(pendingHeightUpdateId);
+        }
+        pendingHeightUpdateId = setTimeout(() => {
+          pendingHeightUpdateId = null;
+          requestAnimationFrame(() => {
+            sendHeightToParent(force, {
+              awaitInitialSettlement: awaitInitialSettlement || (force && !hasPostedInitialHeight)
+            });
+          });
+        }, Math.max(0, delay));
       }
 
       function showLoadingOverlay(message = 'Loading category information…') {
@@ -1509,6 +1578,8 @@
           contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Unable to load category information right now. Please try again later.</p>";
           setStatus('', true);
           hideLoadingOverlay();
+          markInitialContentReady();
+          scheduleHeightUpdate(140, { force: true, awaitInitialSettlement: true });
           scheduleHeightUpdate();
           return;
         }
@@ -1519,6 +1590,8 @@
           contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ No category information is available.</p>";
           setStatus('', true);
           hideLoadingOverlay();
+          markInitialContentReady();
+          scheduleHeightUpdate(140, { force: true, awaitInitialSettlement: true });
           scheduleHeightUpdate();
           return;
         }
@@ -1532,6 +1605,8 @@
         applyCategoryFilters();
         setStatus('', true);
         hideLoadingOverlay();
+        markInitialContentReady();
+        scheduleHeightUpdate(140, { force: true, awaitInitialSettlement: true });
         scheduleHeightUpdate(30);
 
         if (categoryInfoDatasetSource === 'direct-supabase') {
@@ -1545,19 +1620,20 @@
           contentEl.innerHTML = "<p class='text-red-600 font-semibold'>⚠️ Something went wrong while loading category information.</p>";
           setStatus('', true);
           hideLoadingOverlay();
+          markInitialContentReady();
+          scheduleHeightUpdate(140, { force: true, awaitInitialSettlement: true });
           scheduleHeightUpdate();
         });
       });
 
       window.addEventListener('message', event => {
         if (event?.data?.type === 'requestHeight') {
-          scheduleHeightUpdate(10);
+          if (initialContentReady) {
+            sendHeightToParent(true, { awaitInitialSettlement: true });
+          } else {
+            parentHeightRequestPending = true;
+          }
         }
-      });
-
-      window.addEventListener('load', () => {
-        sendHeightToParent(true);
-        scheduleHeightUpdate(20);
       });
     })();
   </script>

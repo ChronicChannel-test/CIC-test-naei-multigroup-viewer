@@ -70,7 +70,7 @@
     .chart-container.ready {
       opacity: 1;
     }
-    
+
     /* Full-screen loading overlay */
     #main-loading-overlay {
       position: fixed;
@@ -826,8 +826,11 @@
     }
     const chartReadyState = {
       bubblechart: false,
-      linechart: false
+      linechart: false,
+      'category-info': false
     };
+    const BASE_REQUIRED_CHART_KEYS = ['bubblechart', 'linechart'];
+    let overlayRequiredChartKeys = [...BASE_REQUIRED_CHART_KEYS];
     let sharedDataBootstrapLaunched = false;
 
     function requestSharedDataBootstrap(reason = 'chart-ready') {
@@ -853,6 +856,14 @@
       'user-guide': document.getElementById('userguide-iframe'),
       resources: document.getElementById('resources-iframe')
     };
+
+    function setOverlayRequiredCharts(initialChartId) {
+      const normalized = normalizeChartId(initialChartId) || 'bubblechart';
+      overlayRequiredChartKeys = [...BASE_REQUIRED_CHART_KEYS];
+      if (normalized === 'category-info') {
+        overlayRequiredChartKeys.push('category-info');
+      }
+    }
 
     function decomposeUrl(rawUrl) {
       if (typeof rawUrl !== 'string' || !rawUrl.length) {
@@ -1099,7 +1110,7 @@
     }
 
     function areAllChartsReady() {
-      return Object.values(chartReadyState).every(Boolean);
+      return overlayRequiredChartKeys.every(key => chartReadyState[key]);
     }
 
     function resolveChartFromPath() {
@@ -1496,7 +1507,6 @@
       chartContainer.style.overflow = 'visible';
       chartContainer.setAttribute('aria-hidden', 'false');
       loadLazyIframeForChart(normalizedId);
-
     }
 
     function loadLazyIframeForChart(chartId) {
@@ -1788,18 +1798,13 @@
         if (chartKey === 'bubblechart') {
           attemptBubbleTutorialAutoOpen();
         }
-        
+
         if (areAllChartsReady()) {
           Object.entries(iframeElements).forEach(([key, iframe]) => {
             if (iframe && iframe.contentWindow) {
               iframe.contentWindow.postMessage({ type: 'requestHeight' }, '*');
             }
           });
-        } else {
-          const pending = Object.entries(chartReadyState)
-            .filter(([, ready]) => !ready)
-            .map(([key]) => key)
-            .join(', ');
         }
       }
       
@@ -1817,23 +1822,6 @@
             : fallbackHeight;
 
           let finalHeight = safeHeight;
-
-          if (chartKey === 'category-info') {
-            const container = document.getElementById('chart-category-info');
-            const containerVisible = container && container.getAttribute('aria-hidden') === 'false';
-            if (containerVisible) {
-              const iframeRect = iframe.getBoundingClientRect();
-              const footerEl = document.getElementById('mainFooter');
-              const footerRect = footerEl ? footerEl.getBoundingClientRect() : null;
-              const footerStyles = footerEl ? window.getComputedStyle(footerEl) : null;
-              const footerMargins = footerStyles
-                ? (parseFloat(footerStyles.marginTop) || 0) + (parseFloat(footerStyles.marginBottom) || 0)
-                : 0;
-              const reservedFooterSpace = (footerRect?.height || 0) + footerMargins;
-              const viewportRemaining = Math.max(window.innerHeight - Math.max(iframeRect.top, 0) - reservedFooterSpace, 0);
-              finalHeight = Math.max(safeHeight, viewportRemaining, 320);
-            }
-          }
 
           if (!Number.isFinite(reportedHeight) || reportedHeight <= 0) {
             debugWarn(`⚠️ Received invalid height (${event.data.height}) from ${chartKey}; using fallback ${safeHeight}px`);
@@ -1984,6 +1972,7 @@
       }
 
       chartParam = normalizeChartId(chartParam) || 'bubblechart';
+      setOverlayRequiredCharts(chartParam);
       console.log('Initial chart selection:', chartParam);
       switchChart(chartParam);
 
