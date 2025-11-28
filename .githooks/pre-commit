@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+git add index.html
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 node "$REPO_ROOT/scripts/update-footer-versions.js"
