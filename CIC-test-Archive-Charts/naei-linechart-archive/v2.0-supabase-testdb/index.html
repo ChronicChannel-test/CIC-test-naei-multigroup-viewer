@@ -536,7 +536,7 @@ function getColorForGroup(name) {
 
 // --- Replace Google Sheets data load with Supabase ---
 async function loadUnits() {
-  const { data, error } = await supabase.from('NAEI_global_Pollutants_legacy').select('*');
+  const { data, error } = await supabase.from('NAEI_global_Pollutants').select('*');
   if (error) throw error;
   pollutantUnits = {};
   data.forEach(r => {
@@ -610,7 +610,7 @@ async function loadData() {
     window.globalYears = [];
     window.globalYearKeys = [];
     groupedData = {};
-    console.log('No timeseries rows found in NAEI_2023ds_t_Group_Data_legacy');
+    console.log('No timeseries rows found in NAEI_2023ds_t_Group_Data');
     return;
   }
 
@@ -643,7 +643,7 @@ async function loadData() {
       return a.localeCompare(b);
     });
     window.allGroupsList = allGroups;
-    console.warn('Groups list was empty from NAEI_global_t_Group_legacy — falling back to groups found in timeseries rows.');
+    console.warn('Groups list was empty from NAEI_global_t_Group — falling back to groups found in timeseries rows.');
   }
 
   console.log(`Loaded ${rows.length} timeseries rows; ${allPollutants.length} pollutants; ${allGroups.length} groups`);
