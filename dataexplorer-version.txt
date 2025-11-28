@@ -1,1 +1,1 @@
-v5.0 testdb
+v5.0 testdbtest
