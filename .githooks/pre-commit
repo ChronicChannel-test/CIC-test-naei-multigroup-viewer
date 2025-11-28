@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+echo "[pre-commit] running"
 
 git add index.html
 REPO_ROOT="$(git rev-parse --show-toplevel)"
