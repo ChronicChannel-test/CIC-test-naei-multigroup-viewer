@@ -47,6 +47,17 @@ npx http-server-spa ./CIC-test-naei-multigroup-viewer index.html 4173 -c-1
 - Execute `npm run build:css` to regenerate `dist/tailwind.css` for production (GitHub Pages, Netlify, etc.).
 - Use `npm run watch:css` during local development to keep the compiled stylesheet in sync.
 
+## Version Footer Automation
+- `dataexplorer-version.txt`, `linechart/linechart-version.txt`, and `bubblechart/bubblechart-version.txt` are the single sources of truth for the displayed versions.
+- A pre-commit hook (`.githooks/pre-commit`) runs `scripts/update-footer-versions.js`, which refreshes the `Explorer Version … • Build …` line in any staged HTML file outside `CIC-test-Archive-Charts/`.
+- Enable the hook locally once:
+
+	```bash
+	git config core.hooksPath .githooks
+	```
+
+- After editing a version file (or any footer), stage your changes and the hook will restage affected HTML files with the correct version/build string before the commit completes.
+
 ## Debugging Console Output
 - Logging is suppressed by default to keep the browser console quiet.
 - Append `?debug=1` (or `?logs=1`) to the URL to re-enable verbose logs across the shell and both iframes.

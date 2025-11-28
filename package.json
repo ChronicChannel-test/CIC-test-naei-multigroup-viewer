@@ -7,6 +7,7 @@
     "build:css": "BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss -i ./tailwind.input.css -o ./dist/tailwind.css --minify",
     "watch:css": "BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss -i ./tailwind.input.css -o ./dist/tailwind.css --watch",
     "export:default-data": "node scripts/export-default-data.js",
+    "update:versions": "node scripts/update-footer-versions.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
