@@ -84,68 +84,6 @@
       width: 28%;
     }
 
-    .category-info-row {
-      transition: background-color 0.4s ease;
-      position: relative;
-    }
-
-    .category-info-row--flash {
-      animation: category-info-row-flash 1.2s ease-out;
-    }
-
-    @keyframes category-info-row-flash {
-      0% {
-        background-color: #dcfce7;
-      }
-      60% {
-        background-color: #f0fdf4;
-      }
-      100% {
-        background-color: transparent;
-      }
-    }
-
-    .category-info-name-cell-content {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      width: 100%;
-    }
-
-    .category-info-row-message {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 12px;
-      border-radius: 999px;
-      background-color: #16a34a;
-      color: #ffffff;
-      font-size: 0.85rem;
-      font-weight: 600;
-      opacity: 0;
-      transform: translateY(-4px);
-      transition: opacity 0.2s ease, transform 0.2s ease;
-      pointer-events: none;
-    }
-
-    .category-info-row-message--visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    @media (max-width: 720px) {
-      .category-info-name-cell-content {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-      }
-
-      .category-info-row-message {
-        align-self: flex-start;
-      }
-    }
-
     .category-info-source-heading {
       text-decoration: underline;
       font-weight: 600;
@@ -237,7 +175,7 @@
       border-radius: 6px;
       background: #ffffff;
       box-sizing: border-box;
-      padding: 4px 4px 12px 4px;
+      padding: 0 4px 12px 4px;
       overflow: visible;
       box-shadow: none;
       border: none;
@@ -251,7 +189,7 @@
       flex-wrap: wrap;
       align-items: center;
       gap: 12px;
-      margin: 6px 0 10px;
+      margin: 0 0 10px;
       max-width: 100%;
     }
 
@@ -413,8 +351,6 @@
       let statusTimer = null;
       let categoryInfoState = null;
       const highlightMatchesEnabled = true;
-      const COPY_MESSAGE_DURATION_MS = 2200;
-      const ROW_FLASH_DURATION_MS = 1200;
       let filterInputActive = true;
       const MIN_HEIGHT_DELTA = 8;
       const MIN_CONTENT_HEIGHT = 320;
@@ -1429,16 +1365,8 @@
           const sourcesHtml = formatSourcesCell(category, nfrLookup, sourcesHighlight);
           const fuelHtml = formatFuelCell(category, fuelHighlight);
           tableHtml += `
-            <tr class="category-info-row">
-              <td class="category-info-name-cell">
-                <span class="category-info-name-cell-content">
-                  <span class="category-info-name-text" style="font-weight:600;">${highlightText(category.name, nameHighlight)}</span>
-                  <span class="category-info-row-message" data-skip-copy="true" aria-hidden="true">
-                    <span aria-hidden="true">✅</span>
-                    <span>Copied</span>
-                  </span>
-                </span>
-              </td>
+            <tr>
+              <td style="font-weight:600;">${highlightText(category.name, nameHighlight)}</td>
               <td class="category-info-activity-cell" data-copy-text="${escapeHtml(activityInfo.description)}">
                 <img src="${activityInfo.iconSrc}" alt="" class="category-info-activity-icon" width="24" height="24" loading="lazy">
                 <span class="sr-only">${escapeHtml(activityInfo.description)}</span>
@@ -1539,82 +1467,29 @@
         filterControlsInitialized = true;
       }
 
-      function getCopyPayloadForRow(row) {
-        if (!row) {
-          return '';
-        }
-
-        const table = row.closest('table');
-        const headerCells = table ? Array.from(table.querySelectorAll('thead th')) : [];
-        const rowCells = Array.from(row.cells || []);
-
-        const sections = rowCells
-          .map((cell, index) => {
-            if (!cell || cell.dataset?.skipCopy) {
-              return null;
-            }
-
-            const rawValue = cell.dataset?.copyText ?? cell.innerText;
-            const value = rawValue ? rawValue.trim() : '';
-            if (!value) {
-              return null;
-            }
-
-            const heading = headerCells[index] ? headerCells[index].innerText.trim() : '';
-            return heading ? `${heading}:\n${value}` : value;
-          })
-          .filter(Boolean);
-
-        return sections.join('\n\n');
-      }
-
-      function getRowCopyIndicator(row) {
-        if (!row) {
-          return null;
-        }
-        return row.querySelector('.category-info-row-message');
-      }
-
-      function showRowCopySuccess(row) {
-        if (!row) {
-          return;
-        }
-
-        const indicator = getRowCopyIndicator(row);
-        if (indicator) {
-          indicator.classList.add('category-info-row-message--visible');
-          clearTimeout(row.copyIndicatorTimer);
-          row.copyIndicatorTimer = setTimeout(() => {
-            indicator.classList.remove('category-info-row-message--visible');
-            row.copyIndicatorTimer = null;
-          }, COPY_MESSAGE_DURATION_MS);
-        }
-
-        row.classList.add('category-info-row--flash');
-        clearTimeout(row.copyFlashTimer);
-        row.copyFlashTimer = setTimeout(() => {
-          row.classList.remove('category-info-row--flash');
-          row.copyFlashTimer = null;
-        }, ROW_FLASH_DURATION_MS);
-      }
-
       function attachCopyHandlers(tableEl) {
         if (!tableEl) return;
 
-        const interactiveSelector = 'a[href], button, input, textarea, select, [contenteditable="true"]';
+        tableEl.addEventListener('click', event => {
+          const row = event.target.closest('tbody tr');
+          if (!row) return;
 
-        const attemptCopyFromRow = row => {
-          if (!row) {
-            return;
-          }
+          const textToCopy = Array.from(row.cells)
+            .map(cell => {
+              if (cell?.dataset?.copyText) {
+                return cell.dataset.copyText.trim();
+              }
+              return cell.innerText.trim();
+            })
+            .filter(Boolean)
+            .join('\n\n');
 
-          const textToCopy = getCopyPayloadForRow(row);
-          if (!textToCopy) {
-            return;
-          }
+          if (!textToCopy) return;
+
+          const successMessage = 'Copied category details to clipboard.';
 
           const onSuccess = () => {
-            showRowCopySuccess(row);
+            setStatus(successMessage, false);
             scheduleHeightUpdate(20);
           };
 
@@ -1655,20 +1530,11 @@
           } else {
             fallbackCopy();
           }
-        };
 
-        tableEl.addEventListener('click', event => {
-          if (event.target.closest(interactiveSelector)) {
-            return;
-          }
-
-          const row = event.target.closest('tbody tr');
-          if (!row) {
-            return;
-          }
-
-          event.preventDefault();
-          attemptCopyFromRow(row);
+          clearTimeout(statusTimer);
+          statusTimer = setTimeout(() => {
+            setStatus('', true);
+          }, 3200);
         });
       }
 
