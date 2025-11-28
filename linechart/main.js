@@ -1172,6 +1172,19 @@ function getSelectedCategories(){
     .map(s => s.value)
     .filter(Boolean);
 }
+window.getSelectedCategories = getSelectedCategories;
+
+let legacyGetSelectedGroupsWarned = false;
+if (typeof window.getSelectedGroups !== 'function') {
+  window.getSelectedGroups = function legacyGetSelectedGroups(){
+    if (!legacyGetSelectedGroupsWarned) {
+      console.warn('getSelectedGroups() is deprecated – using selected categories instead.');
+      legacyGetSelectedGroupsWarned = true;
+    }
+    return getSelectedCategories();
+  };
+}
+
 function addCategorySelector(defaultValue = "", usePlaceholder = true){
   const categoryName = (defaultValue && typeof defaultValue === 'object')
     ? getCategoryDisplayTitle(defaultValue)

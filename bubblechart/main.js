@@ -1603,6 +1603,12 @@ function getSelectedCategories(){
   return values;
 }
 
+// Expose selector helpers globally for legacy code paths (older exports expect getSelectedGroups)
+window.getSelectedCategories = getSelectedCategories;
+if (typeof window.getSelectedGroups !== 'function') {
+  window.getSelectedGroups = () => getSelectedCategories();
+}
+
 // Add category selector dropdown (adapted from linechart)
 function addCategorySelector(defaultValue = "", usePlaceholder = true){
   const categoryName = (defaultValue && typeof defaultValue === 'object')
