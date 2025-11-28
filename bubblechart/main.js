@@ -165,6 +165,7 @@ let parentViewportRedrawTimer = null;
 let parentFooterHeight = DEFAULT_PARENT_FOOTER;
 let parentViewportHeight = DEFAULT_PARENT_VIEWPORT;
 let chartReadyNotified = false;
+let bootstrapReadyNotified = false;
 let chartRenderingUnlocked = false;
 let pendingDrawRequest = null;
 
@@ -638,6 +639,7 @@ async function init() {
 
     // Load data using supabaseModule
     await window.supabaseModule.loadData();
+    notifyParentBootstrapReady();
 
     if (window.supabaseModule.latestDatasetSource === 'hero') {
       await new Promise(resolve => setTimeout(resolve, 50));
@@ -1231,7 +1233,22 @@ function sendContentHeightToParent(force = false) {
     // Suppress height-posting failures; parent will request updates if needed
   }
 }
-
+function notifyParentBootstrapReady() {
+  if (bootstrapReadyNotified) {
+    return;
+  }
+  bootstrapReadyNotified = true;
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: 'chartBootstrapReady',
+        chart: 'bubblechart'
+      }, '*');
+    }
+  } catch (error) {
+    /* Parent might block messaging; ignore */
+  }
+}
 
 async function notifyParentChartReady() {
   if (chartReadyNotified) {

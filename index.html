@@ -830,7 +830,12 @@
       linechart: false,
       'category-info': false
     };
-    const BASE_REQUIRED_CHART_KEYS = ['bubblechart', 'linechart'];
+    const chartBootstrapState = {
+      bubblechart: false,
+      linechart: false
+    };
+    const BOOTSTRAP_REQUIRED_CHARTS = Object.keys(chartBootstrapState);
+    const BASE_REQUIRED_CHART_KEYS = ['bubblechart'];
     let overlayRequiredChartKeys = [...BASE_REQUIRED_CHART_KEYS];
     let sharedDataBootstrapLaunched = false;
 
@@ -861,7 +866,10 @@
     function setOverlayRequiredCharts(initialChartId) {
       const normalized = normalizeChartId(initialChartId) || 'bubblechart';
       overlayRequiredChartKeys = [...BASE_REQUIRED_CHART_KEYS];
-      if (normalized === 'category-info') {
+      if (!overlayRequiredChartKeys.includes(normalized)) {
+        overlayRequiredChartKeys.push(normalized);
+      }
+      if (normalized === 'category-info' && !overlayRequiredChartKeys.includes('category-info')) {
         overlayRequiredChartKeys.push('category-info');
       }
     }
@@ -1112,6 +1120,28 @@
 
     function areAllChartsReady() {
       return overlayRequiredChartKeys.every(key => chartReadyState[key]);
+    }
+
+    function areRequiredHeightsReady() {
+      return overlayRequiredChartKeys.every(key => Boolean(heightsReceived[key]));
+    }
+
+    function areBootstrapChartsReady() {
+      return BOOTSTRAP_REQUIRED_CHARTS.every(key => chartBootstrapState[key]);
+    }
+
+    function maybeHideOverlay() {
+      if (overlayHidden) {
+        return;
+      }
+      if (!areBootstrapChartsReady() || !areRequiredHeightsReady()) {
+        return;
+      }
+      setTimeout(() => {
+        if (!overlayHidden) {
+          window.hideLoadingOverlay();
+        }
+      }, 50);
     }
 
     function resolveChartFromPath() {
@@ -1655,6 +1685,8 @@
     // Simple loading overlay control - MESSAGE BASED APPROACH
     let overlayHidden = false;
     const heightsReceived = { bubblechart: false, linechart: false, 'user-guide': false };
+    const OVERLAY_FAILSAFE_DELAY_MS = 12000;
+    let overlayFailsafeTimer = null;
     
     // Set initial reasonable height estimate
     const lineIframe = iframeElements.linechart;
@@ -1808,6 +1840,16 @@
           });
         }
       }
+
+      if (event.data && event.data.type === 'chartBootstrapReady') {
+        const rawChartKey = event.data.chart;
+        const chartKey = normalizeChartId(rawChartKey) || rawChartKey;
+        if (chartBootstrapState.hasOwnProperty(chartKey) && !chartBootstrapState[chartKey]) {
+          chartBootstrapState[chartKey] = true;
+          maybeHideOverlay();
+        }
+        return;
+      }
       
       // Handle content height from iframe (sent once after initial render)
       if (event.data && event.data.type === 'contentHeight') {
@@ -1836,11 +1878,7 @@
           
           heightsReceived[chartKey] = true;
 
-          if (heightsReceived.bubblechart && heightsReceived.linechart && areAllChartsReady()) {
-            setTimeout(() => {
-              window.hideLoadingOverlay();
-            }, 50);
-          }
+          maybeHideOverlay();
         }
       }
       
@@ -1932,6 +1970,11 @@
         return;
       }
       overlayHidden = true;
+
+      if (overlayFailsafeTimer) {
+        clearTimeout(overlayFailsafeTimer);
+        overlayFailsafeTimer = null;
+      }
       
       const overlay = document.getElementById('main-loading-overlay');
       const chartInterface = document.getElementById('chart-interface');
@@ -1976,6 +2019,13 @@
       setOverlayRequiredCharts(chartParam);
       console.log('Initial chart selection:', chartParam);
       switchChart(chartParam);
+
+      if (!overlayFailsafeTimer) {
+        overlayFailsafeTimer = setTimeout(() => {
+          console.warn('Overlay failsafe triggered after waiting for initial charts to report ready state.');
+          window.hideLoadingOverlay();
+        }, OVERLAY_FAILSAFE_DELAY_MS);
+      }
 
       document.addEventListener('keydown', handleTabKeyboardNavigation);
       

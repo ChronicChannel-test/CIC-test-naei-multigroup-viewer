@@ -32,6 +32,7 @@ let initialLoadComplete = false; // Track if initial chart load is done (prevent
 let initFailureNotified = false; // Ensure we only notify parent once on failure
 let hydrationRefreshPending = false;
 let hydrationRefreshTimer = null;
+let bootstrapReadyNotified = false;
 const DEFAULT_LINE_SELECTIONS = {
   pollutant: 'PM2.5',
   categories: ['All'],
@@ -867,6 +868,23 @@ function sendContentHeightToParent(force = false) {
     requestAnimationFrame(() => updateChartWrapperHeight('post-height-send'));
   } catch (error) {
     console.error('Unable to send line chart content height to parent:', error);
+  }
+}
+
+function notifyParentBootstrapReady() {
+  if (bootstrapReadyNotified) {
+    return;
+  }
+  bootstrapReadyNotified = true;
+  try {
+    if (window.parent && window.parent !== window) {
+      window.parent.postMessage({
+        type: 'chartBootstrapReady',
+        chart: 'linechart'
+      }, '*');
+    }
+  } catch (error) {
+    // Parent messaging can fail if cross-origin; ignore
   }
 }
 
@@ -2329,6 +2347,7 @@ async function init() {
       categorisedData,
       groupedData
     } = await window.supabaseModule.loadData();
+    notifyParentBootstrapReady();
     const resolvedCategories = Array.isArray(categories) ? categories : (Array.isArray(groups) ? groups : []);
     const resolvedCategorisedData = categorisedData || groupedData || {};
 
