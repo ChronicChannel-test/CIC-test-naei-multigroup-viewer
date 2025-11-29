@@ -192,8 +192,10 @@
     }
 
     .spread-nav span {
-      font-size: 2.2rem;
+      font-size: 2.8rem;
       line-height: 1;
+      font-weight: 600;
+      letter-spacing: -0.05em;
     }
 
     .spread-nav:hover:not(:disabled),
@@ -284,13 +286,13 @@
       <div class="chart-wrapper user-guide-wrapper" role="region" aria-label="User guide spread">
         <div class="user-guide-viewer" id="guideViewer">
           <button class="spread-nav spread-nav--prev" type="button" id="spreadPrev" aria-label="Previous pages" disabled>
-            <span aria-hidden="true">&#x2039;</span>
+            <span aria-hidden="true">&#10094;</span>
           </button>
           <div class="user-guide-pages" id="pageSpread" role="group" aria-live="polite" aria-label="User guide pages">
             <p class="user-guide-placeholder">Loading user guide&hellip;</p>
           </div>
           <button class="spread-nav spread-nav--next" type="button" id="spreadNext" aria-label="Next pages" disabled>
-            <span aria-hidden="true">&#x203A;</span>
+            <span aria-hidden="true">&#10095;</span>
           </button>
         </div>
       </div>
