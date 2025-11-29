@@ -579,6 +579,25 @@
         return false;
       }
 
+      function applyMobileSpacing(isMobile) {
+        const pageTitle = document.querySelector('.page-title');
+        const tabNav = document.querySelector('.tab-nav');
+        if (pageTitle) {
+          if (isMobile) {
+            pageTitle.style.paddingRight = '0px';
+          } else {
+            pageTitle.style.paddingRight = '';
+          }
+        }
+        if (tabNav) {
+          if (isMobile) {
+            tabNav.style.paddingRight = '0px';
+          } else {
+            tabNav.style.paddingRight = '';
+          }
+        }
+      }
+
       function applyMobileState() {
         const isMobile = computeMobileState();
         if (isMobile === lastState) {
@@ -591,6 +610,7 @@
         } else {
           root.classList.remove('mobile-device');
         }
+        applyMobileSpacing(isMobile);
       }
 
       applyMobileState();
@@ -598,9 +618,17 @@
       let resizeTimer = null;
       window.addEventListener('resize', () => {
         clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(applyMobileState, 150);
+        resizeTimer = setTimeout(() => {
+          applyMobileState();
+        }, 150);
       });
       window.addEventListener('orientationchange', applyMobileState);
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => applyMobileSpacing(window.__NAEI_IS_MOBILE_DEVICE__));
+      } else {
+        applyMobileSpacing(window.__NAEI_IS_MOBILE_DEVICE__);
+      }
     })();
   </script>
 
