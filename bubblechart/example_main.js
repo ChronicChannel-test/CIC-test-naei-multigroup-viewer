@@ -574,7 +574,7 @@ function addCustomXAxisLabels() {
 function updateUrlFromChartState() {
   // Ensure the data needed for ID lookups is available.
   const pollutants = window.allPollutantsData || [];
-  const categories = window.allCategoriesData || [];
+  const categories = window.allCategoryInfo || [];
   if (!pollutants.length || !categories.length) {
     console.log("URL update skipped: lookup data not yet available.");
     return;
@@ -614,7 +614,7 @@ function updateUrlFromChartState() {
 
       const queryParts = [
         `pollutant_id=${encodeURIComponent(pollutantId)}`,
-        `group_ids=${categoryIds.join(',')}`,
+        `category_ids=${categoryIds.join(',')}`,
         `start_year=${encodeURIComponent(startYear)}`,
         `end_year=${encodeURIComponent(endYear)}`
       ];
@@ -696,6 +696,7 @@ function updateChart(){
   });
 
   window.Colors.resetColorSystem();
+  const categoryData = window.categoryData || {};
   // Use the global year keys to determine which years to display
   const yearsAll = window.globalYears || [];
   const yearKeys = window.globalYearKeys || [];
@@ -710,7 +711,7 @@ function updateChart(){
     const row = [y];
     const key = keysForYears[rowIdx]; // e.g. 'f2015'
     selectedCategories.forEach(g => {
-      const dataRow = groupedData[pollutant]?.[g];
+      const dataRow = categoryData[pollutant]?.[g];
       const raw = dataRow ? dataRow[key] : null;
       const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
       row.push(Number.isNaN(val) ? null : val);
@@ -1222,8 +1223,9 @@ async function revealMainContent() {
                   selectedCategories: (function(){ try { return getSelectedCategories(); } catch(e){ return []; } })(),
                   globalYearsCount: (window.globalYears || []).length
                 };
-                if (window.groupedData && dbg.pollutantSelect) {
-                  dbg.groupedDataPresence = (dbg.selectedCategories || []).map(g => ({ category: g, hasRow: !!(groupedData[dbg.pollutantSelect] && groupedData[dbg.pollutantSelect][g]) }));
+                const debugCategoryData = window.categoryData || null;
+                if (debugCategoryData && dbg.pollutantSelect) {
+                  dbg.categoryDataPresence = (dbg.selectedCategories || []).map(g => ({ category: g, hasRow: !!(debugCategoryData[dbg.pollutantSelect] && debugCategoryData[dbg.pollutantSelect][g]) }));
                 }
                 console.log('🧪 Pre-render diagnostics:', dbg);
                 if (window.parent && window.parent !== window) {
@@ -1313,12 +1315,12 @@ async function revealMainContent() {
 function parseUrlParameters() {
   const params = new URLSearchParams(window.location.search);
   const pollutantId = params.get('pollutant_id');
-  const categoryIds = params.get('group_ids')?.split(',').map(Number).filter(Boolean);
+  const categoryIds = params.get('category_ids')?.split(',').map(Number).filter(Boolean);
   const startYearParam = params.get('start_year');
   const endYearParam = params.get('end_year');
 
   const pollutants = window.allPollutantsData || window.allPollutants || [];
-  const categories = window.allCategoriesData || window.allCategories || [];
+  const categories = window.allCategoryInfo || window.allCategories || [];
   const availableYears = window.globalYears || [];
 
   let pollutantName = null;
@@ -1429,15 +1431,16 @@ async function init() {
     console.log('supabaseModule found, proceeding with initialization...');
     
     // First, load all necessary data from Supabase
-    const { pollutants, categories, yearKeys, pollutantUnits, groupedData } = await window.supabaseModule.loadData();
+    const { pollutants, categories, yearKeys, pollutantUnits, categoryData } = await window.supabaseModule.loadData();
 
     // Store data on the window object for global access
     window.allPollutants = pollutants;
     window.allCategories = categories;
+    window.allCategoryInfo = categories;
     window.globalYearKeys = yearKeys;
     window.globalYears = yearKeys.map(key => key.substring(1));
     window.pollutantUnits = pollutantUnits;
-    window.groupedData = groupedData;
+    window.categoryData = categoryData || {};
     
     // Then, set up the UI selectors with the loaded data
     setupSelectors(pollutants, categories);

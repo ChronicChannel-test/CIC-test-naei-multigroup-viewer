@@ -104,11 +104,11 @@
 
       if (normalizedId === 'bubblechart') {
         // Bubble chart defaults: PM2.5 (id=5), Ecodesign Stove + Gas Boilers (ids 20,37), most recent year (2023)
-        return `${baseUrl}?page=bubblechart&pollutant_id=5&group_ids=20,37&year=2023`;
+        return `${baseUrl}?page=bubblechart&pollutant_id=5&category_ids=20,37&year=2023`;
       }
       if (normalizedId === 'linechart') {
-        // Line chart defaults: PM2.5 (id=5), All group (id=1), full history
-        return `${baseUrl}?page=linechart&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+        // Line chart defaults: PM2.5 (id=5), All category (id=1), full history
+        return `${baseUrl}?page=linechart&pollutant_id=5&category_ids=1&start_year=1970&end_year=2023`;
       }
 
       return `${baseUrl}?page=bubblechart`;

@@ -702,11 +702,8 @@ async function init() {
 
     if (!Array.isArray(window.allCategoriesList) || !window.allCategoriesList.length) {
       const activeCategoriesForSelectors = window.supabaseModule.activeActDataCategories
-        || window.supabaseModule.activeActDataGroups
         || window.supabaseModule.activeCategories
-        || window.supabaseModule.activeGroups
         || window.supabaseModule.allCategories
-        || window.supabaseModule.allGroups
         || [];
       window.allCategories = activeCategoriesForSelectors;
 
@@ -1549,9 +1546,6 @@ function parseUrlParameters() {
   const categoryIdsRaw = params.get('category_ids')
     || params.get('categoryIds')
     || params.get('categoryId')
-    || params.get('group_ids')
-    || params.get('groupIds')
-    || params.get('groupId')
     || '';
   const categoryIdsParam = categoryIdsRaw ? categoryIdsRaw.split(',') : [];
   const yearParamRaw = params.get('year');
@@ -1562,8 +1556,6 @@ function parseUrlParameters() {
   const activeCategoryIdSet = new Set(
     window.supabaseModule.activeActDataCategoryIds
     || window.supabaseModule.activeCategoryIds
-    || window.supabaseModule.activeActDataGroupIds
-    || window.supabaseModule.activeGroupIds
     || []
   );
   const availableYears = window.supabaseModule.getAvailableYears() || [];
@@ -1681,11 +1673,8 @@ function getSelectedCategories(){
   return values;
 }
 
-// Expose selector helpers globally for legacy code paths (older exports expect getSelectedGroups)
+// Expose selector helpers globally for any embed helpers that need them
 window.getSelectedCategories = getSelectedCategories;
-if (typeof window.getSelectedGroups !== 'function') {
-  window.getSelectedGroups = () => getSelectedCategories();
-}
 
 // Add category selector dropdown (adapted from linechart)
 function addCategorySelector(defaultValue = "", usePlaceholder = true){
@@ -2000,7 +1989,7 @@ function updateChart() {
 
   // Get selected categories and assign colors
   const selectedCategoryNames = getSelectedCategories();
-  const colors = selectedCategoryNames.map(categoryName => window.Colors.getColorForGroup(categoryName));
+  const colors = selectedCategoryNames.map(categoryName => window.Colors.getColorForCategory(categoryName));
 
   // Redraw the chart to reflect the new selections
   drawChart();
@@ -2163,8 +2152,12 @@ async function drawChart(skipHeightUpdate = false) {
     const pollutantName = window.supabaseModule.getPollutantName(selectedPollutantId);
 
     // Get display names for categories
-    const higherPolluter_displayName = getCategoryDisplayName(higherPolluter.groupName);
-    const lowerPolluter_displayName = getCategoryDisplayName(lowerPolluter.groupName);
+    const higherPolluter_displayName = getCategoryDisplayName(
+      higherPolluter.categoryName || higherPolluter.groupName || `Category ${higherPolluter.categoryId}`
+    );
+    const lowerPolluter_displayName = getCategoryDisplayName(
+      lowerPolluter.categoryName || lowerPolluter.groupName || `Category ${lowerPolluter.categoryId}`
+    );
 
     // Create enhanced comparison statement with arrows and calculated values
     const statement = {
@@ -2417,10 +2410,7 @@ function loadFromURLParameters() {
   const pollutantId = params.get('pollutant_id');
   const categoryIdsParam = params.get('category_ids')
     || params.get('categoryIds')
-    || params.get('categoryId')
-    || params.get('group_ids')
-    || params.get('groupIds')
-    || params.get('groupId');
+    || params.get('categoryId');
 
   if (year && pollutantId && categoryIdsParam) {
     selectedYear = parseInt(year);

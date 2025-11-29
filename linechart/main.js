@@ -40,6 +40,14 @@ const DEFAULT_LINE_SELECTIONS = {
   endYear: null
 };
 
+function matchesLineChartParam(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  const normalized = String(value).trim().toLowerCase();
+  return normalized === '2' || normalized === 'linechart' || normalized === 'line';
+}
+
 function scheduleHydrationRefreshAttempt(attempt = 0) {
   if (!hydrationRefreshPending) {
     return;
@@ -103,6 +111,9 @@ if (!window.Colors) {
       return chosen;
     }
   };
+  if (typeof window.Colors.getColorForGroup !== 'function') {
+    window.Colors.getColorForGroup = window.Colors.getColorForCategory;
+  }
 }
 
 function waitForChromeStability(targetElements = []) {
@@ -1192,17 +1203,6 @@ function getSelectedCategories(){
 }
 window.getSelectedCategories = getSelectedCategories;
 
-let legacyGetSelectedGroupsWarned = false;
-if (typeof window.getSelectedGroups !== 'function') {
-  window.getSelectedGroups = function legacyGetSelectedGroups(){
-    if (!legacyGetSelectedGroupsWarned) {
-      console.warn('getSelectedGroups() is deprecated – using selected categories instead.');
-      legacyGetSelectedGroupsWarned = true;
-    }
-    return getSelectedCategories();
-  };
-}
-
 function addCategorySelector(defaultValue = "", usePlaceholder = true){
   const categoryName = (defaultValue && typeof defaultValue === 'object')
     ? getCategoryDisplayTitle(defaultValue)
@@ -1220,7 +1220,7 @@ function addCategorySelector(defaultValue = "", usePlaceholder = true){
   const handleBtn = document.createElement('button');
   handleBtn.type = 'button';
   handleBtn.className = 'dragHandle';
-  handleBtn.setAttribute('aria-label', 'Reorder group (use arrow keys)');
+  handleBtn.setAttribute('aria-label', 'Reorder category (use arrow keys)');
   handleBtn.title = 'Drag to reorder (or focus and use Arrow keys)';
   handleBtn.textContent = '⠿';
   handleBtn.style.marginRight = '6px';
@@ -1228,10 +1228,10 @@ function addCategorySelector(defaultValue = "", usePlaceholder = true){
 
   // category select
   const sel = document.createElement('select');
-  sel.setAttribute('aria-label', 'Group selector');
+  sel.setAttribute('aria-label', 'Category selector');
   sel.name = 'categorySelector';
   if (usePlaceholder){
-    const ph = new Option('Select group','');
+    const ph = new Option('Select category','');
     ph.disabled = true; ph.selected = true;
     sel.add(ph);
   }
@@ -1310,7 +1310,7 @@ function refreshButtons() {
 
   const rows = container.querySelectorAll('.categoryRow');
 
-  // Add remove buttons only if there are 2 or more groups
+  // Add remove buttons only if there are 2 or more categories
     if (rows.length >= 2) {
     rows.forEach(row => {
         if (!row.querySelector('.remove-btn')) {
@@ -1318,7 +1318,7 @@ function refreshButtons() {
           removeBtn.type = 'button';
           removeBtn.className = 'remove-btn';
         removeBtn.innerHTML = '<span class="remove-icon" aria-hidden="true"></span> Remove Category';
-        // make ARIA label include the current group name if available
+        // make ARIA label include the current category name if available
         const sel = row.querySelector('select');
         const categoryName = sel ? (sel.value || (sel.options[sel.selectedIndex] && sel.options[sel.selectedIndex].text) || '') : '';
           removeBtn.setAttribute('aria-label', categoryName ? 'Remove category ' + categoryName : 'Remove category');
@@ -1345,9 +1345,9 @@ function refreshButtons() {
     container.appendChild(addBtn);
   }
 
-  // Disable button if 10 groups are present
+  // Disable button if 10 categories are present
   if (rows.length >= 10) {
-    addBtn.textContent = 'Max Groups = 10';
+    addBtn.textContent = 'Max Categories = 10';
     addBtn.disabled = true;
   } else {
     addBtn.innerHTML = '<span class="add-icon" aria-hidden="true"></span> Add Category';
@@ -1500,7 +1500,7 @@ function addCustomXAxisLabels() {
 function updateUrlFromChartState() {
   // Ensure the data needed for ID lookups is available.
   const pollutants = window.allPollutantsData || [];
-  const categories = window.allCategoriesData || [];
+  const categories = window.allCategoryInfo || [];
 
   if (!pollutants.length || !categories.length) {
     return;
@@ -1546,16 +1546,27 @@ function updateUrlFromChartState() {
         `start_year=${encodeURIComponent(startYear)}`,
         `end_year=${encodeURIComponent(endYear)}`
       ];
+
+      const queryString = queryParts.join('&');
+      const nextUrl = `${window.location.pathname}?${queryString}`;
+      try {
+        window.history.replaceState({}, '', nextUrl);
+      } catch (historyError) {
+        lineDebugWarn('Line chart history update failed', historyError);
+      }
       
-      // Send URL update to parent window
-      // But ONLY if this is the active chart (chart=2 in parent URL)
+      // Send URL update to parent window when the line chart is the active view
       if (window.parent && window.parent !== window) {
         try {
           const parentParams = new URLSearchParams(window.parent.location.search);
           const chartParam = parentParams.get('chart');
+          const pageParam = parentParams.get('page');
+          const canUpdateParent = matchesLineChartParam(chartParam)
+            || matchesLineChartParam(pageParam)
+            || (!chartParam && !pageParam);
           
-          // Only send if chart=2 (line chart)
-          if (chartParam === '2') {
+          // Only send if parent currently targets the line chart
+          if (canUpdateParent) {
               window.parent.postMessage({
                 type: 'updateURL',
                 params: queryParts,
@@ -1572,8 +1583,6 @@ function updateUrlFromChartState() {
               chart: '2'
           }, '*');
         }
-      } else {
-        window.history.replaceState({}, '', `${window.location.pathname}?${queryParts.join('&')}`);
       }
 
     } catch (error) {
@@ -1635,7 +1644,7 @@ async function updateChart(){
     window.seriesVisibility = seriesVisibility; // Keep export.js in sync
   }
 
-  const categorisedData = window.categorisedData || window.groupedData || {};
+  const categoryData = window.categoryData || {};
 
   const layeredCategories = selectedCategories.map((category, uiIndex) => ({
     name: category,
@@ -1661,7 +1670,7 @@ async function updateChart(){
     const key = keysForYears[rowIdx];
     const row = [yearLabel];
     drawingCategories.forEach(({ name }) => {
-      const dataRow = categorisedData[pollutant]?.[name];
+      const dataRow = categoryData[pollutant]?.[name];
       const raw = key && dataRow ? dataRow[key] : null;
       const val = (raw === null || raw === undefined) ? null : parseFloat(raw);
       row.push(Number.isNaN(val) ? null : val);
@@ -2182,10 +2191,13 @@ function parseUrlParameters() {
   
   const params = new URLSearchParams(searchParams);
   
-  // Only honor URL overrides when the parent explicitly targets the line chart (chart=2)
+  // Only honor URL overrides when the parent explicitly targets the line chart
   const chartParam = params.get('chart');
+  const pageParam = params.get('page');
   const embedded = isLineChartEmbedded();
-  const allowOverrides = chartParam === '2' || (!embedded && !chartParam);
+  const chartTargetsLine = matchesLineChartParam(chartParam);
+  const pageTargetsLine = matchesLineChartParam(pageParam);
+  const allowOverrides = !embedded || chartTargetsLine || pageTargetsLine;
   if (!allowOverrides) {
     return {
       pollutantName: null,
@@ -2197,8 +2209,8 @@ function parseUrlParameters() {
   
   const pollutantId = params.get('pollutant_id');
   const categoryIdParam = params.get('category_ids')
-    || params.get('group_ids')
-    || params.get('group_id');
+    || params.get('categoryIds')
+    || params.get('category_id');
   const categoryIds = categoryIdParam
     ? categoryIdParam.split(',').map(Number).filter(Boolean)
     : [];
@@ -2206,7 +2218,7 @@ function parseUrlParameters() {
   const endYearParam = params.get('end_year');
 
   const pollutants = window.allPollutantsData || window.allPollutants || [];
-  const categories = window.allCategoriesData || window.allCategories || [];
+  const categories = window.allCategoryInfo || window.allCategories || [];
   const availableYears = window.globalYears || [];
 
   let pollutantName = null;
@@ -2344,22 +2356,20 @@ async function init() {
       groups,
       yearKeys,
       pollutantUnits,
-      categorisedData,
-      groupedData
+      categoryData
     } = await window.supabaseModule.loadData();
     notifyParentBootstrapReady();
     const resolvedCategories = Array.isArray(categories) ? categories : (Array.isArray(groups) ? groups : []);
-    const resolvedCategorisedData = categorisedData || groupedData || {};
+    const resolvedCategoryData = categoryData || {};
 
     // Store data on the window object for global access
     window.allPollutants = pollutants;
     window.allCategories = resolvedCategories;
-    window.allCategoriesData = resolvedCategories;
+    window.allCategoryInfo = resolvedCategories;
     window.globalYearKeys = yearKeys;
     window.globalYears = yearKeys.map(key => key.substring(1));
     window.pollutantUnits = pollutantUnits;
-    window.categorisedData = resolvedCategorisedData;
-    window.groupedData = resolvedCategorisedData; // Legacy alias while rename completes
+    window.categoryData = resolvedCategoryData;
     
     // Then, set up the UI selectors with the loaded data
     setupSelectors(pollutants, resolvedCategories);

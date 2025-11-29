@@ -264,11 +264,42 @@ async function drawBubbleChart(year, pollutantId, categoryIds) {
       window.seriesVisibility = seriesVisibility;
     }
 
-    // Get unique category names to match with visibility array
-    const uniqueCategories = [...new Set(dataPoints.map(p => p.categoryName))];
+    const normalizedCategoryIds = Array.isArray(categoryIds) ? categoryIds : [];
+
+    const categoryDisplayOrder = new Map();
+    normalizedCategoryIds.forEach((rawId, index) => {
+      const numericId = Number(rawId);
+      const categoryName = window.supabaseModule?.getCategoryName?.(numericId) || `${rawId}`;
+      if (!categoryDisplayOrder.has(categoryName)) {
+        categoryDisplayOrder.set(categoryName, index);
+      }
+    });
+
+    const categoryIndexById = new Map();
+    normalizedCategoryIds.forEach((rawId, index) => {
+      const numericId = Number(rawId);
+      if (Number.isFinite(numericId)) {
+        categoryIndexById.set(numericId, index);
+      }
+    });
+
+    const resolveCategoryIndex = (point) => {
+      const numericId = Number(point.categoryId);
+      if (Number.isFinite(numericId) && categoryIndexById.has(numericId)) {
+        return categoryIndexById.get(numericId);
+      }
+      if (point.categoryName && categoryDisplayOrder.has(point.categoryName)) {
+        return categoryDisplayOrder.get(point.categoryName);
+      }
+      return null;
+    };
+
     const visibleDataPoints = dataPoints.filter(point => {
-      const categoryIndex = uniqueCategories.indexOf(point.categoryName);
-      return categoryIndex >= 0 && seriesVisibility[categoryIndex];
+      const categoryIndex = resolveCategoryIndex(point);
+      if (categoryIndex == null) {
+        return true;
+      }
+      return seriesVisibility[categoryIndex];
     });
 
     // Prepare Google DataTable for scatter chart with bubble-like styling
@@ -279,20 +310,6 @@ async function drawBubbleChart(year, pollutantId, categoryIds) {
   data.addColumn({type: 'string', role: 'style'});
 
   // Add data rows with emission factor calculation and sizing
-  const categoryDisplayOrder = (() => {
-    const order = new Map();
-    if (Array.isArray(categoryIds)) {
-      categoryIds.forEach((rawId, index) => {
-        const numericId = Number(rawId);
-        const categoryName = window.supabaseModule?.getCategoryName?.(numericId) || `${rawId}`;
-        if (!order.has(categoryName)) {
-          order.set(categoryName, index);
-        }
-      });
-    }
-    return order;
-  })();
-
   const orderedVisiblePoints = [...visibleDataPoints].sort((a, b) => {
     const orderA = categoryDisplayOrder.has(a.categoryName) ? categoryDisplayOrder.get(a.categoryName) : Number.POSITIVE_INFINITY;
     const orderB = categoryDisplayOrder.has(b.categoryName) ? categoryDisplayOrder.get(b.categoryName) : Number.POSITIVE_INFINITY;
@@ -721,13 +738,20 @@ function createCustomLegend(chart, data, categoryIds, dataPoints) {
 
     const pointsByCategoryId = new Map();
     dataPoints.forEach(point => {
-      if (!pointsByCategoryId.has(point.categoryId)) {
-        pointsByCategoryId.set(point.categoryId, point);
+      const numericId = Number(point.categoryId);
+      if (!Number.isFinite(numericId)) {
+        return;
+      }
+      if (!pointsByCategoryId.has(numericId)) {
+        pointsByCategoryId.set(numericId, point);
       }
     });
 
     categoryIds.forEach((categoryId, index) => {
-      const pointForCategory = pointsByCategoryId.get(categoryId);
+      const numericId = Number(categoryId);
+      const pointForCategory = Number.isFinite(numericId)
+        ? pointsByCategoryId.get(numericId)
+        : null;
       const categoryName = pointForCategory?.categoryName
         || (typeof window.supabaseModule?.getCategoryName === 'function'
           ? window.supabaseModule.getCategoryName(categoryId)

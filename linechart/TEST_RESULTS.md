@@ -69,9 +69,9 @@ All 20 required functions verified to exist:
 ### Global Variable Sharing
 Variables defined at the top level in supabase.js are accessible globally:
 - `pollutantUnits`
-- `categorisedData`
+- `categoryData`
 - `pollutantsData`
-- `categoriesData`
+- `categoryInfo`
 - `allPollutants`
 - `allCategories`
 

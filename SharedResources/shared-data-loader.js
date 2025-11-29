@@ -549,7 +549,7 @@ async function loadDataFromSupabase() {
   
   // Store globally for backwards compatibility
   window.allPollutantsData = pollutants;
-  window.allCategoriesData = categories;
+  window.allCategoryInfo = categories;
   window.allGroupsData = cache.data.groups;
   
   sharedDataInfoLog('Shared Supabase fetch completed', {

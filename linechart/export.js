@@ -41,7 +41,7 @@ function getSelectedCategoryNames() {
 }
 
 function getAllCategoryRecords() {
-  return window.allCategoriesData || window.allGroupsData || [];
+  return window.allCategoryInfo || window.allGroupsData || [];
 }
 
 function buildLineFilenameBase({ startYear, endYear, pollutantName, firstCategoryName }) {
@@ -101,8 +101,6 @@ function exportData(format = 'csv') {
     categories: selectedCategories,
     category_count: selectedCategories.length,
     categories_count: selectedCategories.length,
-    groups: selectedCategories,
-    groups_count: selectedCategories.length,
     year_range: endYear - startYear + 1,
     filename: filenameBase
   };
@@ -137,13 +135,13 @@ function exportData(format = 'csv') {
   rows.push(['Category', ...years]);
 
 
-  const categorisedData = window.categorisedData || window.groupedData || {};
+  const categoryData = window.categoryData || {};
 
   // Data rows - read values by key for robustness
   selectedCategories.forEach(category => {
     const values = keysForYears.map((k) => {
       // look up the data row for this pollutant and category
-      const dataRow = categorisedData[pollutant] ? categorisedData[pollutant][category] : null;
+      const dataRow = categoryData[pollutant] ? categoryData[pollutant][category] : null;
       const raw = dataRow ? dataRow[k] : null;
       return raw ?? '';
     });
@@ -364,7 +362,6 @@ function generateShareUrl() {
   params.set('pollutant_id', pollutantData.id);
   const categoryIdList = categoryIds.join(',');
   params.set('category_ids', categoryIdList);
-  params.set('group_ids', categoryIdList);
   if (startYear) {
     params.set('start_year', startYear);
   }
@@ -389,7 +386,6 @@ function setupShareButton() {
     const shareAnalyticsPayload = {
       pollutant: document.getElementById('pollutantSelect').value,
       category_count: categoryCount,
-      group_count: categoryCount,
       start_year: document.getElementById('startYear')?.value || '',
       end_year: document.getElementById('endYear')?.value || '',
       year_span: (document.getElementById('endYear')?.value && document.getElementById('startYear')?.value) 
@@ -523,7 +519,6 @@ function showShareDialog(shareUrl) {
         window.supabaseModule.trackAnalytics('share_url_copied', {
           pollutant: pollutantName,
           category_count: selectedCategories.length,
-          group_count: selectedCategories.length,
           start_year: startYear,
           end_year: endYear,
           has_year_range: !!(startYear && endYear)
@@ -559,7 +554,6 @@ function showShareDialog(shareUrl) {
           window.supabaseModule.trackAnalytics('share_png_copied', {
             pollutant: pollutantName,
             category_count: selectedCategories.length,
-            group_count: selectedCategories.length,
             start_year: startYear,
             end_year: endYear
           });
@@ -603,7 +597,6 @@ function showShareDialog(shareUrl) {
           startYear,
           endYear,
           categories: selectedCategories,
-          groups: selectedCategories,
           shareUrl
         })
       : null;
@@ -611,7 +604,6 @@ function showShareDialog(shareUrl) {
     window.supabaseModule.trackAnalytics('share_email_opened', {
       pollutant: pollutantName,
       category_count: selectedCategories.length,
-      group_count: selectedCategories.length,
       start_year: startYear,
       end_year: endYear,
       has_year_range: !!(startYear && endYear)

@@ -101,16 +101,16 @@ v2.3-modular-CIC-testdb/
 ```
 index.html
   ├─ supabase.js (loads first)
-  │   └─ Defines: pollutantUnits, categorisedData, etc.
+   │   └─ Defines: pollutantUnits, categoryData, etc.
   │   └─ Functions: loadData, loadUnits, trackAnalytics
   │
   ├─ main.js (loads second)
-  │   └─ Uses: pollutantUnits, categorisedData from supabase.js
+   │   └─ Uses: pollutantUnits, categoryData from supabase.js
   │   └─ Exposes: window.smoothLines
   │   └─ Functions: init, updateChart, renderInitialView
   │
   └─ export.js (loads third)
-     └─ Uses: pollutantUnits, categorisedData, window.smoothLines
+   └─ Uses: pollutantUnits, categoryData, window.smoothLines
       └─ Functions: exportData, generateChartImage, getCleanChartImageURI
 ```
 

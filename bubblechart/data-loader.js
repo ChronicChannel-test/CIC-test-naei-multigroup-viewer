@@ -14,8 +14,8 @@ window.DataLoader = {
     return window.supabaseModule.getAvailableYears();
   },
   
-  getScatterData(year, pollutantId, groupIds) {
-    return window.supabaseModule.getScatterData(year, pollutantId, groupIds);
+  getScatterData(year, pollutantId, categoryIds) {
+    return window.supabaseModule.getScatterData(year, pollutantId, categoryIds);
   },
   
   getPollutantName(pollutantId) {
@@ -26,16 +26,16 @@ window.DataLoader = {
     return window.supabaseModule.getPollutantUnit(pollutantId);
   },
   
-  getGroupName(groupId) {
-    return window.supabaseModule.getGroupName(groupId);
+  getCategoryName(categoryId) {
+    return window.supabaseModule.getCategoryName(categoryId);
   },
   
   get allPollutants() { 
     return window.supabaseModule.allPollutants; 
   },
   
-  get allGroups() { 
-    return window.supabaseModule.allGroups; 
+  get allCategories() { 
+    return window.supabaseModule.allCategories; 
   },
   
   get actDataPollutantId() {

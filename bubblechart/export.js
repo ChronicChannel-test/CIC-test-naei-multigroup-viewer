@@ -47,13 +47,9 @@ function collectCategoryIdsFromChartData(chartData) {
     return chartData.categoryIds;
   }
 
-  if (Array.isArray(chartData.groupIds) && chartData.groupIds.length) {
-    return chartData.groupIds;
-  }
-
   const deduped = [];
   (chartData.dataPoints || []).forEach(point => {
-    const id = point?.categoryId ?? point?.groupId;
+    const id = point?.categoryId;
     if (id == null || deduped.includes(id)) {
       return;
     }
@@ -74,17 +70,10 @@ function resolveCategoryNameById(categoryId, fallbackPoints) {
     }
   }
 
-  if (typeof window.supabaseModule?.getGroupName === 'function') {
-    const legacyResolved = window.supabaseModule.getGroupName(categoryId);
-    if (legacyResolved) {
-      return legacyResolved;
-    }
-  }
-
   if (Array.isArray(fallbackPoints) && fallbackPoints.length) {
-    const match = fallbackPoints.find(point => point?.categoryId === categoryId || point?.groupId === categoryId);
-    if (match?.categoryName || match?.groupName) {
-      return match.categoryName || match.groupName;
+    const match = fallbackPoints.find(point => point?.categoryId === categoryId);
+    if (match?.categoryName) {
+      return match.categoryName;
     }
   }
 
@@ -102,14 +91,6 @@ function resolveCategoryShortTitleById(categoryId) {
       return shortTitle;
     }
   }
-
-  if (typeof window.supabaseModule?.getGroupShortTitle === 'function') {
-    const legacyShort = window.supabaseModule.getGroupShortTitle(categoryId);
-    if (legacyShort) {
-      return legacyShort;
-    }
-  }
-
   return null;
 }
 
@@ -133,7 +114,6 @@ function buildBubbleFilenameBase(chartData) {
 
   const categoryName = resolveCategoryNameById(firstCategoryId, chartData.dataPoints)
     || chartData.dataPoints?.[0]?.categoryName
-    || chartData.dataPoints?.[0]?.groupName
     || null;
 
   const yearSegment = sanitizeFilenameSegment(chartData.year ?? 'Year');
@@ -391,23 +371,17 @@ async function generateChartImage() {
             if (!sourceItems.length && chartData) {
               const categoryOrder = collectCategoryIdsFromChartData(chartData);
               const pointsByCategoryId = new Map(
-                (chartData.dataPoints || []).map(point => {
-                  const id = point.categoryId ?? point.groupId;
-                  return [id, point];
-                })
+                (chartData.dataPoints || []).map(point => [point.categoryId, point])
               );
               sourceItems = categoryOrder.map(categoryId => {
                 const point = pointsByCategoryId.get(categoryId);
                 const categoryName = point?.categoryName
-                  || point?.groupName
                   || resolveCategoryNameById(categoryId, chartData.dataPoints)
                   || `Category ${categoryId}`;
                 const hasData = Boolean(point);
                 const dotColor = typeof window.Colors?.getColorForCategory === 'function'
                   ? window.Colors.getColorForCategory(categoryName)
-                  : (typeof window.Colors?.getColorForGroup === 'function'
-                    ? window.Colors.getColorForGroup(categoryName)
-                    : '#000000');
+                  : '#000000';
                 return {
                   text: hasData ? categoryName : `${categoryName} (No data available)`,
                   dotColor,
@@ -592,7 +566,7 @@ async function generateChartImage() {
             if (!categoryOrdering.length || !window.seriesVisibility) {
               return true;
             }
-            const categoryId = point.categoryId ?? point.groupId;
+            const categoryId = point.categoryId;
             const categoryIndex = categoryOrdering.indexOf(categoryId);
             if (categoryIndex === -1) {
               return true;
@@ -737,12 +711,10 @@ async function generateChartImage() {
             const labelText = `${efDisplay} g/GJ`;
             
             // Always place label to the right of the bubble, always black, no leader line
-            const categoryLabel = point.categoryName || point.groupName || 'Category';
+            const categoryLabel = point.categoryName || 'Category';
             const bubbleColor = window.Colors && typeof window.Colors.getColorForCategory === 'function'
               ? window.Colors.getColorForCategory(categoryLabel)
-              : (window.Colors && typeof window.Colors.getColorForGroup === 'function'
-                ? window.Colors.getColorForGroup(categoryLabel)
-                : '#000000');
+              : '#000000';
 
             ctx.font = '400 70px "Tiresias Infofont", sans-serif';
             ctx.textAlign = 'left';
@@ -944,9 +916,7 @@ function dataURLtoBlob(dataURL) {
 function resolveBubbleShareCategories(chartData) {
   const fromSelectors = typeof window.getSelectedCategories === 'function'
     ? window.getSelectedCategories().filter(Boolean)
-    : (typeof window.getSelectedGroups === 'function'
-      ? window.getSelectedGroups().filter(Boolean)
-      : []);
+    : [];
   if (fromSelectors.length) {
     return fromSelectors;
   }
@@ -964,7 +934,7 @@ function resolveBubbleShareCategories(chartData) {
   if (Array.isArray(chartData?.dataPoints) && chartData.dataPoints.length) {
     const deduped = [];
     chartData.dataPoints.forEach(point => {
-      const name = point?.categoryName || point?.groupName;
+      const name = point?.categoryName;
       if (name && !deduped.includes(name)) {
         deduped.push(name);
       }
@@ -1047,7 +1017,7 @@ function showShareDialog() {
 
   // Build shareable URL with parameters matching updateURL() format
   // Get category IDs with comparison flags ('c' suffix if checkbox is checked)
-  const categoryRows = document.querySelectorAll('.groupRow');
+  const categoryRows = document.querySelectorAll('.categoryRow');
   const selectedCategoryIds = collectCategoryIdsFromChartData(chartData);
   const selectedCategoryCount = selectedCategoryIds.length;
 
@@ -1372,7 +1342,7 @@ function exportData(format = 'csv') {
     const emissionFactor = point.EF !== undefined ? point.EF : 
       (point.actDataValue !== 0 ? (point.pollutantValue / point.actDataValue) * 1000000 : 0);
 
-    const categoryLabel = point.categoryName || point.groupName || 'Category';
+    const categoryLabel = point.categoryName || 'Category';
     rows.push([
       categoryLabel,
       toNumberOrEmpty(point.actDataValue),

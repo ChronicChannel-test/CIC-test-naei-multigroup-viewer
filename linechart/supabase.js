@@ -32,7 +32,6 @@ function getLineSearchParams() {
       const overrideKeys = [
         'pollutant','pollutant_id','pollutantId',
         'category','categories','category_id','categoryIds','category_ids',
-        'group','group_id','groupIds','group_ids',
         'dataset','start_year','end_year','year'
       ];
       overrideKeys.forEach(key => params.delete(key));
@@ -93,12 +92,12 @@ function ensureInitialized() {
 let globalRows = [];
 let globalHeaders = [];
 let pollutantUnits = {};
-let categorisedData = {};
+let categoryData = {};
 let allCategoriesList = [];
 let allPollutants = [];
 let allCategories = [];
 let pollutantsData = []; // Store raw pollutant data for ID lookups
-let categoriesData = []; // Store raw group data for ID lookups
+let categoryInfo = []; // Store raw category metadata for ID lookups
 
 const LINE_DEFAULT_POLLUTANT_NAME = 'PM2.5';
 const LINE_DEFAULT_POLLUTANT_ID = 5;
@@ -109,7 +108,6 @@ const LINE_DEFAULT_END_YEAR = 2023;
 const lineUrlOverrideParams = [
   'pollutant','pollutant_id','pollutantId',
   'category','categories','category_id','categoryIds','category_ids',
-  'group','group_id','groupIds','group_ids',
   'dataset','start_year','end_year','year'
 ];
 let lineHasFullDataset = false;
@@ -171,7 +169,7 @@ function resolveCategoryRecord(identifier) {
     ? identifier.trim().toLowerCase()
     : null;
 
-  return categoriesData.find(g => {
+  return categoryInfo.find(g => {
     if (typeof identifier === 'number') {
       return g.id === identifier;
     }
@@ -252,6 +250,116 @@ function lineMatchesNameSet(values = [], defaults = []) {
   return normalizedValues.every((value, index) => value === normalizedDefaults[index]);
 }
 
+function lineExtractCategoryTitle(record) {
+  if (!record || typeof record !== 'object') {
+    return '';
+  }
+  const title = record.category_title
+    || record.group_name
+    || record.title
+    || record.group_title
+    || '';
+  return typeof title === 'string' ? title.trim() : '';
+}
+
+function lineSortCategoryNames(names = []) {
+  return names.slice().sort((a, b) => {
+    const aName = (a || '').toLowerCase();
+    const bName = (b || '').toLowerCase();
+    if (aName === 'all' && bName !== 'all') {
+      return -1;
+    }
+    if (bName === 'all' && aName !== 'all') {
+      return 1;
+    }
+    return (a || '').localeCompare(b || '');
+  });
+}
+
+function lineBuildCategoryList(records = []) {
+  const seen = new Set();
+  const names = [];
+  records.forEach(record => {
+    const title = lineExtractCategoryTitle(record);
+    if (!title) {
+      return;
+    }
+    const key = title.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    names.push(title);
+  });
+  return lineSortCategoryNames(names);
+}
+
+function lineResolveCategoryKey(record) {
+  if (!record || typeof record !== 'object') {
+    return null;
+  }
+  if (record.id != null) {
+    return record.id;
+  }
+  if (record.category_id != null) {
+    return record.category_id;
+  }
+  const title = lineExtractCategoryTitle(record);
+  return title ? title.toLowerCase() : null;
+}
+
+
+function lineCollectMetadataCategories() {
+  const aggregated = [];
+  const appendRecords = (records) => {
+    if (!Array.isArray(records)) {
+      return;
+    }
+    records.forEach(record => aggregated.push(record));
+  };
+
+  try {
+    const loader = resolveLineSharedLoader();
+    if (loader?.getAllCategories) {
+      try {
+        appendRecords(loader.getAllCategories());
+      } catch (loaderError) {
+        lineSupabaseLog('Unable to read categories via getAllCategories()', loaderError?.message || loaderError);
+      }
+    }
+    if (loader?.getCachedData) {
+      try {
+        const cached = loader.getCachedData();
+        appendRecords(cached?.categories || cached?.groups);
+      } catch (cacheError) {
+        lineSupabaseLog('Unable to read cached categories from shared loader', cacheError?.message || cacheError);
+      }
+    }
+  } catch (error) {
+    lineSupabaseLog('Shared loader unavailable while collecting metadata categories', error?.message || error);
+  }
+
+  const snapshotCategories = window.SharedDataCache?.snapshotData?.categories
+    || window.SharedDataCache?.defaultSnapshot?.data?.categories
+    || null;
+  appendRecords(snapshotCategories);
+
+  try {
+    if (window.parent && window.parent !== window) {
+      const parentSnapshot = window.parent.SharedDataCache?.snapshotData?.categories
+        || window.parent.SharedDataCache?.defaultSnapshot?.data?.categories
+        || null;
+      appendRecords(parentSnapshot);
+    }
+  } catch (error) {
+    /* ignore cross-origin errors */
+  }
+
+  appendRecords(window.allCategoryInfo);
+
+  return aggregated;
+}
+
 function lineUsesDefaultSelection() {
   if (lineSupabaseUrlParams.has('dataset')) {
     return false;
@@ -265,15 +373,11 @@ function lineUsesDefaultSelection() {
   const categoryIds = parseLineIdList(
     lineSupabaseUrlParams.get('category_ids')
     || lineSupabaseUrlParams.get('categoryIds')
-    || lineSupabaseUrlParams.get('group_ids')
-    || lineSupabaseUrlParams.get('groupIds')
-    || lineSupabaseUrlParams.get('group_id')
+    || lineSupabaseUrlParams.get('category_id')
   );
   const categoryNames = parseLineNameList(
     lineSupabaseUrlParams.get('category')
     || lineSupabaseUrlParams.get('categories')
-    || lineSupabaseUrlParams.get('group')
-    || lineSupabaseUrlParams.get('groups')
   );
 
   const pollutantIdsDefault = !pollutantIds.length
@@ -384,15 +488,11 @@ function buildLineHeroOptions() {
   const categoryIds = parseLineIdList(
     lineSupabaseUrlParams.get('category_ids')
     || lineSupabaseUrlParams.get('categoryIds')
-    || lineSupabaseUrlParams.get('group_ids')
-    || lineSupabaseUrlParams.get('groupIds')
-    || lineSupabaseUrlParams.get('group_id')
+    || lineSupabaseUrlParams.get('category_id')
   );
   const categoryNames = parseLineNameList(
     lineSupabaseUrlParams.get('category')
     || lineSupabaseUrlParams.get('categories')
-    || lineSupabaseUrlParams.get('group')
-    || lineSupabaseUrlParams.get('groups')
   );
 
   if (!pollutantIds.length && !pollutantNames.length) {
@@ -444,6 +544,7 @@ async function loadLineHeroDataset(sharedLoader) {
   }
 }
 
+
 /**
  * Track analytics events to Supabase (wrapper for shared Analytics module)
  * @param {string} eventName - Type of event to track
@@ -484,16 +585,36 @@ function applyLineDataset(dataset = {}, options = {}) {
   const categoriesInput = Array.isArray(dataset.categories)
     ? dataset.categories
     : (Array.isArray(dataset.groups) ? dataset.groups : []);
-  const categories = Array.isArray(categoriesInput) ? categoriesInput : [];
+  let categories = Array.isArray(categoriesInput) ? categoriesInput : [];
   const rows = Array.isArray(rowsInput) ? rowsInput : [];
 
   pollutantsData = pollutants.slice();
-  categoriesData = categories.slice();
+  categoryInfo = categories.slice();
+
+  if (categoryInfo.length <= 1) {
+    const metadataCategories = lineCollectMetadataCategories();
+    if (metadataCategories.length) {
+      const mergedCategories = lineMergeRecordCollections(
+        categoryInfo,
+        metadataCategories,
+        lineResolveCategoryKey
+      );
+      if (mergedCategories.length > categoryInfo.length) {
+        lineSupabaseInfoLog('Line chart category metadata replenished', {
+          previousCount: categoryInfo.length,
+          newCount: mergedCategories.length
+        });
+      }
+      categoryInfo = mergedCategories;
+      categories = categoryInfo;
+    }
+  }
+
   globalRows = rows.slice();
   pollutantUnits = {};
 
   window.allPollutantsData = pollutants;
-  window.allCategoriesData = categories;
+  window.allCategoryInfo = categoryInfo;
 
   const pollutantIdToName = {};
   pollutants.forEach(p => {
@@ -509,29 +630,27 @@ function applyLineDataset(dataset = {}, options = {}) {
   });
 
   const groupIdToTitle = {};
-  categories.forEach(g => {
+  categoryInfo.forEach(g => {
     const id = g.id;
-    const title = g.category_title;
+    const title = lineExtractCategoryTitle(g);
     if (title) {
       groupIdToTitle[id] = title;
     }
   });
 
   allPollutants = [...new Set(Object.values(pollutantIdToName).filter(Boolean))].sort();
-  allCategories = [...new Set(Object.values(groupIdToTitle).filter(Boolean))].sort((a, b) => {
-    if (a.toLowerCase() === 'all') return -1;
-    if (b.toLowerCase() === 'all') return 1;
-    return a.localeCompare(b);
-  });
+  allCategories = lineSortCategoryNames(Object.values(groupIdToTitle).filter(Boolean));
 
   window.allCategoriesList = allCategories;
   window.allPollutants = allPollutants;
+  window.pollutantUnits = pollutantUnits;
 
   if (!rows.length) {
     window.globalHeaders = [];
     window.globalYears = [];
     window.globalYearKeys = [];
-    categorisedData = {};
+    categoryData = {};
+    window.categoryData = categoryData;
     lineSupabaseWarnLog('No timeseries rows found in naei_2023ds_t_category_data');
     if (options.source) {
       lineDatasetSource = options.source;
@@ -545,7 +664,7 @@ function applyLineDataset(dataset = {}, options = {}) {
       groups: categories,
       yearKeys: [],
       pollutantUnits,
-      categorisedData
+      categoryData
     };
   }
 
@@ -557,7 +676,7 @@ function applyLineDataset(dataset = {}, options = {}) {
   window.globalYears = headers.map(h => h.slice(1));
   window.globalYearKeys = headers;
 
-  categorisedData = {};
+  categoryData = {};
   rows.forEach(r => {
     const polId = r.pollutant_id;
     const grpId = r.category_id;
@@ -566,13 +685,13 @@ function applyLineDataset(dataset = {}, options = {}) {
     if (!polName || !grpName) {
       return;
     }
-    if (!categorisedData[polName]) {
-      categorisedData[polName] = {};
+    if (!categoryData[polName]) {
+      categoryData[polName] = {};
     }
-    categorisedData[polName][grpName] = r;
+    categoryData[polName][grpName] = r;
   });
 
-  const categoriesFromData = [...new Set(Object.values(categorisedData).flatMap(pol => Object.keys(pol)))];
+  const categoriesFromData = [...new Set(Object.values(categoryData).flatMap(pol => Object.keys(pol)))];
   if ((!allCategories || allCategories.length === 0) && categoriesFromData.length) {
     allCategories = categoriesFromData.sort((a, b) => {
       if (a.toLowerCase() === 'all') return -1;
@@ -582,6 +701,8 @@ function applyLineDataset(dataset = {}, options = {}) {
     window.allCategoriesList = allCategories;
     lineSupabaseWarnLog('Category list was empty from naei_global_t_category — falling back to categories found in timeseries rows.');
   }
+
+  window.categoryData = categoryData;
 
   if (options.source) {
     lineDatasetSource = options.source;
@@ -600,7 +721,7 @@ function applyLineDataset(dataset = {}, options = {}) {
     groups: categories,
     yearKeys: headers,
     pollutantUnits,
-    categorisedData
+    categoryData
   };
 }
 
@@ -990,7 +1111,7 @@ try {
     getPollutantShortName,
     getCategoryShortTitle,
     // Temporary alias to avoid breaking older entry points while category rename rolls out
-    getGroupShortTitle: getCategoryShortTitle,
+    getGroupShortTitle: getCategoryShortTitle
   };
   lineSupabaseLog('supabaseModule initialized successfully');
 } catch (error) {

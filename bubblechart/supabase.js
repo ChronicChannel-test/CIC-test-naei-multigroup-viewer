@@ -139,10 +139,8 @@ let latestDatasetSource = null;
 const hydrationListeners = new Set();
 const urlOverrideParams = [
   'pollutant','pollutantId',
-  'category','categoryId','categoryIds','category_ids',
-  'category','groupId','groupIds','group_ids',
+  'category','categories','categoryId','categoryIds','category_ids',
   'activityCategory','actCategory',
-  'activityGroup','actGroup',
   'dataset','year'
 ];
 let categoryMetadataCache = null;
@@ -188,7 +186,7 @@ function matchesNameSet(values = [], defaults = []) {
 }
 
 function isDefaultBubbleSelection(params = getEffectiveBubbleUrlParams()) {
-  const overrideExclusiveParams = ['dataset', 'activityCategory', 'actCategory', 'activityGroup', 'actGroup'];
+  const overrideExclusiveParams = ['dataset', 'activityCategory', 'actCategory'];
   if (!isBubbleChartActive(params)) {
     return true;
   }
@@ -208,14 +206,9 @@ function isDefaultBubbleSelection(params = getEffectiveBubbleUrlParams()) {
     params.get('category_ids')
     || params.get('categoryIds')
     || params.get('categoryId')
-    || params.get('group_ids')
-    || params.get('groupIds')
-    || params.get('groupId')
   );
   const categoryNames = parseNameList(
     params.get('categories')
-    || params.get('category')
-    || params.get('categories')
     || params.get('category')
   );
 
@@ -330,13 +323,9 @@ function buildBubbleHeroOptions() {
   const categoryIds = parseIdList(
     params.get('category_ids')
     || params.get('categoryIds')
-    || params.get('group_ids')
-    || params.get('groupIds')
   );
   const categoryNames = parseNameList(
     params.get('categories')
-    || params.get('category')
-    || params.get('categories')
     || params.get('category')
   );
 
@@ -442,9 +431,9 @@ async function ensureAllCategoryMetadata(sharedLoader) {
     return categoryMetadataCache;
   }
 
-  const cachedGroups = getCachedCategoryMetadata(sharedLoader);
-  if (Array.isArray(cachedGroups) && cachedGroups.length) {
-    categoryMetadataCache = cachedGroups;
+  const cachedCategories = getCachedCategoryMetadata(sharedLoader);
+  if (Array.isArray(cachedCategories) && cachedCategories.length) {
+    categoryMetadataCache = cachedCategories;
     return categoryMetadataCache;
   }
 
@@ -1034,7 +1023,7 @@ function applyDataset({ pollutants = [], categories = [], rows = [] }, options =
     activityMetadata = null
   } = options || {};
   window.allPollutantsData = pollutants;
-  window.allCategoriesData = categories;
+  window.allCategoryInfo = categories;
 
   pollutantUnits = {};
   pollutants.forEach(p => {
@@ -1211,13 +1200,9 @@ function applyDataset({ pollutants = [], categories = [], rows = [] }, options =
       .sort();
     window.categoriesWithoutActData = inactiveNames;
     window.categoriesWithoutActivityData = inactiveNames;
-    window.groupsWithoutActData = inactiveNames;
-    window.groupsWithoutActivityData = inactiveNames;
   } else {
     window.categoriesWithoutActData = [];
     window.categoriesWithoutActivityData = [];
-    window.groupsWithoutActData = [];
-    window.groupsWithoutActivityData = [];
   }
 
   return {
@@ -1353,11 +1338,11 @@ try {
     get activeActDataCategories() { return activeActDataCategories; },
     get activeActDataCategoryIds() { return activeActDataCategoryIds; },
     get inactiveActDataCategoryIds() { return inactiveActDataCategoryIds; },
+    get activeCategories() { return activeActDataCategories; },
+    get activeCategoryIds() { return activeActDataCategoryIds; },
+    get inactiveCategoryIds() { return inactiveActDataCategoryIds; },
     // Legacy getters maintained temporarily for backwards compatibility
     get activityDataId() { return actDataPollutantId; },
-    get activeGroups() { return activeActDataCategories; },
-    get activeGroupIds() { return activeActDataCategoryIds; },
-    get inactiveActivityGroupIds() { return inactiveActDataCategoryIds; },
     get hasFullDataset() { return hasFullDataset; },
     get latestDatasetSource() { return latestDatasetSource; },
     scheduleFullDatasetLoad,

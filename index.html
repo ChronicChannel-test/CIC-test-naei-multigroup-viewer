@@ -1405,10 +1405,10 @@
       const normalizedId = normalizeChartId(chartId) || 'bubblechart';
 
       if (normalizedId === 'bubblechart') {
-        return `${queryBase}?page=bubblechart&pollutant_id=5&group_ids=20,37&year=2023`;
+        return `${queryBase}?page=bubblechart&pollutant_id=5&category_ids=20,37&year=2023`;
       }
       if (normalizedId === 'linechart') {
-        return `${queryBase}?page=linechart&pollutant_id=5&group_ids=1&start_year=1970&end_year=2023`;
+        return `${queryBase}?page=linechart&pollutant_id=5&category_ids=1&start_year=1970&end_year=2023`;
       }
       if (STATIC_CHART_IDS.has(normalizedId)) {
         return `${basePath}${normalizedId}`;
@@ -1529,10 +1529,10 @@
     function hasParamsForChart(chartId, params) {
       if (!params) return false;
       if (chartId === 'bubblechart') {
-        return ['pollutant_id', 'group_ids', 'year'].every(key => params.has(key) && params.get(key));
+        return ['pollutant_id', 'category_ids', 'year'].every(key => params.has(key) && params.get(key));
       }
       if (chartId === 'linechart') {
-        return ['pollutant_id', 'group_ids', 'start_year', 'end_year'].every(key => params.has(key) && params.get(key));
+        return ['pollutant_id', 'category_ids', 'start_year', 'end_year'].every(key => params.has(key) && params.get(key));
       }
       return false;
     }
@@ -1544,14 +1544,14 @@
       if (chartId === 'bubblechart') {
         return [
           `pollutant_id=${params.get('pollutant_id')}`,
-          `group_ids=${params.get('group_ids')}`,
+          `category_ids=${params.get('category_ids')}`,
           `year=${params.get('year')}`
         ];
       }
       if (chartId === 'linechart') {
         return [
           `pollutant_id=${params.get('pollutant_id')}`,
-          `group_ids=${params.get('group_ids')}`,
+          `category_ids=${params.get('category_ids')}`,
           `start_year=${params.get('start_year')}`,
           `end_year=${params.get('end_year')}`
         ];
@@ -1597,20 +1597,20 @@
 
           if (chartId === 'bubblechart') {
             newParams.set('pollutant_id', '5');
-            newParams.set('group_ids', '20,37');
+            newParams.set('category_ids', '20,37');
             newParams.set('year', '2023');
-            chartStates.bubblechart = ['pollutant_id=5', 'group_ids=20,37', 'year=2023'];
+            chartStates.bubblechart = ['pollutant_id=5', 'category_ids=20,37', 'year=2023'];
           } else if (chartId === 'linechart') {
             newParams.set('pollutant_id', '5');
-            newParams.set('group_ids', '1');
+            newParams.set('category_ids', '1');
             newParams.set('start_year', '1970');
             newParams.set('end_year', '2023');
-            chartStates.linechart = ['pollutant_id=5', 'group_ids=1', 'start_year=1970', 'end_year=2023'];
+            chartStates.linechart = ['pollutant_id=5', 'category_ids=1', 'start_year=1970', 'end_year=2023'];
           }
 
           const paramsArray = [];
           for (const [key, value] of newParams) {
-            if (key === 'group_ids' || key === 'start_year' || key === 'end_year' || key === 'year') {
+            if (key === 'category_ids' || key === 'start_year' || key === 'end_year' || key === 'year') {
               paramsArray.push(`${key}=${value}`);
             } else {
               paramsArray.push(`${key}=${encodeURIComponent(value)}`);
