@@ -390,6 +390,77 @@
       }
     }
 
+    html.mobile-device .sidebar-socials {
+      position: static;
+      width: 100%;
+      flex-direction: row;
+      align-items: flex-start;
+      margin: 16px 20px;
+      gap: 12px;
+      top: auto;
+      right: auto;
+    }
+
+    html.mobile-device #cicLogo {
+      width: 90px;
+    }
+
+    html.mobile-device .sidebar-icons {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      grid-template-rows: repeat(2, 1fr);
+      gap: 8px;
+      margin-top: 0;
+      width: auto;
+    }
+
+    html.mobile-device .kofi-wrapper {
+      margin-top: 0;
+      margin-left: 0;
+      align-self: flex-start;
+      width: 35px;
+      height: 35px;
+    }
+
+    html.mobile-device .kofi-button,
+    html.mobile-device .kofi-icon-svg {
+      height: 35px;
+    }
+
+    html.mobile-device .kofi-button {
+      width: 35px;
+      transition: none;
+    }
+
+    html.mobile-device .kofi-wrapper:hover .kofi-button {
+      width: 35px;
+    }
+
+    html.mobile-device .kofi-wrapper:hover .kofi-text {
+      opacity: 0;
+    }
+
+    html.mobile-device .kofi-button img {
+      position: relative;
+      transform: translateX(3px);
+    }
+
+    html.mobile-device .sidebar-link {
+      width: 35px;
+      height: 35px;
+      margin-bottom: 0;
+    }
+
+    html.mobile-device .sidebar-link img {
+      width: 35px;
+      height: 35px;
+    }
+
+    html.mobile-device a[href*="facebook.com"] img {
+      width: 32px;
+      height: 32px;
+    }
+
     .remove-group-btn,
     .add-group-btn {
       background: none;
@@ -476,6 +547,55 @@
       window.__NAEI_messageQueue = queue;
       window.__NAEI_iframeMessageBridge = enqueue;
       window.addEventListener('message', enqueue, false);
+    })();
+  </script>
+
+  <script>
+    (function initMobileExperienceDetection() {
+      const root = document.documentElement;
+      let lastState = null;
+
+      function computeMobileState() {
+        try {
+          const pointerCoarse = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+          const maxTouchPoints = navigator.maxTouchPoints || 0;
+          const ua = navigator.userAgent || '';
+          const uaMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobi/i.test(ua);
+          const narrowViewport = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 900;
+          if (uaMobile) {
+            return true;
+          }
+          if ((pointerCoarse || maxTouchPoints > 1) && narrowViewport) {
+            return true;
+          }
+        } catch (error) {
+          /* noop */
+        }
+        return false;
+      }
+
+      function applyMobileState() {
+        const isMobile = computeMobileState();
+        if (isMobile === lastState) {
+          return;
+        }
+        lastState = isMobile;
+        window.__NAEI_IS_MOBILE_DEVICE__ = isMobile;
+        if (isMobile) {
+          root.classList.add('mobile-device');
+        } else {
+          root.classList.remove('mobile-device');
+        }
+      }
+
+      applyMobileState();
+
+      let resizeTimer = null;
+      window.addEventListener('resize', () => {
+        clearTimeout(resizeTimer);
+        resizeTimer = setTimeout(applyMobileState, 150);
+      });
+      window.addEventListener('orientationchange', applyMobileState);
     })();
   </script>
 
@@ -642,7 +762,7 @@
     <strong>Contact:</strong> <a  href="mailto:info@chronicillnesschannel.co.uk" target="_blank" rel="noopener" class="text-blue-600hover:text-blue-800">info@chronicillnesschannel.co.uk</a>
       <br>
       <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-        Explorer Version: v4.0 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.11.28
+        Explorer Version: v4.0 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.11.29
       </span>
     </footer>
 

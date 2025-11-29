@@ -97,6 +97,48 @@ function debounce(func, wait) {
   };
 }
 
+const MOBILE_UA_PATTERN = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobi/i;
+
+function detectMobileExperience() {
+  try {
+    if (typeof window.__NAEI_IS_MOBILE_DEVICE__ === 'boolean') {
+      return window.__NAEI_IS_MOBILE_DEVICE__;
+    }
+  } catch (error) {
+    /* noop */
+  }
+
+  try {
+    if (window.parent && window.parent !== window) {
+      const parentFlag = window.parent.__NAEI_IS_MOBILE_DEVICE__;
+      if (typeof parentFlag === 'boolean') {
+        return parentFlag;
+      }
+    }
+  } catch (error) {
+    // Cross-origin access may fail when embedded elsewhere; rely on local detection
+  }
+
+  try {
+    const pointerCoarse = window.matchMedia && window.matchMedia('(pointer:coarse)').matches;
+    const maxTouchPoints = navigator.maxTouchPoints || 0;
+    const ua = navigator.userAgent || '';
+    if (MOBILE_UA_PATTERN.test(ua)) {
+      return true;
+    }
+    const narrowEdge = Math.min(window.innerWidth || 0, window.innerHeight || 0) <= 900;
+    if ((pointerCoarse || maxTouchPoints > 1) && narrowEdge) {
+      return true;
+    }
+  } catch (error) {
+    /* noop */
+  }
+  return false;
+}
+
+const IS_MOBILE_EXPERIENCE = detectMobileExperience();
+window.__NAEI_DISABLE_BUBBLE_TUTORIAL__ = IS_MOBILE_EXPERIENCE;
+
 // Application state
 let selectedYear = null;
 let selectedPollutantId = null;
@@ -292,6 +334,9 @@ window.addEventListener('message', (event) => {
   }
 
   if (event.data.type === 'openBubbleTutorial') {
+    if (window.__NAEI_DISABLE_BUBBLE_TUTORIAL__) {
+      return;
+    }
     const reason = event.data.reason || 'parent';
     const skipScroll = reason !== 'user';
     if (typeof tutorialOverlayApi.open === 'function') {
@@ -747,6 +792,22 @@ function setupTutorialOverlay() {
   const openBtn = document.getElementById('tutorialBtn');
   if (!overlay || !openBtn) {
     // Tutorial overlay markup missing; skipping tutorial setup
+    return;
+  }
+  if (window.__NAEI_DISABLE_BUBBLE_TUTORIAL__) {
+    openBtn.style.display = 'none';
+    openBtn.setAttribute('aria-hidden', 'true');
+    openBtn.setAttribute('tabindex', '-1');
+    openBtn.setAttribute('disabled', 'true');
+    if (typeof overlay.remove === 'function') {
+      overlay.remove();
+    } else if (overlay.parentNode) {
+      overlay.parentNode.removeChild(overlay);
+    }
+    tutorialOverlayApi.open = () => {};
+    tutorialOverlayApi.hide = () => {};
+    tutorialOverlayApi.isActive = () => false;
+    pendingTutorialOpenReason = null;
     return;
   }
   openBtn.setAttribute('aria-expanded', 'false');
