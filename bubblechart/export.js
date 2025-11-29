@@ -621,18 +621,22 @@ async function generateChartImage() {
           
           // Chart area boundaries from chart-renderer.js (scaled by exportScale = 3)
           const exportScale = 3;
-          const chartAreaTop = 70 * exportScale;      // Reduced from 80 to preserve top bubbles
-          const chartAreaRight = 80 * exportScale;    // right: 80 in chart options
+          const chartAreaTop = 70 * exportScale;      // Matching chart renderer chartArea.top
+          const chartAreaRight = 80 * exportScale;    // Matching chart renderer chartArea.right
           
           // Save context state before clipping
           ctx.save();
           
           // Create clipping region - clip only top and right edges
           // Left and bottom are fine (they have axis borders with labels/ticks)
+          const maxBubbleRadiusPx = 90 * exportScale; // Mirrors chart-renderer target radius
+          const topClipAllowance = Math.max(0, chartAreaTop - Math.max(0, maxBubbleRadiusPx - 8));
+          const rightClipAllowance = Math.max(0, chartAreaRight - Math.max(0, maxBubbleRadiusPx - 8));
+
           const clipX = padding;  // Start from left edge (don't clip left)
-          const clipY = chartY + chartAreaTop;  // Clip from chartArea top
-          const clipW = chartWidth - chartAreaRight;  // Clip at chartArea right
-          const clipH = chartHeight - chartAreaTop;  // Full height from top clip down (don't clip bottom)
+          const clipY = chartY + topClipAllowance;  // Only clip if there's safe headroom
+          const clipW = chartWidth - rightClipAllowance;  // Reduce right crop when large bubbles need it
+          const clipH = chartHeight - topClipAllowance;   // Preserve full height when clipping is disabled
           
           ctx.beginPath();
           ctx.rect(clipX, clipY, clipW, clipH);
