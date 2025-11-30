@@ -51,6 +51,11 @@
       white-space: pre-line;
     }
 
+    #categoryTable td {
+      position: relative;
+      transition: background-color 0.25s ease;
+    }
+
     #categoryTable thead tr {
       background: #d0d0d0;
     }
@@ -142,6 +147,30 @@
       position: absolute;
       top: 12px;
       left: 12px;
+    }
+
+    .category-info-row-copying td {
+      background: #00C109 !important;
+    }
+
+    .category-info-copied-label {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #ffffff;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 1;
+      text-transform: uppercase;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.35);
+    }
+
+    .category-info-copied-label.is-visible {
+      opacity: 1;
     }
 
     @media (min-width: 980px) {
@@ -1215,11 +1244,33 @@
         return highlightText('All Sources', highlightRegex);
       }
 
+      function formatSourcesPlainText(category, nfrMap) {
+        if (category.nfrCodes.length) {
+          const lines = ['All Sources from the following NFR Code categories:'];
+          category.nfrCodes.forEach(code => {
+            const description = nfrMap[code];
+            lines.push(description ? `${code}: ${description}` : code);
+          });
+          return lines.join('\n');
+        }
+        if (category.sources.length) {
+          return category.sources.join('\n');
+        }
+        return 'All Sources';
+      }
+
       function formatFuelCell(category, highlightRegex) {
         if (category.activities.length) {
           return buildItemList(category.activities, { multiColumnThreshold: 8 }, highlightRegex);
         }
         return highlightText('All Fuel Types', highlightRegex);
+      }
+
+      function formatFuelPlainText(category) {
+        if (category.activities.length) {
+          return category.activities.join('\n');
+        }
+        return 'All Fuel Types';
       }
 
       function hasActDataForCategory(category) {
@@ -1347,6 +1398,7 @@
           return;
         }
 
+        const copyMetadata = [];
         let tableHtml = `
           <table id="categoryTable" aria-label="NAEI category information">
             <thead>
@@ -1364,15 +1416,24 @@
           const activityInfo = getActivityIndicatorInfo(category);
           const sourcesHtml = formatSourcesCell(category, nfrLookup, sourcesHighlight);
           const fuelHtml = formatFuelCell(category, fuelHighlight);
+          const sourcesPlainText = formatSourcesPlainText(category, nfrLookup);
+          const fuelPlainText = formatFuelPlainText(category);
+          const metadataIndex = copyMetadata.length;
+          copyMetadata.push({
+            name: category.name || '',
+            activity: activityInfo.description || '',
+            sources: sourcesPlainText,
+            fuels: fuelPlainText
+          });
           tableHtml += `
-            <tr>
-              <td style="font-weight:600;">${highlightText(category.name, nameHighlight)}</td>
+            <tr data-copy-index="${metadataIndex}">
+              <td style="font-weight:600;" data-copy-text="${escapeHtml(category.name)}">${highlightText(category.name, nameHighlight)}</td>
               <td class="category-info-activity-cell" data-copy-text="${escapeHtml(activityInfo.description)}">
                 <img src="${activityInfo.iconSrc}" alt="" class="category-info-activity-icon" width="24" height="24" loading="lazy">
                 <span class="sr-only">${escapeHtml(activityInfo.description)}</span>
               </td>
-              <td>${sourcesHtml}</td>
-              <td>${fuelHtml}</td>
+              <td data-copy-text="${escapeHtml(sourcesPlainText)}">${sourcesHtml}</td>
+              <td data-copy-text="${escapeHtml(fuelPlainText)}">${fuelHtml}</td>
             </tr>
           `;
         });
@@ -1381,7 +1442,7 @@
         contentEl.innerHTML = tableHtml;
 
         const tableEl = contentEl.querySelector('table');
-        attachCopyHandlers(tableEl);
+        attachCopyHandlers(tableEl, copyMetadata);
         scheduleHeightUpdate(60);
       }
 
@@ -1438,6 +1499,71 @@
       }
 
       let filterControlsInitialized = false;
+      const COPY_FEEDBACK_DURATION = 2200;
+      const copyFeedbackTimers = new WeakMap();
+
+      function showCopyFeedback(row) {
+        if (!row) {
+          return;
+        }
+
+        const cells = Array.from(row.cells || []);
+        const nonActivityCells = cells.filter((_, index) => index !== 1);
+        const smallestCellWidth = (() => {
+          const widths = nonActivityCells
+            .map(cell => {
+              const rect = cell.getBoundingClientRect();
+              return rect && rect.width ? rect.width : (cell.offsetWidth || 0);
+            })
+            .filter(value => value > 0);
+          if (!widths.length) {
+            return 120;
+          }
+          return Math.min(...widths);
+        })();
+        const copyFontSize = Math.max(18, Math.min(42, Math.floor(smallestCellWidth * 0.35)));
+        if (copyFeedbackTimers.has(row)) {
+          clearTimeout(copyFeedbackTimers.get(row));
+          copyFeedbackTimers.delete(row);
+          row.classList.remove('category-info-row-copying');
+          nonActivityCells.forEach(cell => {
+            const existingLabel = cell.querySelector('.category-info-copied-label');
+            if (existingLabel) {
+              existingLabel.classList.remove('is-visible');
+            }
+          });
+        }
+
+        row.classList.add('category-info-row-copying');
+
+        nonActivityCells.forEach(cell => {
+          let label = cell.querySelector('.category-info-copied-label');
+          if (!label) {
+            label = document.createElement('span');
+            label.className = 'category-info-copied-label';
+            label.textContent = 'Copied';
+            cell.appendChild(label);
+          }
+          label.style.fontSize = `${copyFontSize}px`;
+          label.classList.remove('is-visible');
+          requestAnimationFrame(() => {
+            label.classList.add('is-visible');
+          });
+        });
+
+        const timeoutId = setTimeout(() => {
+          row.classList.remove('category-info-row-copying');
+          nonActivityCells.forEach(cell => {
+            const label = cell.querySelector('.category-info-copied-label');
+            if (label) {
+              label.classList.remove('is-visible');
+            }
+          });
+          copyFeedbackTimers.delete(row);
+        }, COPY_FEEDBACK_DURATION);
+
+        copyFeedbackTimers.set(row, timeoutId);
+      }
 
       function setupFilterControls() {
         if (filterControlsInitialized) {
@@ -1467,28 +1593,51 @@
         filterControlsInitialized = true;
       }
 
-      function attachCopyHandlers(tableEl) {
+      function attachCopyHandlers(tableEl, metadata = []) {
         if (!tableEl) return;
 
         tableEl.addEventListener('click', event => {
           const row = event.target.closest('tbody tr');
           if (!row) return;
 
-          const textToCopy = Array.from(row.cells)
-            .map(cell => {
-              if (cell?.dataset?.copyText) {
-                return cell.dataset.copyText.trim();
-              }
-              return cell.innerText.trim();
-            })
-            .filter(Boolean)
-            .join('\n\n');
+          let textToCopy = '';
+          const metadataIndex = typeof row.dataset.copyIndex !== 'undefined' ? Number(row.dataset.copyIndex) : NaN;
+          if (!Number.isNaN(metadataIndex) && metadata[metadataIndex]) {
+            const rowMeta = metadata[metadataIndex];
+            const lines = [
+              'CATEGORY NAME',
+              rowMeta.name || '',
+              '',
+              rowMeta.activity || '',
+              '',
+              'SOURCES',
+              rowMeta.sources || '',
+              '',
+              'FUEL TYPES',
+              rowMeta.fuels || ''
+            ];
+            textToCopy = lines
+              .join('\n')
+              .replace(/\n{3,}/g, '\n\n')
+              .trim();
+          } else {
+            textToCopy = Array.from(row.cells)
+              .map(cell => {
+                if (cell?.dataset?.copyText) {
+                  return cell.dataset.copyText.trim();
+                }
+                return cell.innerText.trim();
+              })
+              .filter(Boolean)
+              .join('\n\n');
+          }
 
           if (!textToCopy) return;
 
           const successMessage = 'Copied category details to clipboard.';
 
           const onSuccess = () => {
+            showCopyFeedback(row);
             setStatus(successMessage, false);
             scheduleHeightUpdate(20);
           };
