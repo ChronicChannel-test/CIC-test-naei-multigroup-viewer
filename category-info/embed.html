@@ -1419,9 +1419,11 @@
           const sourcesPlainText = formatSourcesPlainText(category, nfrLookup);
           const fuelPlainText = formatFuelPlainText(category);
           const metadataIndex = copyMetadata.length;
+          const activityStatus = activityInfo.message === 'Yes' ? 'Available' : 'Unavailable';
           copyMetadata.push({
             name: category.name || '',
-            activity: activityInfo.description || '',
+            activityDescription: activityInfo.description || '',
+            activityStatus,
             sources: sourcesPlainText,
             fuels: fuelPlainText
           });
@@ -1608,7 +1610,8 @@
               'CATEGORY NAME',
               rowMeta.name || '',
               '',
-              rowMeta.activity || '',
+              'ACTIVITY DATA',
+              rowMeta.activityStatus || rowMeta.activityDescription || '',
               '',
               'SOURCES',
               rowMeta.sources || '',
