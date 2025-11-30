@@ -624,28 +624,18 @@ async function generateChartImage() {
           const chartAreaTop = 70 * exportScale;      // Matching chart renderer chartArea.top
           const chartAreaRight = 80 * exportScale;    // Matching chart renderer chartArea.right
           
-          // Save context state before clipping
           ctx.save();
-          
-          // Create clipping region - clip only top and right edges
-          // Left and bottom are fine (they have axis borders with labels/ticks)
-          const maxBubbleRadiusPx = 90 * exportScale; // Mirrors chart-renderer target radius
+          const maxBubbleRadiusPx = 90 * exportScale;
           const topClipAllowance = Math.max(0, chartAreaTop - Math.max(0, maxBubbleRadiusPx - 8));
           const rightClipAllowance = Math.max(0, chartAreaRight - Math.max(0, maxBubbleRadiusPx - 8));
-
-          const clipX = padding;  // Start from left edge (don't clip left)
-          const clipY = chartY + topClipAllowance;  // Only clip if there's safe headroom
-          const clipW = chartWidth - rightClipAllowance;  // Reduce right crop when large bubbles need it
-          const clipH = chartHeight - topClipAllowance;   // Preserve full height when clipping is disabled
-          
+          const clipX = padding;
+          const clipY = chartY + topClipAllowance;
+          const clipW = chartWidth - rightClipAllowance;
+          const clipH = chartHeight - topClipAllowance;
           ctx.beginPath();
           ctx.rect(clipX, clipY, clipW, clipH);
           ctx.clip();
-          
-          // Draw chart (it will be clipped to remove top/right edge gridlines)
           ctx.drawImage(img, padding, chartY, chartWidth, chartHeight);
-          
-          // Restore context to remove clipping
           ctx.restore();
 
           // Draw EF labels on bubbles
@@ -680,41 +670,52 @@ async function generateChartImage() {
             }
           }
 
-          visibleDataPoints.forEach(point => {
-            // Calculate emission factor using correct conversion factor
-            const emissionFactor = point.EF !== undefined ? point.EF : 
-              (point.actDataValue !== 0 ? (point.pollutantValue / point.actDataValue) * conversionFactor : 0);
-            
-            // Skip if no valid data
-            if (!point || typeof point.actDataValue !== 'number' || typeof point.pollutantValue !== 'number') {
-              return;
-            }
-            
-            // Calculate bubble position in pixels
-            const xRatio = point.actDataValue / xMax;
-            const yRatio = 1 - (point.pollutantValue / yMax); // Invert Y axis
-            const bubbleX = padding + (150 * exportScale) + (xRatio * plotWidth);
-            const bubbleY = chartY + chartAreaTop + (yRatio * plotHeight);
-            
-            // Calculate bubble radius using EXACT same formula as chart-renderer.js (including log scale)
-            let bubbleRadius;
-            if (useLogScale && emissionFactor > 0) {
-              const logEF = Math.log10(emissionFactor);
-              const logMin = Math.log10(minEF);
-              const logMax = Math.log10(maxEF);
-              const logPosition = (logEF - logMin) / (logMax - logMin);
-              const radius = targetMinRadius + (logPosition * (targetMaxRadius - targetMinRadius));
-              bubbleRadius = radius * exportScale;
-            } else {
-              const sqrtEF = Math.sqrt(emissionFactor);
-              bubbleRadius = (scaleFactor * sqrtEF) * exportScale;
-            }
-            
-            // Label text with 8 decimal places for small values
+          const placedLabelBoxes = [];
+          const labelPlacements = visibleDataPoints
+            .map(point => {
+              if (!point || typeof point.actDataValue !== 'number' || typeof point.pollutantValue !== 'number') {
+                return null;
+              }
+
+              const emissionFactor = point.EF !== undefined ? point.EF :
+                (point.actDataValue !== 0 ? (point.pollutantValue / point.actDataValue) * conversionFactor : 0);
+
+              const xRatio = point.actDataValue / xMax;
+              const yRatio = 1 - (point.pollutantValue / yMax);
+              const bubbleX = padding + (150 * exportScale) + (xRatio * plotWidth);
+              const bubbleY = chartY + chartAreaTop + (yRatio * plotHeight);
+
+              let bubbleRadius;
+              if (useLogScale && emissionFactor > 0) {
+                const logEF = Math.log10(emissionFactor);
+                const logMin = Math.log10(minEF);
+                const logMax = Math.log10(maxEF);
+                const logPosition = (logEF - logMin) / (logMax - logMin);
+                const radius = targetMinRadius + (logPosition * (targetMaxRadius - targetMinRadius));
+                bubbleRadius = radius * exportScale;
+              } else {
+                const sqrtEF = Math.sqrt(emissionFactor);
+                bubbleRadius = (scaleFactor * sqrtEF) * exportScale;
+              }
+
+              return {
+                point,
+                emissionFactor,
+                bubbleX,
+                bubbleY,
+                bubbleRadius
+              };
+            })
+            .filter(Boolean)
+            .sort((a, b) => b.bubbleY - a.bubbleY); // place lower labels first so upper ones can nudge upward
+
+          const boxesOverlap = (a, b) => {
+            return !(a.right <= b.left || a.left >= b.right || a.bottom <= b.top || a.top >= b.bottom);
+          };
+
+          labelPlacements.forEach(({ point, emissionFactor, bubbleX, bubbleY, bubbleRadius }) => {
             const efDisplay = emissionFactor < 0.01 ? emissionFactor.toFixed(8) : emissionFactor.toFixed(2);
             const labelText = `${efDisplay} g/GJ`;
-            
-            // Always place label to the right of the bubble, always black, no leader line
             const categoryLabel = point.categoryName || 'Category';
             const bubbleColor = window.Colors && typeof window.Colors.getColorForCategory === 'function'
               ? window.Colors.getColorForCategory(categoryLabel)
@@ -723,13 +724,12 @@ async function generateChartImage() {
             ctx.font = '400 70px "Tiresias Infofont", sans-serif';
             ctx.textAlign = 'left';
             ctx.textBaseline = 'middle';
-            
-            // Position label to the right of bubble with 20px padding
-            const labelX = bubbleX + bubbleRadius + 20;
-            const labelY = bubbleY;
 
-            const desiredInnerStroke = 1.5; // logical px thickness for inner (black) outline in final image
-            const desiredOuterStroke = 3; // logical px thickness for outer (white) halo in final image
+            const labelX = bubbleX + bubbleRadius + 20;
+            let labelY = bubbleY;
+
+            const desiredInnerStroke = 1.5;
+            const desiredOuterStroke = 3;
             const innerStrokeWidth = desiredInnerStroke * exportScale;
             const outerStrokeWidth = desiredOuterStroke * exportScale;
 
@@ -737,9 +737,41 @@ async function generateChartImage() {
             ctx.miterLimit = 2;
 
             const charSpacing = 0.5 * exportScale;
-            let currentX = labelX;
             const characters = [...labelText];
+            const glyphWidths = characters.map(char => ctx.measureText(char).width);
+            const labelWidth = glyphWidths.reduce((sum, width) => sum + width, 0)
+              + (characters.length > 1 ? charSpacing * (characters.length - 1) : 0);
+            const textMetrics = ctx.measureText(labelText);
+            const labelHeight = Math.max(
+              (textMetrics.actualBoundingBoxAscent || 0) + (textMetrics.actualBoundingBoxDescent || 0),
+              70
+            );
+            const halfHeight = labelHeight / 2;
+            const verticalStep = Math.max(labelHeight * 0.6, 25 * exportScale);
 
+            const buildBox = (centerY) => ({
+              left: labelX,
+              right: labelX + labelWidth,
+              top: centerY - halfHeight,
+              bottom: centerY + halfHeight
+            });
+
+            let labelBox = buildBox(labelY);
+            let guard = 0;
+            const maxAdjustments = 25;
+            const minimumLabelTop = chartY;
+            while (placedLabelBoxes.some(existing => boxesOverlap(existing, labelBox)) && guard < maxAdjustments) {
+              labelY -= verticalStep;
+              if (labelY - halfHeight < minimumLabelTop) {
+                labelY = minimumLabelTop + halfHeight;
+                break;
+              }
+              labelBox = buildBox(labelY);
+              guard += 1;
+            }
+            placedLabelBoxes.push(labelBox);
+
+            let currentX = labelX;
             characters.forEach((char, index) => {
               ctx.lineWidth = outerStrokeWidth;
               ctx.strokeStyle = 'rgba(255,255,255,0.95)';
@@ -752,13 +784,11 @@ async function generateChartImage() {
               ctx.fillStyle = bubbleColor;
               ctx.fillText(char, currentX, labelY);
 
-              const advance = ctx.measureText(char).width;
-              currentX += advance;
+              currentX += glyphWidths[index];
               if (index < characters.length - 1) {
                 currentX += charSpacing;
               }
             });
-
           });
 
           // Draw Branding and Footer
