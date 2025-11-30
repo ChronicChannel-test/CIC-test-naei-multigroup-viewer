@@ -99,7 +99,7 @@
     const intro = `I'm sharing UK air pollution/emissions data for ${pollutantName}${yearNarrative ? ` ${yearNarrative}` : ''}.`;
     bodyLines.push(intro);
     bodyLines.push('');
-    bodyLines.push('Groups included:');
+    bodyLines.push('Categories included:');
 
     if (categories.length) {
       categories.forEach((category, index) => {

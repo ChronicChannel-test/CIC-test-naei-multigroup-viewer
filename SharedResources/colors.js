@@ -94,8 +94,3 @@ window.Colors = {
   getColorCache,
   setColorForCategory
 };
-
-// Maintain legacy naming while category terminology rollout completes
-if (typeof window.Colors.getColorForGroup !== 'function') {
-  window.Colors.getColorForGroup = getColorForCategory;
-}

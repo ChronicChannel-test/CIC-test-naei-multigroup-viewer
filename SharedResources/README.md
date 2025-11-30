@@ -33,7 +33,7 @@ Consistent color palette and assignment logic.
 - 10-color distinct palette for data visualization
 - Category-based color preferences (fireplace=red, power=green, etc.)
 - Smart color assignment avoiding duplicates
-- Exports: `Colors.getColorForGroup()`, `Colors.resetColorSystem()`, etc.
+- Exports: `Colors.getColorForCategory()`, `Colors.resetColorSystem()`, etc.
 
 ### Stylesheets
 
@@ -72,7 +72,7 @@ const supabase = window.SupabaseConfig.initSupabaseClient();
 window.Analytics.trackAnalytics(supabase, 'event_name', { data: 'value' });
 
 // Get colors
-const color = window.Colors.getColorForGroup('groupName');
+const color = window.Colors.getColorForCategory('categoryName');
 window.Colors.resetColorSystem(); // Reset for new chart
 ```
 

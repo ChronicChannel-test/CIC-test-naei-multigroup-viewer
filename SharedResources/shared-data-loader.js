@@ -105,7 +105,6 @@ window.SharedDataCache = resolveExistingSharedCache() || {
   data: {
     pollutants: [],
     categories: [],
-    groups: [],
     timeseries: [],
     nfrCodes: []
   },
@@ -118,8 +117,6 @@ window.SharedDataCache = resolveExistingSharedCache() || {
   }
 };
 
-ensureGroupAlias(window.SharedDataCache.data);
-
 const DEFAULT_SNAPSHOT_PATHS = Array.from(new Set([
   SHARED_RESOURCES_BASE_PATH ? `${SHARED_RESOURCES_BASE_PATH}default-chart-data.json` : null,
   '/SharedResources/default-chart-data.json',
@@ -130,20 +127,6 @@ const DEFAULT_SNAPSHOT_PATHS = Array.from(new Set([
 
 let defaultSnapshotPromise = null;
 const HERO_DEFAULT_ACTIVITY_NAME = 'Activity Data';
-
-function ensureGroupAlias(dataset) {
-  if (!dataset || typeof dataset !== 'object') {
-    return dataset;
-  }
-  const categoryRows = Array.isArray(dataset.categories) ? dataset.categories : [];
-  if (!Array.isArray(dataset.groups) || !dataset.groups.length) {
-    dataset.groups = categoryRows.length ? categoryRows : [];
-  }
-  if (!Array.isArray(dataset.categories) || !dataset.categories.length) {
-    dataset.categories = Array.isArray(dataset.groups) ? dataset.groups : [];
-  }
-  return dataset;
-}
 
 function uniqNumbers(values = []) {
   const deduped = [];
@@ -199,11 +182,8 @@ async function loadDefaultSnapshot() {
             continue;
           }
           const snapshot = await response.json();
-          if (snapshot?.data) {
-            ensureGroupAlias(snapshot.data);
-          }
           window.SharedDataCache.defaultSnapshot = snapshot;
-          window.SharedDataCache.snapshotData = snapshot?.data ? ensureGroupAlias(snapshot.data) : null;
+          window.SharedDataCache.snapshotData = snapshot?.data || null;
           const duration = (sharedDataNow() - fetchStart).toFixed(1);
           const counts = snapshot?.data
             ? {
@@ -231,7 +211,7 @@ async function loadDefaultSnapshot() {
   try {
     const snapshot = await defaultSnapshotPromise;
     if (snapshot && !window.SharedDataCache.snapshotData) {
-      window.SharedDataCache.snapshotData = snapshot.data ? ensureGroupAlias(snapshot.data) : null;
+      window.SharedDataCache.snapshotData = snapshot.data || null;
     }
     return snapshot || null;
   } finally {
@@ -245,12 +225,12 @@ function normalizeHeroOptions(rawOptions = {}) {
   const normalized = {
     pollutantIds: uniqNumbers(rawOptions.pollutantIds || []),
     pollutantNames: uniqStrings(rawOptions.pollutantNames || []),
-    categoryIds: uniqNumbers(rawOptions.categoryIds || rawOptions.groupIds || []),
-    categoryNames: uniqStrings(rawOptions.categoryNames || rawOptions.groupNames || []),
+    categoryIds: uniqNumbers(rawOptions.categoryIds || []),
+    categoryNames: uniqStrings(rawOptions.categoryNames || []),
     includeActivityData: Boolean(rawOptions.includeActivityData),
     activityPollutantName: rawOptions.activityPollutantName || HERO_DEFAULT_ACTIVITY_NAME,
     defaultPollutantNames: uniqStrings(rawOptions.defaultPollutantNames || []),
-    defaultCategoryNames: uniqStrings(rawOptions.defaultCategoryNames || rawOptions.defaultGroupNames || [])
+    defaultCategoryNames: uniqStrings(rawOptions.defaultCategoryNames || [])
   };
 
   if (normalized.includeActivityData && normalized.activityPollutantName) {
@@ -445,7 +425,7 @@ async function loadSharedData() {
   // If data is already loaded, return immediately
   if (cache.isLoaded) {
     sharedDataInfoLog('Shared data fulfilled from cache');
-    return ensureGroupAlias(cache.data);
+    return cache.data;
   }
   
   // If loading is in progress, return the existing promise
@@ -463,7 +443,7 @@ async function loadSharedData() {
     cache.isLoaded = true;
     cache.isLoading = false;
     cache.fullBootstrapPromise = null;
-    return ensureGroupAlias(result);
+    return result;
   } catch (error) {
     cache.isLoading = false;
     cache.loadPromise = null;
@@ -536,13 +516,12 @@ async function loadDataFromSupabase() {
 
   const pollutants = pollutantsResp.data || [];
   const categories = categoriesResp.data || [];
-  const groups = categories;
   const timeseries = dataResp.data || [];
   const nfrCodes = nfrResp.data || [];
   
   // Store data in cache
-  cache.data = ensureGroupAlias({ pollutants, categories, groups, timeseries, nfrCodes });
-  cache.snapshotData = cache.snapshotData || ensureGroupAlias({ pollutants, categories, groups });
+  cache.data = { pollutants, categories, timeseries, nfrCodes };
+  cache.snapshotData = cache.snapshotData || { pollutants, categories };
   
   // Build lookup maps for performance
   buildLookupMaps(pollutants, categories);
@@ -550,7 +529,6 @@ async function loadDataFromSupabase() {
   // Store globally for backwards compatibility
   window.allPollutantsData = pollutants;
   window.allCategoryInfo = categories;
-  window.allGroupsData = cache.data.groups;
   
   sharedDataInfoLog('Shared Supabase fetch completed', {
     totalDurationMs: Number((sharedDataNow() - batchStart).toFixed(1)),
@@ -608,7 +586,7 @@ function getCachedData() {
   if (!window.SharedDataCache.isLoaded) {
     throw new Error('Shared data not loaded. Call loadSharedData() first.');
   }
-  return ensureGroupAlias(window.SharedDataCache.data);
+  return window.SharedDataCache.data;
 }
 
 /**
@@ -665,7 +643,7 @@ function clearCache() {
   cache.isLoaded = false;
   cache.isLoading = false;
   cache.loadPromise = null;
-  cache.data = { pollutants: [], categories: [], groups: [], timeseries: [], nfrCodes: [] };
+  cache.data = { pollutants: [], categories: [], timeseries: [], nfrCodes: [] };
   
   Object.keys(cache.maps).forEach(key => {
     if (typeof cache.maps[key] === 'object') {

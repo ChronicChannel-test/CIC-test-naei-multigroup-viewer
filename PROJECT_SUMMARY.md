@@ -57,7 +57,7 @@ CIC-test-naei-data/
   - 10 distinct colors for data visualization
   - Category-based preferences (fireplace=red, power=green, gas=blue, etc.)
   - Smart color assignment avoiding duplicates
-  - Exports: `Colors.getColorForGroup()`, `Colors.resetColorSystem()`, etc.
+  - Exports: `Colors.getColorForCategory()`, `Colors.resetColorSystem()`, etc.
 
 #### Stylesheets:
 - **common-styles.css**: Base styling for all NAEI viewers

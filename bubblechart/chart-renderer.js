@@ -66,9 +66,6 @@ if (!window.Colors) {
       return chosen;
     }
   };
-
-  // Maintain legacy name for any scripts that still expect getColorForGroup
-  window.Colors.getColorForGroup = window.Colors.getColorForCategory;
 }
 
 function createDeferred() {

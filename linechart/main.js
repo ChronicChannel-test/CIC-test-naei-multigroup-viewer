@@ -111,9 +111,6 @@ if (!window.Colors) {
       return chosen;
     }
   };
-  if (typeof window.Colors.getColorForGroup !== 'function') {
-    window.Colors.getColorForGroup = window.Colors.getColorForCategory;
-  }
 }
 
 function waitForChromeStability(targetElements = []) {
