@@ -90,4 +90,4 @@ To add new features or modify the scatter chart:
 
 ## License
 
-Data from NAEI is subject to their terms of use. Application code is provided for educational and research purposes.
+Test Data from NAEI is subject to their terms of use. Application code is provided for educational and research purposes.
