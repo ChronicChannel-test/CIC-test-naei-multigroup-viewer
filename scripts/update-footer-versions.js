@@ -78,7 +78,14 @@ function main() {
   const htmlFiles = stagedFiles
     .filter((relativePath) => !relativePath.startsWith('CIC-test-Archive-Charts/'))
     .filter((relativePath) => path.extname(relativePath).toLowerCase() === '.html');
-
+  
+  const defaultTargets = ['index.html'];
+  defaultTargets.forEach((relativePath) => {
+    const absolutePath = path.join(repoRoot, relativePath);
+    if (fs.existsSync(absolutePath) && !htmlFiles.includes(relativePath)) {
+      htmlFiles.push(relativePath);
+    }
+  });
   if (!htmlFiles.length) {
     return;
   }
