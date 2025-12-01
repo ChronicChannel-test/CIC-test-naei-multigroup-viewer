@@ -227,6 +227,10 @@
       margin: 0 0 6px;
     }
 
+    .user-guide-status.is-hidden {
+      display: none;
+    }
+
     .user-guide-hint {
       margin: 0;
       font-size: 0.95rem;
@@ -324,7 +328,6 @@
       const ALWAYS_SINGLE_VIEW = true;
       const MIN_FRAME_HEIGHT = 460;
       const WRAPPER_BUFFER = 27;
-      const READY_MESSAGE = 'Use the arrows or keyboard to move one page at a time.';
       const MAX_PAGE_WIDTH = 1120;
       const MIN_PAGE_WIDTH = 260;
       const TARGET_PAGE_WIDTH = 740;
@@ -516,7 +519,7 @@
         spread.replaceChildren(...stagedContainers);
         releaseHeightLock();
         updateNavOffset();
-        setStatus(READY_MESSAGE);
+        setStatus('');
         scheduleHeightUpdate(60);
       } catch (error) {
         releaseHeightLock();
@@ -755,8 +758,14 @@
     }
 
     function setStatus(message) {
-      if (pageLabel) {
-        pageLabel.textContent = message;
+      if (!pageLabel) {
+        return;
+      }
+      const container = pageLabel.closest('.user-guide-status');
+      const hasMessage = Boolean(message && String(message).trim());
+      pageLabel.textContent = message || '';
+      if (container) {
+        container.classList.toggle('is-hidden', !hasMessage);
       }
     }
 
