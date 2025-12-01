@@ -272,6 +272,8 @@ select,
   line-height: 1.3;
   align-self: center;
   text-align: center;
+  position: relative;
+  top: -10px;
 }
 
 .tutorial-download-link {

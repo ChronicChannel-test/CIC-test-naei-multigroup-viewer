@@ -1674,7 +1674,8 @@ function parseUrlParameters() {
     };
   }
   
-  const pollutantId = params.get('pollutant_id');
+  const pollutantIdParam = params.get('pollutant_id');
+  const pollutantIdNumeric = pollutantIdParam ? Number(pollutantIdParam) : null;
   const categoryIdsRaw = params.get('category_ids')
     || params.get('categoryIds')
     || params.get('categoryId')
@@ -1691,12 +1692,25 @@ function parseUrlParameters() {
     || []
   );
   const availableYears = window.supabaseModule.getAvailableYears() || [];
+  const actDataPollutantId = Number(
+    window.supabaseModule.actDataPollutantId
+    || window.supabaseModule.activityDataId
+    || NaN
+  );
 
   let pollutantName = null;
-  if (pollutantId) {
-    const pollutant = pollutants.find(p => String(p.id) === String(pollutantId));
+  const activityDataRequested = Number.isFinite(actDataPollutantId)
+    && Number.isFinite(pollutantIdNumeric)
+    && actDataPollutantId === pollutantIdNumeric;
+
+  if (pollutantIdParam && !activityDataRequested) {
+    const pollutant = pollutants.find(p => String(p.id) === String(pollutantIdParam));
     if (pollutant) {
-      pollutantName = pollutant.pollutant;
+      const isActivityByName = typeof pollutant.pollutant === 'string'
+        && pollutant.pollutant.trim().toLowerCase() === 'activity data';
+      if (!isActivityByName) {
+        pollutantName = pollutant.pollutant;
+      }
     }
   }
 

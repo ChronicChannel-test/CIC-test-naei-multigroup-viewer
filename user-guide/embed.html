@@ -27,7 +27,7 @@
     }
 
     .user-guide-shell {
-      padding-bottom: 6px;
+      padding-bottom: 0;
       margin: 0;
     }
 
@@ -86,7 +86,7 @@
       justify-content: center;
       align-items: flex-start;
       min-height: 460px;
-      padding: 16px 0 28px;
+      padding: 16px 0 8px;
     }
 
     .guide-page {
@@ -330,8 +330,8 @@
       const DEFAULT_PAGE_ASPECT_RATIO = Math.SQRT2; // height / width fallback (A4 portrait)
       const FOOTER_VIEWPORT_GAP = 6;
       const GUIDE_VERTICAL_GAP = 4;
-      const FOOTER_CLAMP_BUFFER = 2;
-      const FOOTER_SHADOW_OVERHANG = 4;
+      const FOOTER_CLAMP_BUFFER = 8;
+      const FOOTER_SHADOW_OVERHANG = 18;
       const SOCIAL_SIDEBAR_RESERVE = 140;
 
       let pdfDoc = null;
@@ -690,12 +690,13 @@
           link.target = '_blank';
           link.rel = 'noopener';
           link.title = annotation.title || annotation.url;
-        } else if (annotation.dest) {
+        } else if (annotation.dest || annotation.action) {
+          const destination = annotation.dest || annotation.action;
           link.href = '#';
           link.title = 'Go to referenced section';
           link.addEventListener('click', event => {
             event.preventDefault();
-            goToDestination(annotation.dest);
+            goToDestination(destination);
           });
         } else {
           link.style.pointerEvents = 'none';
@@ -705,16 +706,30 @@
       });
     }
 
-    async function goToDestination(destination) {
-      if (!pdfDoc) {
+    async function goToDestination(rawDestination) {
+      if (!pdfDoc || !rawDestination) {
         return;
       }
+      let destination = null;
       try {
-        const target = await pdfDoc.getDestination(destination);
-        if (!target) {
-          return;
+        if (Array.isArray(rawDestination)) {
+          destination = rawDestination;
+        } else if (rawDestination && typeof rawDestination === 'object' && Array.isArray(rawDestination.dest)) {
+          destination = rawDestination.dest;
+        } else if (typeof rawDestination === 'string') {
+          destination = await pdfDoc.getDestination(rawDestination);
+        } else {
+          destination = await pdfDoc.getDestination(rawDestination);
         }
-        const [ref] = target;
+      } catch (error) {
+        console.warn('Unable to resolve PDF destination', rawDestination, error);
+        return;
+      }
+      if (!destination || !destination.length) {
+        return;
+      }
+      const [ref] = destination;
+      try {
         let pageIndex = null;
         if (typeof ref === 'object' && ref !== null) {
           pageIndex = await pdfDoc.getPageIndex(ref);
@@ -847,6 +862,15 @@
       };
     }
 
+    function getElementBottom(el) {
+      if (!el) {
+        return 0;
+      }
+      const rect = el.getBoundingClientRect();
+      const scrollOffset = window.scrollY || window.pageYOffset || 0;
+      return Math.max(0, Math.round((rect.bottom || 0) + scrollOffset));
+    }
+
     function computeWrapperHeight() {
       const spreadHeight = spread?.offsetHeight || spread?.scrollHeight || 0;
       if (spreadHeight > 0) {
@@ -873,17 +897,29 @@
       const shellHeight = shell?.offsetHeight || shell?.scrollHeight || 0;
       const wrapperHeight = wrapper?.offsetHeight || wrapper?.scrollHeight || 0;
       const viewerHeight = viewer?.offsetHeight || viewer?.scrollHeight || 0;
-      const bodyHeight = document.body?.offsetHeight || document.body?.scrollHeight || 0;
-      const docHeight = document.documentElement?.offsetHeight || document.documentElement?.scrollHeight || 0;
-      const measured = Math.max(
-        shellHeight,
-        wrapperHeight,
-        viewerHeight,
-        bodyHeight,
-        docHeight,
-        MIN_FRAME_HEIGHT
+      const primaryHeight = Math.max(shellHeight, wrapperHeight, viewerHeight);
+      if (primaryHeight > 0) {
+        return Math.max(MIN_FRAME_HEIGHT, Math.round(primaryHeight + FOOTER_CLAMP_BUFFER - FOOTER_SHADOW_OVERHANG));
+      }
+      const shellBottom = getElementBottom(shell);
+      const wrapperBottom = getElementBottom(wrapper);
+      const viewerBottom = getElementBottom(viewer);
+      const positionFallback = Math.max(shellBottom || 0, wrapperBottom || 0, viewerBottom || 0);
+      if (positionFallback > 0) {
+        return Math.max(MIN_FRAME_HEIGHT, Math.round(positionFallback + FOOTER_CLAMP_BUFFER - FOOTER_SHADOW_OVERHANG));
+      }
+      const body = document.body;
+      const html = document.documentElement;
+      const documentHeight = Math.max(
+        body?.scrollHeight || 0,
+        body?.offsetHeight || 0,
+        html?.scrollHeight || 0,
+        html?.offsetHeight || 0
       );
-      return Math.round(measured + WRAPPER_BUFFER);
+      if (documentHeight > 0) {
+        return Math.max(MIN_FRAME_HEIGHT, Math.round(documentHeight));
+      }
+      return Math.max(MIN_FRAME_HEIGHT + WRAPPER_BUFFER, 600);
     }
 
     function sendHeightToParent() {
