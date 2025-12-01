@@ -1287,6 +1287,15 @@ function setupTutorialOverlay() {
     }
   });
 
+  const closeOnResize = () => {
+    if (overlayActive) {
+      hideOverlay('window-resize');
+    }
+  };
+
+  window.addEventListener('resize', closeOnResize);
+  window.addEventListener('orientationchange', closeOnResize);
+
   if (stage) {
     stage.addEventListener('touchstart', handleTouchStart, { passive: true });
     stage.addEventListener('touchend', handleTouchEnd, { passive: true });
