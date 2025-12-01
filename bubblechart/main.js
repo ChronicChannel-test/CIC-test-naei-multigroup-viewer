@@ -155,6 +155,7 @@ const DEFAULT_PARENT_VIEWPORT = 900;
 const CSS_DEFAULT_FOOTER_RESERVE = 160; // Mirrors --bubble-footer-height default in styles.css
 const CSS_VISUAL_PADDING = 27; // Extra breathing room so chart clears the footer visually
 const RESIZE_THRESHOLD = 3;
+const INLINE_TUTORIAL_BREAKPOINT = 820;
 const TUTORIAL_SLIDE_MATRIX = [
   ['002', '003', '004', '005'],
   ['002', '003', '004', '007'],
@@ -809,6 +810,45 @@ function setupTutorialOverlay() {
   }
   openBtn.setAttribute('aria-expanded', 'false');
 
+  const chartWrapper = document.querySelector('.chart-wrapper');
+  const overlayOriginalParent = overlay.parentNode;
+  const overlayOriginalNextSibling = overlay.nextSibling;
+  const tutorialModeMedia = window.matchMedia(`(max-width: ${INLINE_TUTORIAL_BREAKPOINT}px)`);
+  let tutorialMode = tutorialModeMedia.matches ? 'inline' : 'overlay';
+
+  function determineTutorialMode() {
+    return tutorialModeMedia.matches ? 'inline' : 'overlay';
+  }
+
+  function isInlineMode() {
+    return tutorialMode === 'inline';
+  }
+
+  function applyTutorialMode(mode) {
+    if (!overlay) {
+      return;
+    }
+    if (mode === 'inline') {
+      if (chartWrapper && overlay.parentNode !== chartWrapper) {
+        chartWrapper.appendChild(overlay);
+      }
+      overlay.classList.add('inline-mode');
+      overlay.classList.remove('visible');
+      overlay.setAttribute('aria-hidden', 'true');
+      unlockDocumentScroll();
+    } else {
+      if (overlayOriginalParent) {
+        overlayOriginalParent.insertBefore(overlay, overlayOriginalNextSibling);
+      } else if (overlay.parentNode !== document.body) {
+        document.body.appendChild(overlay);
+      }
+      overlay.classList.remove('inline-mode');
+      overlay.classList.remove('visible');
+      overlay.setAttribute('aria-hidden', 'true');
+      unlockDocumentScroll();
+    }
+  }
+
   const dialog = overlay.querySelector('.bubble-tutorial-dialog');
   const stage = overlay.querySelector('.bubble-tutorial-stage');
   const closeBtn = overlay.querySelector('.bubble-tutorial-close');
@@ -832,8 +872,10 @@ function setupTutorialOverlay() {
     styles: null
   };
 
+  applyTutorialMode(tutorialMode);
+
   function lockDocumentScroll() {
-    if (scrollLockState.active) {
+    if (isInlineMode() || scrollLockState.active) {
       return;
     }
     const body = document.body;
@@ -1019,6 +1061,9 @@ function setupTutorialOverlay() {
       return;
     }
     if (event.key === 'Tab') {
+      if (isInlineMode()) {
+        return;
+      }
       const focusable = getFocusableElements();
       if (!focusable.length) {
         return;
@@ -1151,16 +1196,25 @@ function setupTutorialOverlay() {
     if (overlayActive) {
       return;
     }
+    tutorialMode = determineTutorialMode();
+    applyTutorialMode(tutorialMode);
     const skipScroll = Boolean(options.skipScroll) || source === 'url-param';
-    if (!skipScroll && IS_EMBEDDED) {
+    if (!skipScroll && IS_EMBEDDED && !isInlineMode()) {
       await scrollTutorialIntoView();
     }
     overlayActive = true;
     lastFocusedElement = document.activeElement;
+    if (!isInlineMode()) {
+      lockDocumentScroll();
+    }
     overlay.classList.add('visible');
     overlay.setAttribute('aria-hidden', 'false');
     openBtn.setAttribute('aria-expanded', 'true');
-    lockDocumentScroll();
+    if (isInlineMode()) {
+      requestAnimationFrame(() => {
+        overlay.scrollIntoView({ behavior: skipScroll ? 'auto' : 'smooth', block: 'start' });
+      });
+    }
     currentVisibleLayers.forEach(suffix => {
       const img = layerBySuffix.get(suffix);
       if (img) {
@@ -1209,8 +1263,26 @@ function setupTutorialOverlay() {
     nextBtn.addEventListener('click', showNextSlide);
   }
 
+  function handleTutorialModeChange() {
+    const desired = determineTutorialMode();
+    if (desired === tutorialMode) {
+      return;
+    }
+    if (overlayActive) {
+      hideOverlay('mode-change');
+    }
+    tutorialMode = desired;
+    applyTutorialMode(tutorialMode);
+  }
+
+  if (typeof tutorialModeMedia.addEventListener === 'function') {
+    tutorialModeMedia.addEventListener('change', handleTutorialModeChange);
+  } else if (typeof tutorialModeMedia.addListener === 'function') {
+    tutorialModeMedia.addListener(handleTutorialModeChange);
+  }
+
   overlay.addEventListener('click', (event) => {
-    if (event.target === overlay) {
+    if (!isInlineMode() && event.target === overlay) {
       hideOverlay('user');
     }
   });

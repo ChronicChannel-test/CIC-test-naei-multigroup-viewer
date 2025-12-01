@@ -160,10 +160,15 @@
 
         <!-- Chart area -->
         <div class="chart-wrapper">
-          <button type="button" id="tutorialBtn" class="tutorial-launch-btn" aria-haspopup="dialog" aria-controls="bubbleTutorialOverlay">
-            <img src="../SharedResources/images/Green-button-play-white-triangle-200x200.svg" alt="" aria-hidden="true" class="tutorial-launch-icon">
-            <span>Bubble Chart Tutorial</span>
-          </button>
+          <div class="tutorial-launch-row">
+            <button type="button" id="tutorialBtn" class="tutorial-launch-btn" aria-haspopup="dialog" aria-controls="bubbleTutorialOverlay">
+              <img src="../SharedResources/images/Green-button-play-white-triangle-200x200.svg" alt="" aria-hidden="true" class="tutorial-launch-icon">
+              <span>Bubble Chart Tutorial</span>
+            </button>
+            <a id="tutorialDownloadLink" class="tutorial-download-link" href="../SharedResources/docs/Bubble-Chart-Tutorial-v1.pdf" target="_blank" rel="noopener">
+              Download tutorial (PDF)
+            </a>
+          </div>
 
           <div id="chartTitle"></div>
           <div id="customLegend" style="display: flex; flex-wrap: wrap; gap: 10px;"></div>
