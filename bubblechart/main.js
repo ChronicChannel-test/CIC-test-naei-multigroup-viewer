@@ -826,6 +826,57 @@ function setupTutorialOverlay() {
   let overlayActive = false;
   let lastFocusedElement = null;
   let touchStartX = null;
+  const scrollLockState = {
+    active: false,
+    offset: 0,
+    styles: null
+  };
+
+  function lockDocumentScroll() {
+    if (scrollLockState.active) {
+      return;
+    }
+    const body = document.body;
+    if (!body) {
+      return;
+    }
+    scrollLockState.offset = window.scrollY || window.pageYOffset || 0;
+    scrollLockState.styles = {
+      position: body.style.position || '',
+      top: body.style.top || '',
+      left: body.style.left || '',
+      right: body.style.right || '',
+      width: body.style.width || ''
+    };
+    body.style.position = 'fixed';
+    body.style.top = `-${scrollLockState.offset}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    body.classList.add('tutorial-open');
+    scrollLockState.active = true;
+  }
+
+  function unlockDocumentScroll() {
+    if (!scrollLockState.active) {
+      return;
+    }
+    const body = document.body;
+    if (body) {
+      const previous = scrollLockState.styles || {};
+      body.style.position = previous.position || '';
+      body.style.top = previous.top || '';
+      body.style.left = previous.left || '';
+      body.style.right = previous.right || '';
+      body.style.width = previous.width || '';
+      body.classList.remove('tutorial-open');
+    }
+    const offset = scrollLockState.offset || 0;
+    scrollLockState.active = false;
+    scrollLockState.offset = 0;
+    scrollLockState.styles = null;
+    window.scrollTo({ top: offset, behavior: 'auto' });
+  }
 
   const lastSlideIndex = TUTORIAL_SLIDE_MATRIX.length - 1;
 
@@ -1101,7 +1152,7 @@ function setupTutorialOverlay() {
       return;
     }
     const skipScroll = Boolean(options.skipScroll) || source === 'url-param';
-    if (!skipScroll) {
+    if (!skipScroll && IS_EMBEDDED) {
       await scrollTutorialIntoView();
     }
     overlayActive = true;
@@ -1109,7 +1160,7 @@ function setupTutorialOverlay() {
     overlay.classList.add('visible');
     overlay.setAttribute('aria-hidden', 'false');
     openBtn.setAttribute('aria-expanded', 'true');
-    document.body.classList.add('tutorial-open');
+    lockDocumentScroll();
     currentVisibleLayers.forEach(suffix => {
       const img = layerBySuffix.get(suffix);
       if (img) {
@@ -1135,7 +1186,7 @@ function setupTutorialOverlay() {
     overlay.classList.remove('visible');
     overlay.setAttribute('aria-hidden', 'true');
     openBtn.setAttribute('aria-expanded', 'false');
-    document.body.classList.remove('tutorial-open');
+    unlockDocumentScroll();
     document.removeEventListener('keydown', handleOverlayKeydown);
     touchStartX = null;
     if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
