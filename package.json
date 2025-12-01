@@ -8,6 +8,7 @@
     "watch:css": "BROWSERSLIST_IGNORE_OLD_DATA=1 tailwindcss -i ./tailwind.input.css -o ./dist/tailwind.css --watch",
     "export:default-data": "node scripts/export-default-data.js",
     "update:versions": "node scripts/update-footer-versions.js",
+    "supabase:env": "node scripts/generate-supabase-env.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
@@ -23,6 +24,7 @@
   },
   "homepage": "https://github.com/ChronicChannel-test/CIC-test-naei-multigroup-viewer#readme",
   "devDependencies": {
+    "dotenv": "^16.4.7",
     "@supabase/supabase-js": "^2.39.6",
     "autoprefixer": "^10.4.22",
     "postcss": "^8.5.6",

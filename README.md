@@ -17,7 +17,10 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 
 ## Working Locally
 - Serve the repository with any static file server (`python -m http.server`, `npx serve`, etc.) so the Supabase client can resolve relative paths.
-- Configure credentials in `SharedResources/supabase-config.js`; the helper exports `initSupabaseClient()` used everywhere.
+- Configure Supabase credentials once via `.env` + `npm run supabase:env`:
+	1. Copy `.env.example` to `.env.local` (or `.env`) and drop in your test/live project values (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, optional `SUPABASE_STORAGE_KEY_BASE`).
+	2. Run `npm run supabase:env` (or `SUPABASE_ENV_FILE=.env.live npm run supabase:env`) to regenerate `SharedResources/supabase-env.js`.
+	3. The runtime `SharedResources/supabase-config.js` now auto-detects `window.__NAEI_SUPABASE_CONFIG`, so switching environments only requires rerunning the script with a different env file—no manual edits across multiple HTML files.
 - Supabase functions live under `supabase/functions/` and can be deployed via the Supabase CLI when backend updates are needed.
 
 ## Deep-Link Tabs & Embeds

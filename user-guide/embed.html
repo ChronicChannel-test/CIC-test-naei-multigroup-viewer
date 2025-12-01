@@ -11,8 +11,8 @@
   <link rel="stylesheet" href="../SharedResources/common-styles.css">
   <style>
     :root {
-      --user-guide-buffer: 27px;
-      --user-guide-gap: 24px;
+      --user-guide-buffer: 14px;
+      --user-guide-gap: 20px;
     }
 
     *, *::before, *::after {
@@ -27,7 +27,7 @@
     }
 
     .user-guide-shell {
-      padding-bottom: 8px;
+      padding-bottom: 6px;
       margin: 0;
     }
 
@@ -86,7 +86,7 @@
       justify-content: center;
       align-items: flex-start;
       min-height: 460px;
-      padding: 16px 0 0;
+      padding: 16px 0 28px;
     }
 
     .guide-page {
@@ -94,7 +94,8 @@
       flex: 0 0 auto;
       background: #ffffff;
       border-radius: 14px;
-      box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+      box-shadow: none;
+      filter: drop-shadow(0 26px 32px rgba(15, 23, 42, 0.24));
       overflow: hidden;
       min-width: 200px;
     }
@@ -173,7 +174,7 @@
 
     .spread-nav {
       position: absolute;
-      top: 50%;
+      top: var(--nav-vertical-center, 50%);
       transform: translateY(-50%);
       width: 56px;
       height: 86px;
@@ -260,11 +261,6 @@
       .main-title {
         font-size: 26px;
       }
-
-      .spread-nav--prev,
-      .spread-nav--next {
-        top: 46%;
-      }
     }
   </style>
 </head>
@@ -279,7 +275,7 @@
       </div>
 
       <div class="user-guide-downloads" role="group" aria-label="User guide downloads">
-        <a id="downloadUserGuide" class="user-guide-download" href="../SharedResources/docs/User-Guide-Pollution-Emissions-Data-Explorer-v0.8.pdf" download target="_blank" rel="noopener">Download User Guide</a>
+        <a id="downloadUserGuide" class="user-guide-download" href="../SharedResources/docs/User-Guide-Pollution-Emissions-Data-Explorer-v1.0.pdf" download target="_blank" rel="noopener">Download User Guide</a>
       </div>
 
       <div class="user-guide-status">
@@ -313,7 +309,7 @@
       const worker = new Worker(workerModuleUrl.href, { type: 'module' });
       pdfjsLib.GlobalWorkerOptions.workerPort = worker;
 
-      const basePdfPath = '../SharedResources/docs/User-Guide-Pollution-Emissions-Data-Explorer-v0.8.pdf';
+      const basePdfPath = '../SharedResources/docs/User-Guide-Pollution-Emissions-Data-Explorer-v1.0.pdf';
       const tutorialPdfPath = '../SharedResources/docs/Bubble-Chart-Tutorial-v4.pdf';
       const shell = document.querySelector('.chart-shell');
       const wrapper = document.querySelector('.user-guide-wrapper');
@@ -327,20 +323,21 @@
       const dualViewQuery = window.matchMedia('(min-width: 1100px)');
       const ALWAYS_SINGLE_VIEW = true;
       const MIN_FRAME_HEIGHT = 460;
-      const WRAPPER_BUFFER = 27;
-      const MAX_PAGE_WIDTH = 1120;
+      const WRAPPER_BUFFER = 10;
+      const MAX_PAGE_WIDTH = 1280;
       const MIN_PAGE_WIDTH = 260;
-      const TARGET_PAGE_WIDTH = 740;
-      const PAGE_ASPECT_RATIO = Math.SQRT2; // height / width for A4
-      const FOOTER_VIEWPORT_GAP = 12;
-      const GUIDE_VERTICAL_GAP = 20;
-      const FOOTER_CLAMP_BUFFER = 8;
-      const FOOTER_SHADOW_OVERHANG = 18;
+      const TARGET_PAGE_WIDTH = 920;
+      const DEFAULT_PAGE_ASPECT_RATIO = Math.SQRT2; // height / width fallback (A4 portrait)
+      const FOOTER_VIEWPORT_GAP = 6;
+      const GUIDE_VERTICAL_GAP = 4;
+      const FOOTER_CLAMP_BUFFER = 2;
+      const FOOTER_SHADOW_OVERHANG = 4;
       const SOCIAL_SIDEBAR_RESERVE = 140;
 
       let pdfDoc = null;
       let currentPage = 1;
       let renderVersion = 0;
+      let documentAspectRatio = DEFAULT_PAGE_ASPECT_RATIO;
       let parentViewportHeight = null;
       let parentFooterHeight = 0;
       let heightTimer = null;
@@ -453,6 +450,8 @@
         const url = buildAbsoluteUrl(basePdfPath);
         const task = pdfjsLib.getDocument({ url });
         pdfDoc = await task.promise;
+        await updateDocumentAspectRatio();
+        scheduleHeightUpdate(80);
         currentPage = 1;
         renderSpread();
       } catch (error) {
@@ -574,9 +573,10 @@
     }
 
     function getPageDimensions(pageCount) {
+      const aspectRatio = getCurrentAspectRatio();
       if (!viewer) {
         const fallbackWidth = MAX_PAGE_WIDTH;
-        return { width: fallbackWidth, height: Math.round(fallbackWidth * PAGE_ASPECT_RATIO) };
+        return { width: fallbackWidth, height: Math.round(fallbackWidth * aspectRatio) };
       }
       const available = viewer.clientWidth || spread.clientWidth || window.innerWidth || 960;
       const style = window.getComputedStyle(spread);
@@ -592,17 +592,17 @@
         const widthBudget = Math.min(widthPerPage, maxSocialAdjustedWidth);
         const preferredWidth = Math.min(TARGET_PAGE_WIDTH, widthBudget);
         const clampedWidth = Math.max(MIN_PAGE_WIDTH, Math.min(MAX_PAGE_WIDTH, preferredWidth));
-        const derivedHeight = Math.round(clampedWidth * PAGE_ASPECT_RATIO);
+        const derivedHeight = Math.round(clampedWidth * aspectRatio);
         const finalHeight = Math.max(derivedHeight, MIN_FRAME_HEIGHT);
         return { width: clampedWidth, height: finalHeight };
       }
 
-      const heightLimitedWidth = referenceHeight > 0 ? (referenceHeight / PAGE_ASPECT_RATIO) : MAX_PAGE_WIDTH;
+      const heightLimitedWidth = referenceHeight > 0 ? (referenceHeight / aspectRatio) : MAX_PAGE_WIDTH;
       const clampedWidth = Math.min(
         MAX_PAGE_WIDTH,
         Math.max(MIN_PAGE_WIDTH, Math.min(widthPerPage, heightLimitedWidth))
       );
-      const derivedHeight = Math.round(clampedWidth * PAGE_ASPECT_RATIO);
+      const derivedHeight = Math.round(clampedWidth * aspectRatio);
       return { width: clampedWidth, height: derivedHeight };
     }
 
@@ -611,7 +611,7 @@
         return;
       }
       const targetWidth = pageDimensions?.width || MAX_PAGE_WIDTH;
-      const targetHeight = pageDimensions?.height || Math.round(targetWidth * PAGE_ASPECT_RATIO);
+      const targetHeight = pageDimensions?.height || Math.round(targetWidth * getCurrentAspectRatio());
       const canvas = container.querySelector('canvas');
       const textLayer = container.querySelector('.text-layer');
       const annotationLayer = container.querySelector('.annotation-layer');
@@ -807,6 +807,7 @@
       if (!firstPage || !lastPage) {
         viewer.style.setProperty('--nav-offset-prev', '10px');
         viewer.style.setProperty('--nav-offset-next', '10px');
+        viewer.style.removeProperty('--nav-vertical-center');
         return;
       }
       const viewerRect = viewer.getBoundingClientRect();
@@ -818,6 +819,17 @@
       const nextOffset = Math.max(6, Math.round(viewerRect.right - lastRect.right - nextWidth * 0.45));
       viewer.style.setProperty('--nav-offset-prev', `${prevOffset}px`);
       viewer.style.setProperty('--nav-offset-next', `${nextOffset}px`);
+
+      const pagesTop = Math.min(firstRect.top, lastRect.top);
+      const pagesBottom = Math.max(firstRect.bottom, lastRect.bottom);
+      const relativeCenter = ((pagesTop + pagesBottom) / 2) - viewerRect.top;
+      const viewerHeight = viewerRect.height || viewer.offsetHeight || MIN_FRAME_HEIGHT;
+      const clampedCenter = Math.min(Math.max(relativeCenter, 0), viewerHeight);
+      if (Number.isFinite(clampedCenter)) {
+        viewer.style.setProperty('--nav-vertical-center', `${Math.round(clampedCenter)}px`);
+      } else {
+        viewer.style.removeProperty('--nav-vertical-center');
+      }
     }
 
     function lockSpreadHeight() {
@@ -835,22 +847,17 @@
       };
     }
 
-    function getElementBottom(el) {
-      if (!el) {
-        return 0;
-      }
-      const rect = el.getBoundingClientRect();
-      const scrollOffset = window.scrollY || window.pageYOffset || 0;
-      return Math.max(0, Math.round((rect.bottom || 0) + scrollOffset));
-    }
-
     function computeWrapperHeight() {
       const spreadHeight = spread?.offsetHeight || spread?.scrollHeight || 0;
-      const referenceHeight = getReferenceViewportHeight();
       if (spreadHeight > 0) {
-        return Math.max(referenceHeight, spreadHeight + 30, MIN_FRAME_HEIGHT);
+        const paddedHeight = Math.round(spreadHeight + WRAPPER_BUFFER);
+        return Math.max(MIN_FRAME_HEIGHT, paddedHeight);
       }
-      return Math.max(referenceHeight, MIN_FRAME_HEIGHT);
+      const referenceHeight = getReferenceViewportHeight();
+      if (referenceHeight > 0) {
+        return Math.max(MIN_FRAME_HEIGHT, referenceHeight);
+      }
+      return Math.max(MIN_FRAME_HEIGHT + WRAPPER_BUFFER, 600);
     }
 
     function applyWrapperHeight() {
@@ -866,29 +873,17 @@
       const shellHeight = shell?.offsetHeight || shell?.scrollHeight || 0;
       const wrapperHeight = wrapper?.offsetHeight || wrapper?.scrollHeight || 0;
       const viewerHeight = viewer?.offsetHeight || viewer?.scrollHeight || 0;
-      const primaryHeight = Math.max(shellHeight, wrapperHeight, viewerHeight);
-      if (primaryHeight > 0) {
-        return Math.max(MIN_FRAME_HEIGHT, Math.round(primaryHeight + FOOTER_CLAMP_BUFFER - FOOTER_SHADOW_OVERHANG));
-      }
-      const shellBottom = getElementBottom(shell);
-      const wrapperBottom = getElementBottom(wrapper);
-      const viewerBottom = getElementBottom(viewer);
-      const positionFallback = Math.max(shellBottom || 0, wrapperBottom || 0, viewerBottom || 0);
-      if (positionFallback > 0) {
-        return Math.max(MIN_FRAME_HEIGHT, Math.round(positionFallback + FOOTER_CLAMP_BUFFER - FOOTER_SHADOW_OVERHANG));
-      }
-      const body = document.body;
-      const html = document.documentElement;
-      const documentHeight = Math.max(
-        body?.scrollHeight || 0,
-        body?.offsetHeight || 0,
-        html?.scrollHeight || 0,
-        html?.offsetHeight || 0
+      const bodyHeight = document.body?.offsetHeight || document.body?.scrollHeight || 0;
+      const docHeight = document.documentElement?.offsetHeight || document.documentElement?.scrollHeight || 0;
+      const measured = Math.max(
+        shellHeight,
+        wrapperHeight,
+        viewerHeight,
+        bodyHeight,
+        docHeight,
+        MIN_FRAME_HEIGHT
       );
-      if (documentHeight > 0) {
-        return Math.max(MIN_FRAME_HEIGHT, Math.round(documentHeight));
-      }
-      return Math.max(MIN_FRAME_HEIGHT + WRAPPER_BUFFER, 600);
+      return Math.round(measured + WRAPPER_BUFFER);
     }
 
     function sendHeightToParent() {
@@ -964,6 +959,34 @@
       } catch (error) {
         console.warn('Unable to request parent viewport metrics', error);
       }
+    }
+
+    async function updateDocumentAspectRatio() {
+      if (!pdfDoc) {
+        documentAspectRatio = DEFAULT_PAGE_ASPECT_RATIO;
+        return;
+      }
+      try {
+        const page = await pdfDoc.getPage(1);
+        const viewport = page.getViewport({ scale: 1 });
+        const ratio = viewport.height / viewport.width;
+        if (Number.isFinite(ratio) && ratio > 0) {
+          documentAspectRatio = ratio;
+        } else {
+          documentAspectRatio = DEFAULT_PAGE_ASPECT_RATIO;
+        }
+      } catch (error) {
+        documentAspectRatio = DEFAULT_PAGE_ASPECT_RATIO;
+        console.warn('Unable to determine user guide page ratio', error);
+      }
+    }
+
+    function getCurrentAspectRatio() {
+      const ratio = documentAspectRatio || DEFAULT_PAGE_ASPECT_RATIO;
+      if (!Number.isFinite(ratio) || ratio <= 0) {
+        return DEFAULT_PAGE_ASPECT_RATIO;
+      }
+      return ratio;
     }
 
     window.addEventListener('unload', () => {

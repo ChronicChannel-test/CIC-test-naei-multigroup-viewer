@@ -3,8 +3,8 @@
  * Export the default "hero" dataset used for instant renders when no URL overrides are supplied.
  * The payload mirrors the Supabase tables but only includes:
  *  - Pollutants: PM2.5 + Activity Data
- *  - Groups: All, Ecodesign Stove - Ready To Burn, Gas Boilers
- *  - Timeseries rows for the pollutant/group combinations above
+ *  - Categories: All, Ecodesign Stove - Ready To Burn, Gas Boilers
+ *  - Timeseries rows for the pollutant/category combinations above
  */
 
 const fs = require('fs');
@@ -24,8 +24,8 @@ const OUTPUT_PATH = path.join(__dirname, '..', 'SharedResources', 'default-chart
 const DEFAULT_LINE_POLLUTANT = 'PM2.5';
 const DEFAULT_BUBBLE_POLLUTANT = 'PM2.5';
 const DEFAULT_ACTIVITY_POLLUTANT = 'Activity Data';
-const DEFAULT_LINE_GROUPS = ['All'];
-const DEFAULT_BUBBLE_GROUPS = ['Ecodesign Stove - Ready To Burn', 'Gas Boilers'];
+const DEFAULT_LINE_CATEGORIES = ['All'];
+const DEFAULT_BUBBLE_CATEGORIES = ['Ecodesign Stove - Ready To Burn', 'Gas Boilers'];
 const DEFAULT_YEAR = 2023;
 
 async function main() {
@@ -51,19 +51,19 @@ async function main() {
     throw new Error('No pollutant metadata returned.');
   }
 
-  console.log('Fetching full group metadata...');
-  const { data: groupRows, error: groupError } = await client
+  console.log('Fetching full category metadata...');
+  const { data: categoryRows, error: categoryError } = await client
     .from('naei_global_t_category')
     .select('id,category_title')
     .order('category_title', { ascending: true });
-  if (groupError) throw groupError;
+  if (categoryError) throw categoryError;
 
-  if (!groupRows || groupRows.length === 0) {
-    throw new Error('No group metadata returned.');
+  if (!categoryRows || categoryRows.length === 0) {
+    throw new Error('No category metadata returned.');
   }
 
   const pollutantIdMap = Object.fromEntries(pollutantRows.map(row => [row.pollutant, row.id]));
-  const groupIdMap = Object.fromEntries(groupRows.map(row => [row.category_title, row.id]));
+  const categoryIdMap = Object.fromEntries(categoryRows.map(row => [row.category_title, row.id]));
 
   const linePollutantId = pollutantIdMap[DEFAULT_LINE_POLLUTANT];
   const bubblePollutantId = pollutantIdMap[DEFAULT_BUBBLE_POLLUTANT];
@@ -73,18 +73,18 @@ async function main() {
     throw new Error('Missing required pollutant IDs in metadata.');
   }
 
-  const lineGroupIds = DEFAULT_LINE_GROUPS.map(name => {
-    const id = groupIdMap[name];
+  const lineCategoryIds = DEFAULT_LINE_CATEGORIES.map(name => {
+    const id = categoryIdMap[name];
     if (!id) {
-      throw new Error(`Missing required line group: ${name}`);
+      throw new Error(`Missing required line category: ${name}`);
     }
     return id;
   });
 
-  const bubbleGroupIds = DEFAULT_BUBBLE_GROUPS.map(name => {
-    const id = groupIdMap[name];
+  const bubbleCategoryIds = DEFAULT_BUBBLE_CATEGORIES.map(name => {
+    const id = categoryIdMap[name];
     if (!id) {
-      throw new Error(`Missing required bubble group: ${name}`);
+      throw new Error(`Missing required bubble category: ${name}`);
     }
     return id;
   });
@@ -94,7 +94,7 @@ async function main() {
     .from('naei_2023ds_t_category_data')
     .select('*')
     .eq('pollutant_id', linePollutantId)
-    .in('category_id', lineGroupIds);
+    .in('category_id', lineCategoryIds);
   if (lineTimeseriesError) throw lineTimeseriesError;
 
   if (!lineTimeseriesRows || !lineTimeseriesRows.length) {
@@ -106,7 +106,7 @@ async function main() {
     .from('naei_2023ds_t_category_data')
     .select('id,pollutant_id,category_id,f2023')
     .in('pollutant_id', [bubblePollutantId, activityPollutantId])
-    .in('category_id', bubbleGroupIds);
+    .in('category_id', bubbleCategoryIds);
   if (bubbleSnapshotError) throw bubbleSnapshotError;
 
   if (!bubbleSnapshotRows || !bubbleSnapshotRows.length) {
@@ -120,7 +120,7 @@ async function main() {
     .eq('pollutant_id', activityPollutantId);
   if (activityCoverageError) throw activityCoverageError;
 
-  const activityGroupSet = new Set(
+  const activityCategorySet = new Set(
     (activityCoverageRows || []).map(row => row.category_id)
   );
 
@@ -145,14 +145,14 @@ async function main() {
     defaults: {
       lineChart: {
         pollutant: DEFAULT_LINE_POLLUTANT,
-        groups: DEFAULT_LINE_GROUPS,
+        groups: DEFAULT_LINE_CATEGORIES,
         startYear: years[0] ? Number(years[0]) : null,
         endYear: years[years.length - 1] ? Number(years[years.length - 1]) : null
       },
       bubbleChart: {
         pollutant: DEFAULT_BUBBLE_POLLUTANT,
         activityPollutant: DEFAULT_ACTIVITY_POLLUTANT,
-        groups: DEFAULT_BUBBLE_GROUPS,
+        groups: DEFAULT_BUBBLE_CATEGORIES,
         year: DEFAULT_YEAR
       }
     },
@@ -167,10 +167,10 @@ async function main() {
         }
         return base;
       }),
-      groups: groupRows.map(row => ({
+      categories: categoryRows.map(row => ({
         id: row.id,
         category_title: row.category_title,
-        has_activity_data: activityGroupSet.has(row.id)
+        has_activity_data: activityCategorySet.has(row.id)
       })),
       timeseries: timeseriesRows,
       yearKeys,
@@ -183,7 +183,7 @@ async function main() {
   fs.writeFileSync(OUTPUT_PATH, JSON.stringify(payload, null, 2));
 
   console.log(`Default dataset written to ${OUTPUT_PATH}`);
-  console.log(`Contains ${pollutantRows.length} pollutants, ${groupRows.length} groups, ${timeseriesRows.length} timeseries rows.`);
+  console.log(`Contains ${pollutantRows.length} pollutants, ${categoryRows.length} categories, ${timeseriesRows.length} timeseries rows.`);
 }
 
 main().catch(error => {
