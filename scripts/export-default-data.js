@@ -145,14 +145,14 @@ async function main() {
     defaults: {
       lineChart: {
         pollutant: DEFAULT_LINE_POLLUTANT,
-        groups: DEFAULT_LINE_CATEGORIES,
+        categories: DEFAULT_LINE_CATEGORIES,
         startYear: years[0] ? Number(years[0]) : null,
         endYear: years[years.length - 1] ? Number(years[years.length - 1]) : null
       },
       bubbleChart: {
         pollutant: DEFAULT_BUBBLE_POLLUTANT,
         activityPollutant: DEFAULT_ACTIVITY_POLLUTANT,
-        groups: DEFAULT_BUBBLE_CATEGORIES,
+        categories: DEFAULT_BUBBLE_CATEGORIES,
         year: DEFAULT_YEAR
       }
     },
