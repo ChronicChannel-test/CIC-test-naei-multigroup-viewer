@@ -11,7 +11,7 @@ Successfully completed migration to shared resources architecture and created ne
 CIC-test-naei-data/
 ├── Shared Resources/
 │   ├── images/              (Logos, icons, favicon)
-│   ├── analytics.js         (Privacy-friendly tracking)
+│   ├── analytics.js         (Lightweight site-wide tracking)
 │   ├── colors.js            (10-color palette with category mapping)
 │   ├── common-styles.css    (Base styling)
 │   ├── supabase-config.js   (Database configuration)
@@ -47,7 +47,7 @@ CIC-test-naei-data/
   - Exports: `SupabaseConfig.initSupabaseClient()`
   - Single source of truth for database credentials
 
-- **analytics.js**: Privacy-friendly usage tracking
+- **analytics.js**: Lightweight site-wide analytics (page views + interactions)
   - Session tracking with UUID
   - User fingerprinting (privacy-preserving)
   - Country detection via timezone
@@ -219,7 +219,7 @@ All applications connect to:
 - `naei_global_t_pollutant` - Pollutant definitions and units
 - `naei_global_t_category` - Emission source category definitions
 - `naei_2023ds_t_category_data` - Time-series data (1970-2023)
-- `analytics_events` - Usage tracking (optional)
+- `site_events` - Simplified site-wide analytics (optional)
 
 ## Next Steps
 

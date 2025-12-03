@@ -22,11 +22,11 @@ Centralized Supabase database connection configuration.
 - Used by all applications to connect to the NAEI database
 
 #### `analytics.js`
-Privacy-friendly analytics tracking system.
-- Session tracking
-- User fingerprinting (privacy-preserving)
-- Country detection via timezone
-- Exports: `Analytics.trackAnalytics()`, `Analytics.getUserCountry()`, etc.
+Lightweight site-wide analytics helper.
+- Session tracking via sessionStorage IDs (no fingerprinting)
+- Auto `page_view` event + manual `interaction` events
+- Country detection via timezone/locale (best-effort)
+- Exports: `SiteAnalytics.trackInteraction()`, `SiteAnalytics.trackPageView()`, legacy `Analytics.trackAnalytics()` shim
 
 #### `colors.js`
 Consistent color palette and assignment logic.
@@ -65,11 +65,17 @@ Base styling shared across all NAEI viewers:
 
 ### In JavaScript
 ```javascript
-// Initialize Supabase
-const supabase = window.SupabaseConfig.initSupabaseClient();
+// Optional: set a friendly slug or defaults before auto page_view fires
+window.SiteAnalytics.configure({
+   pageSlug: '/linechart',
+   defaults: { app: 'linechart' }
+});
 
-// Track analytics
-window.Analytics.trackAnalytics(supabase, 'event_name', { data: 'value' });
+// Track a user interaction
+window.SiteAnalytics.trackInteraction('share_click', {
+   format: 'png',
+   pollutant: 'PM2.5'
+});
 
 // Get colors
 const color = window.Colors.getColorForCategory('categoryName');
@@ -104,7 +110,7 @@ The shared Supabase configuration connects to these tables:
 - `naei_global_t_pollutant` - Pollutant definitions and units
 - `naei_global_t_category` - Emission source group definitions
 - `naei_2023ds_t_category_data` - Time-series data (1970-2023)
-- `analytics_events` - Usage analytics tracking (optional)
+- `site_events` - Lightweight site-wide analytics (optional)
 
 ## Color Palette
 
@@ -130,11 +136,8 @@ Category assignments:
 ## Analytics Events
 
 Standard analytics events tracked across applications:
-- `page_load` - Application initialized
-- `chart_drawn` / `scatter_chart_drawn` / `bubble_chart_drawn` - Chart rendered
-- `share_url_copied` - Shareable URL copied
-- `share_png_copied` - Chart image copied to clipboard
-- `chart_downloaded` / `scatter_chart_downloaded` / `bubble_chart_downloaded` - PNG downloaded
+- `page_view` - Emitted automatically once per load
+- `interaction` - Custom label provided via `trackInteraction(label, data)`
 
 Analytics can be disabled with URL parameter: `?analytics=off`
 

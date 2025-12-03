@@ -7,6 +7,8 @@ This analytics system tracks user interactions with your NAEI viewer to help you
 - How often data is exported (CSV/Excel/PNG)
 - User engagement patterns
 
+> **Heads up:** the repository now ships a much lighter site-wide tracker (`SharedResources/analytics.js`) that writes to the `site_events` table created by `scripts/site_analytics_setup.sql`. Use that setup when you only need page views + high-value interactions across the entire Explorer. Keep the instructions below if you still want the detailed, linechart-specific dashboard.
+
 ## Privacy-First Approach
 - **No personal data collected** - only usage patterns
 - **Fingerprinting is minimal** - basic browser info for unique user counting
