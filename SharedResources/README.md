@@ -24,7 +24,7 @@ Centralized Supabase database connection configuration.
 #### `analytics.js`
 Lightweight site-wide analytics helper.
 - Session tracking via sessionStorage IDs (no fingerprinting)
-- Auto `page_view` event + manual `interaction` events
+- Auto `page_drawn` event + manual `interaction` events
 - Country detection via timezone/locale (best-effort)
 - Exports: `SiteAnalytics.trackInteraction()`, `SiteAnalytics.trackPageView()`, legacy `Analytics.trackAnalytics()` shim
 
@@ -65,7 +65,7 @@ Base styling shared across all NAEI viewers:
 
 ### In JavaScript
 ```javascript
-// Optional: set a friendly slug or defaults before auto page_view fires
+// Optional: set a friendly slug or defaults before auto page_drawn fires
 window.SiteAnalytics.configure({
    pageSlug: '/linechart',
    defaults: { app: 'linechart' }
@@ -136,8 +136,9 @@ Category assignments:
 ## Analytics Events
 
 Standard analytics events tracked across applications:
-- `page_view` - Emitted automatically once per load
+- `page_drawn` - Emitted automatically once per load when the DOM is ready
 - `interaction` - Custom label provided via `trackInteraction(label, data)`
+- `page_seen` - Optional heartbeat fired ~15s after load to approximate human viewing
 
 Analytics can be disabled with URL parameter: `?analytics=off`
 

@@ -22,7 +22,8 @@
   let pendingFlush = null;
   let cachedEndpoint = null;
   let cachedKey = null;
-  let autoPageViewSent = false;
+  let autoPageDrawnSent = false;
+  let heartbeatTimer = null;
 
   const state = {
     sessionId: loadSessionId(),
@@ -290,12 +291,12 @@
     return pendingFlush;
   }
 
-  function trackPageView(meta = {}) {
+  function trackPageDrawn(meta = {}) {
     if (window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__) {
       return Promise.resolve(false);
     }
     const viewport = buildViewportInfo();
-    const record = buildRecord('page_view', {
+    const record = buildRecord('page_drawn', {
       ...meta,
       pageSlug: meta.pageSlug,
       screen_size: viewport.screen,
@@ -313,25 +314,26 @@
   }
 
   async function legacyTrackAnalytics(_client, eventName, details = {}) {
-    if (eventName === 'page_load' || eventName === 'page_view') {
-      return trackPageView(details);
+    if (eventName === 'page_load' || eventName === 'page_view' || eventName === 'page_drawn') {
+      return trackPageDrawn(details);
     }
     return trackInteraction(eventName, details);
   }
 
-  function autoTrackPageView() {
+  function autoTrackPageDrawn() {
     if (analyticsDisabled || window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__) {
       return;
     }
-    if (autoPageViewSent) {
+    if (autoPageDrawnSent) {
       return;
     }
     const fire = () => {
-      if (autoPageViewSent) {
+      if (autoPageDrawnSent) {
         return;
       }
-      autoPageViewSent = true;
-      trackPageView();
+      autoPageDrawnSent = true;
+      trackPageDrawn();
+      scheduleHeartbeat();
     };
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
       runSoon(fire);
@@ -340,10 +342,21 @@
     }
   }
 
+  function scheduleHeartbeat() {
+    clearTimeout(heartbeatTimer);
+    heartbeatTimer = window.setTimeout(() => {
+      heartbeatTimer = null;
+      trackInteraction('page_seen', {
+        dwell_seconds: 15
+      });
+    }, 15000);
+  }
+
   function exposeApi() {
     const api = {
       configure,
-      trackPageView,
+      trackPageDrawn,
+      trackPageView: trackPageDrawn,
       trackInteraction,
       flush: flushQueue,
       getSessionId: () => state.sessionId,
@@ -356,7 +369,8 @@
       trackAnalytics: legacyTrackAnalytics,
       getUserCountry,
       getSessionId: () => state.sessionId,
-      trackPageView,
+      trackPageDrawn,
+      trackPageView: trackPageDrawn,
       trackInteraction
     };
   }
@@ -377,5 +391,5 @@
 
   exposeApi();
   registerLifecycleHooks();
-  autoTrackPageView();
+  autoTrackPageDrawn();
 })();

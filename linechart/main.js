@@ -1626,7 +1626,7 @@ async function updateChart(){
   updateUrlFromChartState();
 
   // Track chart view analytics
-  window.supabaseModule.trackAnalytics('chart_view', {
+  window.supabaseModule.trackAnalytics('linechart_drawn', {
     pollutant: pollutant,
     start_year: startYear,
     end_year: endYear,

@@ -7,7 +7,7 @@ INSERT INTO daily_analytics (
     date,
     total_sessions,
     unique_users,
-    chart_views,
+    linechart_drawn,
     data_exports,
     chart_downloads,
     ui_interactions,
@@ -22,7 +22,7 @@ SELECT
     stats_date,
     total_sessions,
     unique_users,
-    chart_views,
+    linechart_drawn,
     data_exports,
     chart_downloads,
     ui_interactions,
@@ -39,7 +39,7 @@ SELECT
                 COUNT(*) as view_count
             FROM analytics_events 
             WHERE DATE(timestamp - INTERVAL '4 hours') = stats_date
-            AND event_type IN ('chart_view', 'data_export', 'chart_download')
+            AND event_type IN ('linechart_drawn', 'data_export', 'chart_download')
             AND event_data->>'pollutant' IS NOT NULL
             GROUP BY event_data->>'pollutant'
             ORDER BY view_count DESC
@@ -55,7 +55,7 @@ SELECT
                 COUNT(*) as usage_count
             FROM analytics_events 
             WHERE DATE(timestamp - INTERVAL '4 hours') = stats_date
-            AND event_type IN ('chart_view', 'data_export', 'chart_download')
+            AND event_type IN ('linechart_drawn', 'data_export', 'chart_download')
             AND event_data->'groups' IS NOT NULL
             GROUP BY jsonb_array_elements_text(event_data->'groups')
             ORDER BY usage_count DESC
@@ -68,7 +68,7 @@ ON CONFLICT (date)
 DO UPDATE SET 
     total_sessions = EXCLUDED.total_sessions,
     unique_users = EXCLUDED.unique_users,
-    chart_views = EXCLUDED.chart_views,
+    linechart_drawn = EXCLUDED.linechart_drawn,
     data_exports = EXCLUDED.data_exports,
     chart_downloads = EXCLUDED.chart_downloads,
     ui_interactions = EXCLUDED.ui_interactions,
@@ -89,7 +89,7 @@ SELECT
     date,
     total_sessions,
     unique_users,
-    chart_views,
+    linechart_drawn,
     data_exports,
     ui_interactions
 FROM daily_analytics 

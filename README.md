@@ -16,12 +16,12 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 4. Exports rely on client-side XLSX/PNG generation; analytics events post to Supabase via `SharedResources/analytics.js` when enabled.
 
 ## Site-Wide Analytics (Optional)
-- The helper `SharedResources/analytics.js` now emits only two event types: `page_view` (automatic, once per load) and `interaction` (anything you call manually via `SiteAnalytics.trackInteraction(label, data)`).
+- The helper `SharedResources/analytics.js` now emits an automatic `page_drawn` event (once per load) plus any manual `interaction` events you send via `SiteAnalytics.trackInteraction(label, data)`. A lightweight `page_seen` heartbeat fires ~15 seconds later to approximate a human actually viewing the page.
 - Events insert into the lightweight `site_events` table through the Supabase REST API, so no application-specific client wiring is required.
 - Country attribution continues to rely on the privacy-friendly timezone/locale guess (`GB`, `US`, etc.); no IP addresses or fingerprints are stored.
-- To provision the storage, run `scripts/site_analytics_setup.sql` inside your Supabase project once, then keep Row Level Security policies as-is for the anon key.
+- To provision the storage, run `../CIC-test-data-explorer-analytics/scripts/site_analytics_setup.sql` inside your Supabase project once (the SQL now lives in the private analytics repo), then keep Row Level Security policies as-is for the anon key.
 - Per-page slugs are inferred from `body[data-page-slug]`; set `window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__ = true` before loading the script if a view should remain silent.
-- For a quick local view of the data, open `site-analytics-dashboard.html` (serve it via `npx serve` or similar). It pulls from `site_event_daily_summary`, `site_event_country_summary`, and the latest `site_events` rows to render overview cards, tables, and recent activity—no deployment needed.
+- For a quick local view of the data, open `../CIC-test-data-explorer-analytics/site-analytics-dashboard.html` from the private repo (serve it via `npx serve` or similar). It pulls from `site_event_daily_summary`, `site_event_country_summary`, and the latest `site_events` rows to render overview cards, tables, and recent activity—no deployment needed.
 
 ## Working Locally
 - Serve the repository with any static file server (`python -m http.server`, `npx serve`, etc.) so the Supabase client can resolve relative paths.
