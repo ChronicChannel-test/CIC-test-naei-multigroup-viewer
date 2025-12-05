@@ -144,6 +144,13 @@ const urlOverrideParams = [
   'activityCategory','actCategory',
   'dataset','year'
 ];
+const systemAnalyticsEvents = new Set([
+  'page_drawn',
+  'sbase_data_queried',
+  'sbase_data_loaded',
+  'sbase_data_error',
+  'bubble_chart_drawn'
+]);
 let categoryMetadataCache = null;
 let categoryMetadataPromise = null;
 let sharedLoaderReference = null;
@@ -388,11 +395,31 @@ async function loadBubbleHeroDataset(sharedLoader) {
  * @param {Object} details - Additional event data
  */
 async function performAnalyticsWrite(eventName, details = {}) {
+  const normalizedName = typeof eventName === 'string'
+    ? eventName.trim()
+    : (eventName || '');
+  const payload = { ...details };
+  const isSystemEvent = systemAnalyticsEvents.has(normalizedName);
+
+  if (window.SiteAnalytics) {
+    const tracker = isSystemEvent
+      ? window.SiteAnalytics.trackSystem
+      : window.SiteAnalytics.trackInteraction;
+    if (typeof tracker === 'function') {
+      await tracker(normalizedName, payload);
+      return true;
+    }
+  }
+
   const client = ensureInitialized();
-  if (client && window.Analytics) {
-    await window.Analytics.trackAnalytics(client, eventName, details);
+  if (client && window.Analytics?.trackAnalytics) {
+    const legacyPayload = isSystemEvent
+      ? { ...payload, __eventType: 'system' }
+      : payload;
+    await window.Analytics.trackAnalytics(client, normalizedName, legacyPayload);
     return true;
   }
+
   return false;
 }
 

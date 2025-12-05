@@ -12,6 +12,14 @@
   const FLUSH_DELAY_MS = 2000;
   const HEARTBEAT_INTERVAL_MS = 30000;
   const HEARTBEAT_IDLE_TIMEOUT_MS = 60000;
+  const SYSTEM_EVENT_LABELS = new Set([
+    'page_drawn',
+    'sbase_data_queried',
+    'sbase_data_loaded',
+    'sbase_data_error',
+    'bubble_chart_drawn',
+    'linechart_drawn'
+  ]);
 
   const searchParams = buildSearchParams();
   const debugEnabled = ['debug', 'debugLogs', 'analyticsDebug', 'logs']
@@ -203,6 +211,7 @@
     const label = meta.label || meta.event_label || null;
     return {
       session_id: state.sessionId,
+      event_timestamp: now,
       page_slug: pageSlug,
       event_type: eventType,
       event_label: label,
@@ -315,13 +324,12 @@
     heartbeatCount = 0;
     pauseHeartbeatLoop();
     const viewport = buildViewportInfo();
-    const record = buildRecord('page_drawn', {
+    return trackSystem('page_drawn', {
       ...meta,
       pageSlug: meta.pageSlug,
       screen_size: viewport.screen,
       viewport_size: viewport.viewport
     });
-    return Promise.resolve(queueEvent(record));
   }
 
   function trackInteraction(label, meta = {}) {
@@ -337,11 +345,34 @@
     return Promise.resolve(queued);
   }
 
+  function trackSystem(label, meta = {}) {
+    const record = buildRecord('system', {
+      ...(meta || {}),
+      label: label || 'system'
+    });
+    return Promise.resolve(queueEvent(record));
+  }
+
   async function legacyTrackAnalytics(_client, eventName, details = {}) {
-    if (eventName === 'page_drawn') {
+    const normalizedName = typeof eventName === 'string'
+      ? eventName.trim()
+      : (eventName || '');
+
+    if (normalizedName === 'page_drawn') {
       return trackPageDrawn(details);
     }
-    return trackInteraction(eventName, details);
+
+    let overrideType = null;
+    if (details && typeof details === 'object' && details.__eventType) {
+      overrideType = details.__eventType;
+      delete details.__eventType;
+    }
+
+    if (overrideType === 'system' || SYSTEM_EVENT_LABELS.has(normalizedName)) {
+      return trackSystem(normalizedName, details);
+    }
+
+    return trackInteraction(normalizedName, details);
   }
 
   function autoTrackPageDrawn() {
@@ -452,6 +483,7 @@
       configure,
       trackPageDrawn,
       trackInteraction,
+      trackSystem,
       flush: flushQueue,
       getSessionId: () => state.sessionId,
       getUserCountry,
@@ -464,7 +496,8 @@
       getUserCountry,
       getSessionId: () => state.sessionId,
       trackPageDrawn,
-      trackInteraction
+      trackInteraction,
+      trackSystem
     };
   }
 

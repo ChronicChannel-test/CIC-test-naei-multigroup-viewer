@@ -1589,6 +1589,69 @@ function updateUrlFromChartState() {
   }, 300); // Debounce for 300ms
 }
 
+function buildLineChartViewMeta({
+  pollutantName,
+  startYear,
+  endYear,
+  categoryNames = []
+} = {}) {
+  const pollutantRecord = (window.allPollutantsData || []).find(entry => entry.pollutant === pollutantName);
+  const pollutantId = pollutantRecord ? pollutantRecord.id : null;
+  const categoryRecords = window.allCategoryInfo || [];
+  const categoryIds = categoryNames
+    .map(name => {
+      const match = categoryRecords.find(entry => getCategoryDisplayTitle(entry) === name);
+      return match ? match.id : null;
+    })
+    .filter(id => id !== null);
+
+  const queryParts = [];
+  if (pollutantId) {
+    queryParts.push(`pollutant_id=${encodeURIComponent(pollutantId)}`);
+  }
+  if (categoryIds.length) {
+    queryParts.push(`category_ids=${categoryIds.join(',')}`);
+  }
+  if (startYear) {
+    queryParts.push(`start_year=${encodeURIComponent(startYear)}`);
+  }
+  if (endYear) {
+    queryParts.push(`end_year=${encodeURIComponent(endYear)}`);
+  }
+
+  const normalizedQuery = queryParts.join('&');
+  const queryString = normalizedQuery ? `?${normalizedQuery}` : null;
+  const shareUrl = normalizedQuery
+    ? `${window.location.origin}${window.location.pathname}?${normalizedQuery}`
+    : window.location.href;
+
+  return {
+    pageSlug: '/linechart',
+    pollutant: pollutantName || null,
+    pollutant_id: pollutantId || null,
+    start_year: startYear || null,
+    end_year: endYear || null,
+    year_range: (startYear && endYear) ? (endYear - startYear + 1) : null,
+    categories: categoryNames,
+    categories_count: categoryNames.length,
+    category_ids: categoryIds,
+    query: queryString,
+    share_url: shareUrl
+  };
+}
+
+function publishLineChartViewMeta(meta) {
+  if (!meta) {
+    return;
+  }
+  window.__LINE_CHART_VIEW_META__ = meta;
+  try {
+    window.dispatchEvent(new CustomEvent('lineChartViewMeta', { detail: meta }));
+  } catch (error) {
+    // Ignore dispatch failures to avoid noisy consoles in older browsers
+  }
+}
+
 
 async function updateChart(){
   if (!googleChartsReady || !hasGoogleCoreChartConstructors()) {
@@ -1625,6 +1688,13 @@ async function updateChart(){
 
   // Update the URL with the new state (debounced)
   updateUrlFromChartState();
+
+  publishLineChartViewMeta(buildLineChartViewMeta({
+    pollutantName: pollutant,
+    startYear,
+    endYear,
+    categoryNames: selectedCategories
+  }));
 
   // Track chart view analytics only when the selection changes
   const nextSelectionKey = JSON.stringify({

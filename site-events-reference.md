@@ -6,18 +6,18 @@ This document captures every `page_slug`/`event_type`/`event_label` combination 
 
 | page_slug examples | event_type | event_label | When it fires | Notes |
 | --- | --- | --- | --- | --- |
-| `/home`, `/bubblechart`, `/linechart`, `/category-info`, `/resources-embed`, `/user-guide`, dev test pages | `page_drawn` | _(null)_ | Exactly once per load, when DOM is ready | Includes viewport + screen metadata; automatic unless `window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__` is set. |
-| same as above | `interaction` | `page_seen` | Every 30s heartbeat after the user interacts and while the tab stays visible | Carries dwell seconds + heartbeat count; dashboards should filter out if they only want deliberate actions. |
+| `/home`, `/bubblechart`, `/linechart`, `/category-info`, `/resources-embed`, `/user-guide`, dev test pages | `system` | `page_drawn` | Exactly once per load, when DOM is ready | Includes viewport + screen metadata; automatic unless `window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__` is set. |
+| `/bubblechart`, `/linechart` | `interaction` | `page_seen` | Every 30s heartbeat after the user interacts and while the tab stays visible | Carries dwell seconds + heartbeat count; dashboards should filter out if they only want deliberate actions. |
 
 ## `/bubblechart`
 
 | event_type | event_label | Trigger | Key metadata |
 | --- | --- | --- | --- |
-| `interaction` | `bubble_chart_seen` | First time the iframe (or standalone page) becomes visible (`bubblechart/index.html`) | `pageSlug` forced to `/bubblechart` so embedded charts still roll up correctly. |
-| `interaction` | `sbase_data_queried` | Supabase query/snapshot race begins in `bubblechart/supabase.js` | Records whether URL overrides were present, snapshot eligibility, and timestamp. |
-| `interaction` | `sbase_data_loaded` | Dataset load succeeds | Includes data source (`cache`, `snapshot`, `hero`, `direct`, etc.), duration, row count, and `fullDataset` flag. |
-| `interaction` | `sbase_data_error` | Dataset load throws | Captures error message + source + duration for debugging fetch failures. |
-| `interaction` | `bubble_chart_drawn` | User commits a *new* combo of year/pollutant/categories (`bubblechart/main.js`) | Deduped via JSON selection key; payload lists pollutant name, category IDs, and counts. |
+| `interaction` | `bubble_chart_seen` | First time the iframe (or standalone page) becomes visible (`bubblechart/index.html`) | `pageSlug` forced to `/bubblechart`; payload now mirrors the share URL (pollutant, category IDs + flags, year) so this is the canonical “chart view” signal (only `page_seen` heartbeats remain excluded). |
+| `system` | `sbase_data_queried` | Supabase query/snapshot race begins in `bubblechart/supabase.js` | Records whether URL overrides were present, snapshot eligibility, and timestamp. |
+| `system` | `sbase_data_loaded` | Dataset load succeeds | Includes data source (`cache`, `snapshot`, `hero`, `direct`, etc.), duration, row count, and `fullDataset` flag. |
+| `system` | `sbase_data_error` | Dataset load throws | Captures error message + source + duration for debugging fetch failures. |
+| `system` | `bubble_chart_drawn` | User commits a *new* combo of year/pollutant/categories (`bubblechart/main.js`) | Deduped via JSON selection key; payload lists pollutant name, category IDs, and counts. |
 | `interaction` | `bubble_chart_downloaded` | PNG export button succeeds (`bubblechart/export.js`) | Emits year, pollutant, category count, filename, and `chart_type`. |
 | `interaction` | `share_url_copied` | URL copy button inside share dialog | Tracks pollutant, year, category count to gauge sharing behavior. |
 | `interaction` | `share_png_copied` | “Copy chart image” button completes | Same context as above plus clipboard success/failure. |
@@ -30,11 +30,11 @@ _Note:_ `bubblechart/main.js` explicitly calls `trackAnalytics('page_drawn', {ap
 
 | event_type | event_label | Trigger | Key metadata |
 | --- | --- | --- | --- |
-| `interaction` | `linechart_seen` | iframe/page becomes visible (`linechart/index.html`) | Mirrors the bubble chart visibility logic. |
-| `interaction` | `sbase_data_queried` | Line shared-loader kicks off (`linechart/supabase.js`) | Tracks overrides, snapshot eligibility, shared loader availability. |
-| `interaction` | `sbase_data_loaded` | Dataset load succeeds | Emits source, duration, row count, `fullDataset` flag. |
-| `interaction` | `sbase_data_error` | Dataset load fails | Error message + source + duration. |
-| `interaction` | `linechart_drawn` | New selection of pollutant, categories, or year range is rendered (`linechart/main.js`) | Includes year span, category count, and pollutant identifier. |
+| `interaction` | `linechart_seen` | iframe/page becomes visible (`linechart/index.html`) | Mirrors the bubble logic and now includes the active pollutant, category list, and year range so it can double as the official chart view/selection log (only `page_seen` heartbeats are ignored). |
+| `system` | `sbase_data_queried` | Line shared-loader kicks off (`linechart/supabase.js`) | Tracks overrides, snapshot eligibility, shared loader availability. |
+| `system` | `sbase_data_loaded` | Dataset load succeeds | Emits source, duration, row count, `fullDataset` flag. |
+| `system` | `sbase_data_error` | Dataset load fails | Error message + source + duration. |
+| `system` | `linechart_drawn` | New selection of pollutant, categories, or year range is rendered (`linechart/main.js`) | Includes year span, category count, and pollutant identifier. |
 | `interaction` | `share_button_click` | Share dialog opened (`linechart/export.js`) | Payload carries pollutant, category count, and year span. |
 | `interaction` | `share_url_copied` | Share dialog URL copied | Indicates successful link copy, with same context metadata. |
 | `interaction` | `share_png_copied` | Chart PNG copied to clipboard from share dialog | Signals more engaged share action. |

@@ -735,13 +735,6 @@ async function init() {
     // Finally, reveal the main content and draw the chart
     await revealMainContent();
 
-    // Chart ready signal is now sent from revealMainContent after loading overlay fades
-
-    // Track page load
-    await window.supabaseModule.trackAnalytics('page_drawn', {
-      app: 'bubble_chart'
-    });
-
   } catch (error) {
     console.error('Failed to initialize application:', error);
     showNotification('Failed to load data. Please refresh the page.', 'error');
@@ -2220,6 +2213,46 @@ function setupEventListeners() {
   }
 }
 
+function buildBubbleChartViewMeta({
+  year,
+  pollutantId,
+  categoryIds = [],
+  categoryNames = []
+} = {}) {
+  const pollutantName = pollutantId
+    ? window.supabaseModule?.getPollutantName?.(pollutantId) || null
+    : null;
+  const normalizedQuery = (window.location.search || '').replace(/^[?]+/, '');
+  const shareUrlBuilder = window.NAEIUrlState?.buildShareUrl;
+  const shareUrl = typeof shareUrlBuilder === 'function'
+    ? shareUrlBuilder(normalizedQuery)
+    : `${window.location.origin}${window.location.pathname}${normalizedQuery ? `?${normalizedQuery}` : ''}`;
+
+  return {
+    pageSlug: '/bubblechart',
+    year: year || null,
+    pollutant: pollutantName,
+    pollutant_id: pollutantId || null,
+    categories: categoryNames,
+    category_ids: categoryIds,
+    category_count: categoryIds.length,
+    query: normalizedQuery ? `?${normalizedQuery}` : null,
+    share_url: shareUrl
+  };
+}
+
+function publishBubbleChartViewMeta(meta) {
+  if (!meta) {
+    return;
+  }
+  window.__BUBBLE_CHART_VIEW_META__ = meta;
+  try {
+    window.dispatchEvent(new CustomEvent('bubbleChartViewMeta', { detail: meta }));
+  } catch (error) {
+    // Silently ignore dispatch failures (e.g., older browsers)
+  }
+}
+
 /**
  * Draw the scatter chart
  * @param {boolean} skipHeightUpdate - If true, don't send height update to parent (for resize events)
@@ -2322,6 +2355,13 @@ async function drawChart(skipHeightUpdate = false) {
   
   // Update URL
   updateURL();
+
+  publishBubbleChartViewMeta(buildBubbleChartViewMeta({
+    year: selectedYear,
+    pollutantId: selectedPollutantId,
+    categoryIds: selectedCategoryIds,
+    categoryNames: selectedCategoryNames
+  }));
   
   // Track chart draw event only when selections change to avoid inflated counts
   const nextSelectionKey = JSON.stringify({

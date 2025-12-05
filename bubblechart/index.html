@@ -223,23 +223,55 @@
     (function () {
       const chartId = 'bubblechart';
       const embedded = window.parent && window.parent !== window;
-      let seenLogged = false;
+      const state = {
+        seenLogged: false,
+        isVisible: !embedded,
+        meta: null
+      };
 
-      function trackSeenEvent() {
-        if (seenLogged || !window.SiteAnalytics?.trackInteraction) {
+      function normalizeMeta(raw) {
+        if (!raw || typeof raw !== 'object') {
+          return { pageSlug: '/bubblechart' };
+        }
+        const normalized = { pageSlug: '/bubblechart', ...raw };
+        if (!normalized.query) {
+          const currentQuery = window.location.search || '';
+          normalized.query = currentQuery || null;
+        }
+        return normalized;
+      }
+
+      function tryTrackSeen() {
+        if (state.seenLogged || !state.isVisible) {
           return;
         }
-        seenLogged = true;
-        window.SiteAnalytics.trackInteraction('bubble_chart_seen', {
-          pageSlug: '/bubblechart'
-        });
+        if (!state.meta || !window.SiteAnalytics?.trackInteraction) {
+          return;
+        }
+        state.seenLogged = true;
+        window.SiteAnalytics.trackInteraction('bubble_chart_seen', state.meta);
       }
 
       function handleVisibilityChange(isVisible) {
-        if (isVisible) {
-          trackSeenEvent();
+        if (!isVisible) {
+          return;
         }
+        state.isVisible = true;
+        tryTrackSeen();
       }
+
+      function handleMetaUpdate(meta) {
+        state.meta = normalizeMeta(meta);
+        tryTrackSeen();
+      }
+
+      if (window.__BUBBLE_CHART_VIEW_META__) {
+        handleMetaUpdate(window.__BUBBLE_CHART_VIEW_META__);
+      }
+
+      window.addEventListener('bubbleChartViewMeta', (event) => {
+        handleMetaUpdate(event?.detail);
+      });
 
       if (!embedded) {
         handleVisibilityChange(true);
