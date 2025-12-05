@@ -45,4 +45,4 @@ _Note:_ `bubblechart/main.js` explicitly calls `trackAnalytics('page_drawn', {ap
 
 Pages like `/category-info`, `/resources-embed`, `/user-guide`, and `/home` only load `SharedResources/analytics.js` without additional manual calls. They therefore emit **only** the two global signals (`page_drawn` and heartbeat `page_seen`). Dev/test harnesses behave the same way but use their literal path (for example `/linechart/test-dependencies.html`).
 
-If new interactions are added, prefer routing them through `window.SiteAnalytics.trackInteraction(label, meta)` so these tables remain accurate and the dashboard continues to group events consistently.
+If new interactions are added, prefer routing them through `window.SiteAnalytics.trackInteraction(label, meta)` so these tables remain accurate and the dashboard continues to group events consistently. The only embed-specific slug today is `resources-embed` (that module runs inside other pages), whereas `category-info` and `user-guide` load as full standalone views, so their slugs don’t need extra suffixes.
