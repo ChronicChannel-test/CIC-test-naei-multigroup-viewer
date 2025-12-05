@@ -145,6 +145,7 @@ let selectedPollutantId = null;
 let chartRenderCallback = null; // Callback for when chart finishes rendering
 let selectedCategoryIds = [];
 let initialComparisonFlags = []; // Store comparison flags from URL for initial checkbox state
+let lastTrackedBubbleSelectionKey = null; // Prevent duplicate analytics events for unchanged selections
 const MIN_CHART_WRAPPER_HEIGHT = 480;
 const MIN_CHART_CANVAS_HEIGHT = 420;
 const CHART_HEADER_BUFFER = 10; // spacing between title/legend and chart
@@ -737,7 +738,7 @@ async function init() {
     // Chart ready signal is now sent from revealMainContent after loading overlay fades
 
     // Track page load
-    await window.supabaseModule.trackAnalytics('page_load', {
+    await window.supabaseModule.trackAnalytics('page_drawn', {
       app: 'bubble_chart'
     });
 
@@ -2322,12 +2323,23 @@ async function drawChart(skipHeightUpdate = false) {
   // Update URL
   updateURL();
   
-  // Track chart draw event
-  window.supabaseModule.trackAnalytics('bubble_chart_drawn', {
+  // Track chart draw event only when selections change to avoid inflated counts
+  const nextSelectionKey = JSON.stringify({
     year: selectedYear,
-    pollutant: window.supabaseModule.getPollutantName(selectedPollutantId),
-    category_count: selectedCategoryIds.length
+    pollutantId: selectedPollutantId,
+    categories: selectedCategoryIds
   });
+
+  if (nextSelectionKey !== lastTrackedBubbleSelectionKey) {
+    lastTrackedBubbleSelectionKey = nextSelectionKey;
+    window.supabaseModule.trackAnalytics('bubble_chart_drawn', {
+      year: selectedYear,
+      pollutant: window.supabaseModule.getPollutantName(selectedPollutantId),
+      category_count: selectedCategoryIds.length,
+      category_ids: selectedCategoryIds,
+      categories: selectedCategoryNames
+    });
+  }
 
   // Only send height update if not triggered by resize (prevents growing gap)
   if (!skipHeightUpdate) {

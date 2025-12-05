@@ -26,7 +26,7 @@ Lightweight site-wide analytics helper.
 - Session tracking via sessionStorage IDs (no fingerprinting)
 - Auto `page_drawn` event + manual `interaction` events
 - Country detection via timezone/locale (best-effort)
-- Exports: `SiteAnalytics.trackInteraction()`, `SiteAnalytics.trackPageView()`, legacy `Analytics.trackAnalytics()` shim
+- Exports: `SiteAnalytics.trackInteraction()`, `SiteAnalytics.trackPageDrawn()`, legacy `Analytics.trackAnalytics()` shim
 
 #### `colors.js`
 Consistent color palette and assignment logic.
@@ -138,7 +138,11 @@ Category assignments:
 Standard analytics events tracked across applications:
 - `page_drawn` - Emitted automatically once per load when the DOM is ready
 - `interaction` - Custom label provided via `trackInteraction(label, data)`
-- `page_seen` - Optional heartbeat fired ~15s after load to approximate human viewing
+- `page_seen` - Heartbeat fired every 30s *after* a user interaction (and only while the tab remains visible); pauses automatically once the page has been idle for ~1 minute to approximate real dwell time
+- `bubble_chart_seen` / `linechart_seen` - Fired once per load when each iframe-backed tab becomes visible inside the main experience
+- `sbase_data_queried` - Chart has issued a Supabase dataset request (details include whether snapshots/queues are eligible)
+- `sbase_data_loaded` - Supabase delivered usable data and the chart hydrated successfully; metadata captures the source (cache, snapshot, hero, direct, etc.)
+- `sbase_data_error` - Supabase query failed or returned unusable data; payload includes the error message and elapsed time
 
 Analytics can be disabled with URL parameter: `?analytics=off`
 

@@ -16,6 +16,7 @@ const bubbleDataInfoLog = (() => {
 const bubbleDataNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 window.__NAEI_DEBUG__ = window.__NAEI_DEBUG__ || supabaseDebugLoggingEnabled;
 
+
 const bubbleLogger = (() => {
   if (window.BubbleLogger) {
     if (supabaseDebugLoggingEnabled) {
@@ -386,12 +387,17 @@ async function loadBubbleHeroDataset(sharedLoader) {
  * @param {string} eventName - Type of event to track
  * @param {Object} details - Additional event data
  */
-async function trackAnalytics(eventName, details = {}) {
-  // Use shared Analytics module
+async function performAnalyticsWrite(eventName, details = {}) {
   const client = ensureInitialized();
   if (client && window.Analytics) {
     await window.Analytics.trackAnalytics(client, eventName, details);
+    return true;
   }
+  return false;
+}
+
+async function trackAnalytics(eventName, details = {}) {
+  return performAnalyticsWrite(eventName, details);
 }
 
 /**
@@ -581,18 +587,24 @@ function triggerBubbleFullDatasetBootstrap(sharedLoader, reason = 'bubble-chart'
 }
 
 async function loadData(options = {}) {
-  const { useDefaultSnapshot = !hasUrlOverrides() } = options;
+  const urlOverridesActive = hasUrlOverrides();
+  const { useDefaultSnapshot = !urlOverridesActive } = options;
 
   const defaultChartMode = Boolean(useDefaultSnapshot);
   const sharedLoader = await resolveSharedLoader();
   let snapshotRequestedAt = null;
   let snapshotPromise = null;
+  const loadStartedAt = bubbleDataNow();
+  const queryDetails = {
+    page: 'bubble_chart',
+    hasUrlOverrides: urlOverridesActive,
+    snapshotEligible: defaultChartMode,
+    sharedLoaderAvailable: Boolean(sharedLoader),
+    timestamp: new Date().toISOString()
+  };
 
   try {
-    await trackAnalytics('page_load', {
-      page: 'bubble_chart',
-      timestamp: new Date().toISOString()
-    });
+    await trackAnalytics('sbase_data_queried', queryDetails);
 
     let pollutants = [];
     let categories = [];
@@ -848,16 +860,24 @@ async function loadData(options = {}) {
         });
     }
 
+    await trackAnalytics('sbase_data_loaded', {
+      page: 'bubble_chart',
+      source: latestDatasetSource || 'unknown',
+      durationMs: Number((bubbleDataNow() - loadStartedAt).toFixed(1)),
+      rows: rows.length,
+      fullDataset: Boolean(hasFullDataset)
+    });
+
     return dataset;
 
   } catch (error) {
     console.error('Error loading scatter chart data:', error);
     
-    // Track error
-    await trackAnalytics('error', {
-      error_type: 'data_load_error',
-      error_message: error.message,
-      page: 'bubble_chart'
+    await trackAnalytics('sbase_data_error', {
+      page: 'bubble_chart',
+      message: error?.message || String(error),
+      source: latestDatasetSource || 'unknown',
+      durationMs: Number((bubbleDataNow() - loadStartedAt).toFixed(1))
     });
     
     throw error;

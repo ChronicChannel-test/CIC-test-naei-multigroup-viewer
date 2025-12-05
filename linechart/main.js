@@ -33,6 +33,7 @@ let initFailureNotified = false; // Ensure we only notify parent once on failure
 let hydrationRefreshPending = false;
 let hydrationRefreshTimer = null;
 let bootstrapReadyNotified = false;
+let lastTrackedLineSelectionKey = null; // Avoid duplicate analytics events when selections stay the same
 const DEFAULT_LINE_SELECTIONS = {
   pollutant: 'PM2.5',
   categories: ['All'],
@@ -1625,15 +1626,25 @@ async function updateChart(){
   // Update the URL with the new state (debounced)
   updateUrlFromChartState();
 
-  // Track chart view analytics
-  window.supabaseModule.trackAnalytics('linechart_drawn', {
-    pollutant: pollutant,
-    start_year: startYear,
-    end_year: endYear,
-    categories: selectedCategories,
-    categories_count: selectedCategories.length,
-    year_range: endYear - startYear + 1
+  // Track chart view analytics only when the selection changes
+  const nextSelectionKey = JSON.stringify({
+    pollutant,
+    startYear,
+    endYear,
+    categories: selectedCategories
   });
+
+  if (nextSelectionKey !== lastTrackedLineSelectionKey) {
+    lastTrackedLineSelectionKey = nextSelectionKey;
+    window.supabaseModule.trackAnalytics('linechart_drawn', {
+      pollutant: pollutant,
+      start_year: startYear,
+      end_year: endYear,
+      categories: selectedCategories,
+      categories_count: selectedCategories.length,
+      year_range: endYear - startYear + 1
+    });
+  }
 
   window.Colors.resetColorSystem();
   if (seriesVisibility.length !== selectedCategories.length) {

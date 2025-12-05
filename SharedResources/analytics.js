@@ -7,9 +7,11 @@
 
   const TABLE_NAME = 'site_events';
   const SESSION_KEY = 'cic_site_session_id';
-  const RESERVED_FIELDS = new Set(['label', 'event_label', 'pageSlug', 'page_slug']);
+  const RESERVED_FIELDS = new Set(['label', 'event_label', 'pageSlug', 'page_slug', 'skipActivityTouch']);
   const MAX_QUEUE_LENGTH = 25;
   const FLUSH_DELAY_MS = 2000;
+  const HEARTBEAT_INTERVAL_MS = 30000;
+  const HEARTBEAT_IDLE_TIMEOUT_MS = 60000;
 
   const searchParams = buildSearchParams();
   const debugEnabled = ['debug', 'debugLogs', 'analyticsDebug', 'logs']
@@ -24,11 +26,16 @@
   let cachedKey = null;
   let autoPageDrawnSent = false;
   let heartbeatTimer = null;
+  let heartbeatEligible = false;
+  let heartbeatRunning = false;
+  let heartbeatCount = 0;
 
   const state = {
     sessionId: loadSessionId(),
     pageSlug: resolvePageSlug(),
-    defaults: {}
+    defaults: {},
+    pageOpenedAt: Date.now(),
+    lastInteractionAt: null
   };
 
   function runSoon(callback) {
@@ -246,6 +253,10 @@
     return { endpoint: cachedEndpoint, key: cachedKey };
   }
 
+  function isLikelyJwt(token) {
+    return typeof token === 'string' && token.split('.').length === 3;
+  }
+
   function flushQueue(options = {}) {
     if (!eventQueue.length || analyticsDisabled) {
       return Promise.resolve(false);
@@ -260,14 +271,17 @@
       return Promise.resolve(false);
     }
     const payload = eventQueue.splice(0, eventQueue.length);
+    const headers = {
+      'Content-Type': 'application/json',
+      apikey: credentials.key,
+      Prefer: 'return=minimal'
+    };
+    if (isLikelyJwt(credentials.key)) {
+      headers.Authorization = `Bearer ${credentials.key}`;
+    }
     const requestInit = {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: credentials.key,
-        Authorization: `Bearer ${credentials.key}`,
-        Prefer: 'return=minimal'
-      },
+      headers,
       body: JSON.stringify(payload),
       keepalive: Boolean(options.keepalive)
     };
@@ -295,6 +309,11 @@
     if (window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__) {
       return Promise.resolve(false);
     }
+    state.pageOpenedAt = Date.now();
+    state.lastInteractionAt = null;
+    heartbeatEligible = true;
+    heartbeatCount = 0;
+    pauseHeartbeatLoop();
     const viewport = buildViewportInfo();
     const record = buildRecord('page_drawn', {
       ...meta,
@@ -306,15 +325,20 @@
   }
 
   function trackInteraction(label, meta = {}) {
+    const { skipActivityTouch, ...metaPayload } = meta || {};
     const record = buildRecord('interaction', {
-      ...meta,
+      ...metaPayload,
       label: label || 'interaction'
     });
-    return Promise.resolve(queueEvent(record));
+    const queued = queueEvent(record);
+    if (!skipActivityTouch && label !== 'page_seen') {
+      markUserActivity();
+    }
+    return Promise.resolve(queued);
   }
 
   async function legacyTrackAnalytics(_client, eventName, details = {}) {
-    if (eventName === 'page_load' || eventName === 'page_view' || eventName === 'page_drawn') {
+    if (eventName === 'page_drawn') {
       return trackPageDrawn(details);
     }
     return trackInteraction(eventName, details);
@@ -333,7 +357,6 @@
       }
       autoPageDrawnSent = true;
       trackPageDrawn();
-      scheduleHeartbeat();
     };
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
       runSoon(fire);
@@ -342,21 +365,92 @@
     }
   }
 
-  function scheduleHeartbeat() {
-    clearTimeout(heartbeatTimer);
+  function markUserActivity() {
+    state.lastInteractionAt = Date.now();
+    if (!heartbeatEligible || analyticsDisabled || document.visibilityState === 'hidden') {
+      return;
+    }
+    startHeartbeatLoop({ resetTimer: !heartbeatRunning });
+  }
+
+  function hasRecentActivity() {
+    if (!state.lastInteractionAt) {
+      return false;
+    }
+    return (Date.now() - state.lastInteractionAt) <= HEARTBEAT_IDLE_TIMEOUT_MS;
+  }
+
+  function shouldSendHeartbeat() {
+    return heartbeatEligible
+      && !analyticsDisabled
+      && document.visibilityState !== 'hidden'
+      && hasRecentActivity();
+  }
+
+  function clearHeartbeatTimer() {
+    if (heartbeatTimer) {
+      clearTimeout(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  }
+
+  function recordHeartbeat() {
+    if (!shouldSendHeartbeat()) {
+      return;
+    }
+    heartbeatCount += 1;
+    const dwellSeconds = Math.max(0, Math.round((Date.now() - (state.pageOpenedAt || Date.now())) / 1000));
+    trackInteraction('page_seen', {
+      dwell_seconds: dwellSeconds,
+      heartbeat_interval_seconds: HEARTBEAT_INTERVAL_MS / 1000,
+      heartbeat_count: heartbeatCount,
+      skipActivityTouch: true
+    });
+  }
+
+  function queueHeartbeatTick() {
+    clearHeartbeatTimer();
+    if (!shouldSendHeartbeat()) {
+      pauseHeartbeatLoop();
+      return;
+    }
     heartbeatTimer = window.setTimeout(() => {
       heartbeatTimer = null;
-      trackInteraction('page_seen', {
-        dwell_seconds: 15
-      });
-    }, 15000);
+      if (!shouldSendHeartbeat()) {
+        pauseHeartbeatLoop();
+        return;
+      }
+      recordHeartbeat();
+      queueHeartbeatTick();
+    }, HEARTBEAT_INTERVAL_MS);
+  }
+
+  function startHeartbeatLoop(options = {}) {
+    if (!shouldSendHeartbeat()) {
+      return;
+    }
+    if (options.resetCount) {
+      heartbeatCount = 0;
+    }
+    if (options.resetTimer) {
+      clearHeartbeatTimer();
+    }
+    if (heartbeatRunning && !options.resetTimer) {
+      return;
+    }
+    heartbeatRunning = true;
+    queueHeartbeatTick();
+  }
+
+  function pauseHeartbeatLoop() {
+    heartbeatRunning = false;
+    clearHeartbeatTimer();
   }
 
   function exposeApi() {
     const api = {
       configure,
       trackPageDrawn,
-      trackPageView: trackPageDrawn,
       trackInteraction,
       flush: flushQueue,
       getSessionId: () => state.sessionId,
@@ -370,7 +464,6 @@
       getUserCountry,
       getSessionId: () => state.sessionId,
       trackPageDrawn,
-      trackPageView: trackPageDrawn,
       trackInteraction
     };
   }
@@ -380,11 +473,15 @@
       flushQueue();
     });
     window.addEventListener('beforeunload', () => {
+      pauseHeartbeatLoop();
       flushQueue({ keepalive: true });
     });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') {
+        pauseHeartbeatLoop();
         flushQueue({ keepalive: true });
+      } else if (shouldSendHeartbeat()) {
+        startHeartbeatLoop({ resetTimer: true });
       }
     });
   }

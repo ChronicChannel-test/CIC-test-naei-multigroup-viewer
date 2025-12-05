@@ -16,20 +16,26 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 4. Exports rely on client-side XLSX/PNG generation; analytics events post to Supabase via `SharedResources/analytics.js` when enabled.
 
 ## Site-Wide Analytics (Optional)
-- The helper `SharedResources/analytics.js` now emits an automatic `page_drawn` event (once per load) plus any manual `interaction` events you send via `SiteAnalytics.trackInteraction(label, data)`. A lightweight `page_seen` heartbeat fires ~15 seconds later to approximate a human actually viewing the page.
+- The helper `SharedResources/analytics.js` now emits an automatic `page_drawn` event (once per load) plus any manual `interaction` events you send via `SiteAnalytics.trackInteraction(label, data)`. A recurring `page_seen` heartbeat fires every 30 seconds *after* the user interacts (and only while the tab stays visible) so we approximate active dwell time instead of background tab time, and dashboard “Interactions” explicitly filters those heartbeats out so you only see deliberate actions.
 - Events insert into the lightweight `site_events` table through the Supabase REST API, so no application-specific client wiring is required.
 - Country attribution continues to rely on the privacy-friendly timezone/locale guess (`GB`, `US`, etc.); no IP addresses or fingerprints are stored.
-- To provision the storage, run `../CIC-test-data-explorer-analytics/scripts/site_analytics_setup.sql` inside your Supabase project once (the SQL now lives in the private analytics repo), then keep Row Level Security policies as-is for the anon key.
+- To provision the storage, run `../CIC-test-data-explorer-analytics/scripts/site_analytics_setup.sql` inside your Supabase project once (the SQL now lives in the private analytics repo), then keep the existing Row Level Security policies for the `anon` role (Supabase now maps this to the publishable key that replaces the legacy anon key).
 - Per-page slugs are inferred from `body[data-page-slug]`; set `window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__ = true` before loading the script if a view should remain silent.
-- For a quick local view of the data, open `../CIC-test-data-explorer-analytics/site-analytics-dashboard.html` from the private repo (serve it via `npx serve` or similar). It pulls from `site_event_daily_summary`, `site_event_country_summary`, and the latest `site_events` rows to render overview cards, tables, and recent activity—no deployment needed.
+- For a quick local view of the data, open `../CIC-test-data-explorer-analytics/site-analytics-dashboard.html` from the private repo (serve it via `npx serve` or similar). It now pulls from `site_event_daily_summary`, `site_event_country_summary`, `site_event_session_summary`, and the latest `site_events` rows to render overview cards (including Avg Session Length), tables, and recent activity—no deployment needed.
 
 ## Working Locally
 - Serve the repository with any static file server (`python -m http.server`, `npx serve`, etc.) so the Supabase client can resolve relative paths.
 - Configure Supabase credentials once via `.env` + `npm run supabase:env`:
-	1. Copy `.env.example` to `.env.local` (or `.env`) and drop in your test/live project values (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, optional `SUPABASE_STORAGE_KEY_BASE`).
+	1. Copy `.env.example` to `.env.local` (or `.env`) and drop in your test/live project values (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, optional `SUPABASE_STORAGE_KEY_BASE`). Backend/CLI scripts can also read `SUPABASE_SECRET_KEY` if you include it.
 	2. Run `npm run supabase:env` (or `SUPABASE_ENV_FILE=.env.live npm run supabase:env`) to regenerate `SharedResources/supabase-env.js`.
 	3. The runtime `SharedResources/supabase-config.js` now auto-detects `window.__NAEI_SUPABASE_CONFIG`, so switching environments only requires rerunning the script with a different env file—no manual edits across multiple HTML files.
 - Supabase functions live under `supabase/functions/` and can be deployed via the Supabase CLI when backend updates are needed.
+
+### Supabase API Key Migration (2025+)
+- Supabase now issues **publishable** (`sb_publishable_…`) keys for browser traffic and **secret** (`sb_secret_…`) keys for servers/automation. These replace the legacy `anon` and `service_role` JWTs, which Supabase will retire after November 2025.
+- Generate the new keys from **Project Settings → API Keys → Try the new keys** in the Supabase dashboard, then update your `.env`/CI secrets with `SUPABASE_PUBLISHABLE_KEY` and (optionally) `SUPABASE_SECRET_KEY`.
+- Re-run `npm run supabase:env` whenever you rotate the publishable key so `SharedResources/supabase-env.js` ships the latest browser-safe credential.
+- CLI/Node scripts such as `scripts/export-default-data.js` automatically pick up the secret key if `SUPABASE_SECRET_KEY` or the historic `SUPABASE_SERVICE_ROLE_KEY` env vars are defined, so no additional flags are required after rotation.
 
 ## Deep-Link Tabs & Embeds
 - The shell router inside `index.html` (mirrored in `404.html`) makes `/category-info`, `/user-guide`, and `/resources` deep links fall back to the SPA before the iframe content loads.

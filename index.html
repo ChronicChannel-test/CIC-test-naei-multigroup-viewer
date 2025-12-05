@@ -87,11 +87,24 @@
       height: 100vh;
       background: white;
       z-index: 10000;
+      display: block;
+      box-sizing: border-box;
+      padding: 0 1.5rem;
+      transition: opacity 0.5s ease;
+    }
+    
+    #main-loading-overlay .main-loading-content {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: center;
-      transition: opacity 0.5s ease;
+      text-align: center;
+      gap: 20px;
+      width: 100%;
+      max-width: 360px;
     }
     
     #main-loading-overlay .main-spinner {
@@ -100,13 +113,14 @@
       border-radius: 50%;
       background: conic-gradient(#E6194B 0deg 120deg, #F58231 120deg 240deg, #FFE119 240deg 360deg);
       animation: spin 1.25s linear infinite;
-      margin-bottom: 20px;
+      margin: 0;
     }
     
     #main-loading-overlay .main-loading-text {
       color: #374151;
       font-size: 18px;
       font-weight: 500;
+      margin: 0;
     }
     
   #chart_div {
@@ -669,8 +683,10 @@
 
   <!-- Full-screen loading overlay -->
   <div id="main-loading-overlay">
-    <div class="main-spinner"></div>
-    <div class="main-loading-text">Loading data, please wait...</div>
+    <div class="main-loading-content">
+      <div class="main-spinner"></div>
+      <div class="main-loading-text">Loading data, please wait...</div>
+    </div>
   </div>
 
   <!-- CIC Logo and Social Media Sidebar -->
@@ -830,7 +846,7 @@
     <strong>Contact:</strong> <a  href="mailto:info@chronicillnesschannel.co.uk" target="_blank" rel="noopener" class="text-blue-600hover:text-blue-800">info@chronicillnesschannel.co.uk</a>
       <br>
       <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-        Explorer Version: v4.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.12.03
+        Explorer Version: v4.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.12.05
       </span>
     </footer>
 
@@ -1050,6 +1066,22 @@
       'user-guide': document.getElementById('userguide-iframe'),
       resources: document.getElementById('resources-iframe')
     };
+
+    function notifyIframeVisibility(chartId, isVisible) {
+      const iframe = iframeElements[chartId];
+      if (!iframe || !iframe.contentWindow) {
+        return;
+      }
+      try {
+        iframe.contentWindow.postMessage({
+          type: 'chartVisibility',
+          chartId,
+          visible: Boolean(isVisible)
+        }, '*');
+      } catch (error) {
+        debugWarn('Unable to post visibility message to', chartId, error);
+      }
+    }
 
     function setOverlayRequiredCharts(initialChartId) {
       const normalized = normalizeChartId(initialChartId) || 'bubblechart';
@@ -1596,6 +1628,7 @@
 
     function switchChart(rawChartId) {
       const chartId = normalizeChartId(rawChartId) || 'bubblechart';
+      const previousChart = currentChart;
 
       if (currentChart === chartId) return;
 
@@ -1667,6 +1700,10 @@
       currentChart = chartId;
       updateTabStates();
       showChart(chartId);
+      notifyIframeVisibility(chartId, true);
+      if (previousChart && previousChart !== chartId) {
+        notifyIframeVisibility(previousChart, false);
+      }
 
     }
 
