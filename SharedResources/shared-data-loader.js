@@ -22,6 +22,58 @@ const sharedDataInfoLog = (() => {
   return (...args) => info('[SharedData]', ...args);
 })();
 const sharedDataNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
+const SHARED_FAILURE_EVENT_COOLDOWN_MS = 60000;
+const sharedFailureEventScopes = new Map();
+
+function normalizeSharedSlug(slug) {
+  if (!slug || typeof slug !== 'string') {
+    return null;
+  }
+  const trimmed = slug.trim();
+  if (!trimmed) {
+    return null;
+  }
+  if (trimmed.startsWith('http')) {
+    try {
+      return new URL(trimmed, window.location.origin).pathname || '/';
+    } catch (error) {
+      return '/';
+    }
+  }
+  return trimmed.startsWith('/') ? trimmed.replace(/\/+/g, '/') : `/${trimmed}`;
+}
+
+function resolveSharedPageSlug() {
+  const datasetSlug = normalizeSharedSlug(document?.body?.dataset?.pageSlug || '');
+  if (datasetSlug) {
+    return datasetSlug;
+  }
+  try {
+    const path = window.location?.pathname;
+    return normalizeSharedSlug(path) || '/';
+  } catch (error) {
+    return '/';
+  }
+}
+
+function shouldEmitScopedFailure(cache, scopeKey, cooldownMs) {
+  const key = scopeKey || '/';
+  const now = Date.now();
+  const last = cache.get(key) || 0;
+  if (now - last < cooldownMs) {
+    return false;
+  }
+  cache.set(key, now);
+  return true;
+}
+
+function shouldEmitSharedFailureEvent(scopeKey, forceEvent = false) {
+  if (forceEvent) {
+    sharedFailureEventScopes.set(scopeKey || '/', Date.now());
+    return true;
+  }
+  return shouldEmitScopedFailure(sharedFailureEventScopes, scopeKey || '/', SHARED_FAILURE_EVENT_COOLDOWN_MS);
+}
 
 function swallowSharedPromise(promise) {
   if (promise && typeof promise.then === 'function' && typeof promise.catch === 'function') {
@@ -36,11 +88,15 @@ function reportSharedSupabaseFailure(context = {}) {
   const durationMs = typeof context.durationMs === 'number' ? context.durationMs : (context.durationMs || null);
   const attempt = typeof context.attempt === 'number' ? context.attempt : null;
   const reason = context.reason || null;
+  const pageSlug = normalizeSharedSlug(context.pageSlug) || resolveSharedPageSlug();
+  const scopeKey = context.scopeKey || pageSlug || '/';
+  const shouldEmitEvent = shouldEmitSharedFailureEvent(scopeKey, Boolean(context.forceEvent));
 
-  if (window.SiteAnalytics?.trackSystem) {
+  if (shouldEmitEvent && window.SiteAnalytics?.trackSystem) {
     swallowSharedPromise(
       window.SiteAnalytics.trackSystem('sbase_data_error', {
         page: 'shared_loader',
+        pageSlug,
         source,
         label: context.label,
         durationMs,
@@ -55,7 +111,7 @@ function reportSharedSupabaseFailure(context = {}) {
   if (window.SiteErrors?.log) {
     swallowSharedPromise(
       window.SiteErrors.log({
-        pageSlug: context.pageSlug,
+        pageSlug,
         source,
         severity: 'error',
         message,

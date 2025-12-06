@@ -564,7 +564,12 @@
       });
 
       window.addEventListener('message', event => {
-        if (event?.data?.type === 'requestHeight') {
+        const payload = event?.data;
+        if (!payload) {
+          return;
+        }
+
+        if (payload.type === 'requestHeight') {
           scheduleHeightUpdate(20, true);
         }
       });

@@ -208,6 +208,8 @@ const systemAnalyticsEvents = new Set([
   'json_data_loaded',
   'bubblechart_drawn'
 ]);
+const BUBBLE_FAILURE_EVENT_COOLDOWN_MS = 60000;
+const bubbleFailureEventScopes = new Map();
 let categoryMetadataCache = null;
 let categoryMetadataPromise = null;
 let sharedLoaderReference = null;
@@ -522,6 +524,20 @@ async function trackAnalytics(eventName, details = {}) {
   return performAnalyticsWrite(eventName, details);
 }
 
+function shouldEmitBubbleFailureEvent(scopeKey = 'bubble_chart', forceEvent = false) {
+  if (forceEvent) {
+    bubbleFailureEventScopes.set(scopeKey, Date.now());
+    return true;
+  }
+  const now = Date.now();
+  const last = bubbleFailureEventScopes.get(scopeKey) || 0;
+  if (now - last < BUBBLE_FAILURE_EVENT_COOLDOWN_MS) {
+    return false;
+  }
+  bubbleFailureEventScopes.set(scopeKey, now);
+  return true;
+}
+
 function swallowBubblePromise(promise) {
   if (promise && typeof promise.then === 'function' && typeof promise.catch === 'function') {
     promise.catch(() => {});
@@ -547,12 +563,18 @@ function recordBubbleSupabaseFailure(meta = {}) {
     errorCode: error?.code || null
   };
 
+  const pageSlug = meta.pageSlug || '/bubblechart';
+  const scopeKey = meta.scopeKey || 'bubble_chart';
+  const shouldEmitAnalytics = shouldEmitBubbleFailureEvent(scopeKey, Boolean(meta.forceEvent));
+
   const tasks = [];
-  tasks.push(trackAnalytics('sbase_data_error', analyticsPayload));
+  if (shouldEmitAnalytics) {
+    tasks.push(trackAnalytics('sbase_data_error', analyticsPayload));
+  }
 
   if (window.SiteErrors?.log) {
     tasks.push(window.SiteErrors.log({
-      pageSlug: '/bubblechart',
+      pageSlug,
       source,
       severity: meta.severity || 'error',
       message,
@@ -568,6 +590,9 @@ function recordBubbleSupabaseFailure(meta = {}) {
     }));
   }
 
+  if (!tasks.length) {
+    return Promise.resolve([]);
+  }
   return Promise.allSettled(tasks);
 }
 

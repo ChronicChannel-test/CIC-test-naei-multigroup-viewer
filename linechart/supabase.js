@@ -156,6 +156,8 @@ const systemAnalyticsEvents = new Set([
   'json_data_loaded',
   'linechart_drawn'
 ]);
+const LINE_FAILURE_EVENT_COOLDOWN_MS = 60000;
+const lineFailureEventScopes = new Map();
 let lineHasFullDataset = false;
 let lineDatasetSource = null;
 let lineFullDatasetPromise = null;
@@ -715,6 +717,20 @@ async function trackAnalytics(eventName, details = {}) {
   }
 }
 
+function shouldEmitLineFailureEvent(scopeKey = 'linechart', forceEvent = false) {
+  if (forceEvent) {
+    lineFailureEventScopes.set(scopeKey, Date.now());
+    return true;
+  }
+  const now = Date.now();
+  const last = lineFailureEventScopes.get(scopeKey) || 0;
+  if (now - last < LINE_FAILURE_EVENT_COOLDOWN_MS) {
+    return false;
+  }
+  lineFailureEventScopes.set(scopeKey, now);
+  return true;
+}
+
 function swallowLinePromise(promise) {
   if (promise && typeof promise.then === 'function' && typeof promise.catch === 'function') {
     promise.catch(() => {});
@@ -738,12 +754,18 @@ function recordLineSupabaseFailure(meta = {}) {
     errorCode: error?.code || null
   };
 
+  const pageSlug = meta.pageSlug || '/linechart';
+  const scopeKey = meta.scopeKey || 'linechart';
+  const shouldEmitAnalytics = shouldEmitLineFailureEvent(scopeKey, Boolean(meta.forceEvent));
+
   const tasks = [];
-  tasks.push(trackAnalytics('sbase_data_error', analyticsPayload));
+  if (shouldEmitAnalytics) {
+    tasks.push(trackAnalytics('sbase_data_error', analyticsPayload));
+  }
 
   if (window.SiteErrors?.log) {
     tasks.push(window.SiteErrors.log({
-      pageSlug: '/linechart',
+      pageSlug,
       source,
       severity: meta.severity || 'error',
       message,
@@ -758,6 +780,9 @@ function recordLineSupabaseFailure(meta = {}) {
     }));
   }
 
+  if (!tasks.length) {
+    return Promise.resolve([]);
+  }
   return Promise.allSettled(tasks);
 }
 
