@@ -442,6 +442,12 @@ async function loadBubbleHeroDataset(sharedLoader) {
     return heroDataset;
   } catch (error) {
     bubbleDataInfoLog('Bubble hero dataset unavailable', error.message || error);
+    swallowBubblePromise(recordBubbleSupabaseFailure({
+      source: 'hero-dataset',
+      label: 'hero-dataset',
+      reason: 'hero-dataset',
+      error
+    }));
     return null;
   }
 }
@@ -514,6 +520,55 @@ async function performAnalyticsWrite(eventName, details = {}) {
 
 async function trackAnalytics(eventName, details = {}) {
   return performAnalyticsWrite(eventName, details);
+}
+
+function swallowBubblePromise(promise) {
+  if (promise && typeof promise.then === 'function' && typeof promise.catch === 'function') {
+    promise.catch(() => {});
+  }
+}
+
+function recordBubbleSupabaseFailure(meta = {}) {
+  const error = meta.error;
+  const message = meta.message || error?.message || 'Bubble Supabase request failed';
+  const source = meta.source || meta.label || 'bubble-supabase';
+  const durationMs = typeof meta.durationMs === 'number' ? meta.durationMs : (meta.durationMs || null);
+  const attempt = typeof meta.attempt === 'number' ? meta.attempt : (meta.attempt || null);
+  const inactiveChartMode = typeof meta.inactiveChartMode === 'boolean' ? meta.inactiveChartMode : undefined;
+  const reason = meta.reason || null;
+  const analyticsPayload = {
+    page: 'bubble_chart',
+    source,
+    message,
+    durationMs,
+    attempt,
+    reason,
+    inactiveChartMode,
+    errorCode: error?.code || null
+  };
+
+  const tasks = [];
+  tasks.push(trackAnalytics('sbase_data_error', analyticsPayload));
+
+  if (window.SiteErrors?.log) {
+    tasks.push(window.SiteErrors.log({
+      pageSlug: '/bubblechart',
+      source,
+      severity: meta.severity || 'error',
+      message,
+      error_code: error?.code || null,
+      details: {
+        ...meta.details,
+        durationMs,
+        attempt,
+        reason,
+        inactiveChartMode,
+        stack: error?.stack || null
+      }
+    }));
+  }
+
+  return Promise.allSettled(tasks);
 }
 
 /**
@@ -702,6 +757,13 @@ function triggerBubbleFullDatasetBootstrap(sharedLoader, reason = 'bubble-chart'
   })().catch(error => {
     bubbleFullDatasetPromise = null;
     console.error('Bubble chart full dataset bootstrap failed:', error);
+    swallowBubblePromise(recordBubbleSupabaseFailure({
+      source: 'bubble-bootstrap',
+      label: 'shared-bootstrap',
+      reason: bootstrapReason,
+      durationMs: Number((bubbleDataNow() - start).toFixed(1)),
+      error
+    }));
     throw error;
   });
 
@@ -1092,14 +1154,14 @@ async function loadData(options = {}) {
 
   } catch (error) {
     console.error('Error loading scatter chart data:', error);
-    
-    await trackAnalytics('sbase_data_error', {
-      page: 'bubble_chart',
-      message: error?.message || String(error),
+    await recordBubbleSupabaseFailure({
       source: latestDatasetSource || 'unknown',
-      durationMs: Number((bubbleDataNow() - loadStartedAt).toFixed(1))
+      durationMs: Number((bubbleDataNow() - loadStartedAt).toFixed(1)),
+      error,
+      inactiveChartMode: snapshotOnlyMode,
+      reason: 'load-data'
     });
-    
+
     throw error;
   }
 }
@@ -1520,6 +1582,14 @@ async function loadDataDirectly() {
             attempt,
             message: response.error.message || String(response.error)
           });
+          swallowBubblePromise(recordBubbleSupabaseFailure({
+            source: 'bubble-direct-query',
+            label,
+            durationMs: duration,
+            attempt,
+            reason: 'direct-fetch',
+            error: response.error
+          }));
         } else {
           bubbleDataInfoLog('Supabase query completed', {
             label,
@@ -1529,6 +1599,23 @@ async function loadDataDirectly() {
           });
         }
         return response;
+      }).catch(error => {
+        const duration = Number((bubbleDataNow() - start).toFixed(1));
+        bubbleDataInfoLog('Supabase query threw', {
+          label,
+          durationMs: duration,
+          attempt,
+          message: error?.message || String(error)
+        });
+        swallowBubblePromise(recordBubbleSupabaseFailure({
+          source: 'bubble-direct-query',
+          label,
+          durationMs: duration,
+          attempt,
+          reason: 'direct-fetch',
+          error
+        }));
+        throw error;
       });
     };
 

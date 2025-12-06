@@ -23,6 +23,55 @@ const sharedDataInfoLog = (() => {
 })();
 const sharedDataNow = () => (typeof performance !== 'undefined' && performance.now ? performance.now() : Date.now());
 
+function swallowSharedPromise(promise) {
+  if (promise && typeof promise.then === 'function' && typeof promise.catch === 'function') {
+    promise.catch(() => {});
+  }
+}
+
+function reportSharedSupabaseFailure(context = {}) {
+  const error = context.error;
+  const message = context.message || error?.message || 'Shared data loader Supabase request failed';
+  const source = context.source || context.label || 'shared-data-loader';
+  const durationMs = typeof context.durationMs === 'number' ? context.durationMs : (context.durationMs || null);
+  const attempt = typeof context.attempt === 'number' ? context.attempt : null;
+  const reason = context.reason || null;
+
+  if (window.SiteAnalytics?.trackSystem) {
+    swallowSharedPromise(
+      window.SiteAnalytics.trackSystem('sbase_data_error', {
+        page: 'shared_loader',
+        source,
+        label: context.label,
+        durationMs,
+        attempt,
+        reason,
+        message,
+        errorCode: error?.code || null
+      })
+    );
+  }
+
+  if (window.SiteErrors?.log) {
+    swallowSharedPromise(
+      window.SiteErrors.log({
+        pageSlug: context.pageSlug,
+        source,
+        severity: 'error',
+        message,
+        error_code: error?.code || null,
+        details: {
+          label: context.label || null,
+          durationMs,
+          attempt,
+          reason,
+          stack: error?.stack || null
+        }
+      })
+    );
+  }
+}
+
 const SHARED_RESOURCES_BASE_PATH = (() => {
   const normalizePath = path => {
     if (!path || typeof path !== 'string') {
@@ -421,6 +470,12 @@ async function loadHeroDataset(options = {}) {
     return payload;
   })().catch(error => {
     cache.heroCache.delete(normalized.cacheKey);
+    reportSharedSupabaseFailure({
+      label: 'hero-dataset',
+      source: 'shared-hero-dataset',
+      reason: 'loadHeroDataset',
+      error
+    });
     throw error;
   });
 
@@ -473,6 +528,11 @@ async function loadSharedData() {
     cache.isLoading = false;
     cache.loadPromise = null;
     cache.fullBootstrapPromise = null;
+    reportSharedSupabaseFailure({
+      source: 'shared-loader-load',
+      reason: 'loadSharedData',
+      error
+    });
     throw error;
   }
 }
@@ -515,6 +575,12 @@ async function loadDataFromSupabase() {
           durationMs: Number(duration),
           message: response.error.message || String(response.error)
         });
+        reportSharedSupabaseFailure({
+          label,
+          durationMs: Number(duration),
+          error: response.error,
+          source: 'shared-loader-query'
+        });
       } else {
         sharedDataInfoLog('Supabase query completed', {
           label,
@@ -523,6 +589,20 @@ async function loadDataFromSupabase() {
         });
       }
       return response;
+    }).catch(error => {
+      const duration = Number((sharedDataNow() - start).toFixed(1));
+      sharedDataInfoLog('Supabase query threw', {
+        label,
+        durationMs: duration,
+        message: error?.message || String(error)
+      });
+      reportSharedSupabaseFailure({
+        label,
+        durationMs: duration,
+        error,
+        source: 'shared-loader-query'
+      });
+      throw error;
     });
   };
   

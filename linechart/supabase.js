@@ -715,6 +715,52 @@ async function trackAnalytics(eventName, details = {}) {
   }
 }
 
+function swallowLinePromise(promise) {
+  if (promise && typeof promise.then === 'function' && typeof promise.catch === 'function') {
+    promise.catch(() => {});
+  }
+}
+
+function recordLineSupabaseFailure(meta = {}) {
+  const error = meta.error;
+  const message = meta.message || error?.message || 'Line chart Supabase request failed';
+  const source = meta.source || meta.label || 'linechart-supabase';
+  const durationMs = typeof meta.durationMs === 'number' ? meta.durationMs : (meta.durationMs || null);
+  const attempt = typeof meta.attempt === 'number' ? meta.attempt : (meta.attempt || null);
+  const reason = meta.reason || null;
+  const analyticsPayload = {
+    page: 'linechart',
+    source,
+    message,
+    durationMs,
+    attempt,
+    reason,
+    errorCode: error?.code || null
+  };
+
+  const tasks = [];
+  tasks.push(trackAnalytics('sbase_data_error', analyticsPayload));
+
+  if (window.SiteErrors?.log) {
+    tasks.push(window.SiteErrors.log({
+      pageSlug: '/linechart',
+      source,
+      severity: meta.severity || 'error',
+      message,
+      error_code: error?.code || null,
+      details: {
+        ...meta.details,
+        durationMs,
+        attempt,
+        reason,
+        stack: error?.stack || null
+      }
+    }));
+  }
+
+  return Promise.allSettled(tasks);
+}
+
 /**
  * Load pollutant units from Supabase
  */
@@ -938,6 +984,13 @@ function triggerLineFullDatasetBootstrap(sharedLoader, reason = 'line-chart') {
   })().catch(error => {
     lineFullDatasetPromise = null;
     lineSupabaseWarnLog('Failed to hydrate full dataset', error.message || error);
+    swallowLinePromise(recordLineSupabaseFailure({
+      source: 'line-bootstrap',
+      label: 'shared-bootstrap',
+      reason: bootstrapReason,
+      durationMs: Number((lineSupabaseNow() - start).toFixed(1)),
+      error
+    }));
     throw error;
   });
 
@@ -1364,11 +1417,11 @@ async function loadData(options = {}) {
     return processed;
   } catch (error) {
     console.error('Error loading line chart data:', error);
-    await trackAnalytics('sbase_data_error', {
-      page: 'linechart',
-      message: error?.message || String(error),
+    await recordLineSupabaseFailure({
       source: datasetSource || 'unknown',
-      durationMs: Number((lineSupabaseNow() - loadStartedAt).toFixed(1))
+      durationMs: Number((lineSupabaseNow() - loadStartedAt).toFixed(1)),
+      error,
+      reason: 'load-data'
     });
     throw error;
   }
@@ -1401,6 +1454,14 @@ async function loadDataDirectly() {
             attempt,
             message: response.error.message || String(response.error)
           });
+          swallowLinePromise(recordLineSupabaseFailure({
+            source: 'line-direct-query',
+            label,
+            durationMs: duration,
+            attempt,
+            reason: 'direct-fetch',
+            error: response.error
+          }));
         } else {
           lineSupabaseInfoLog('Supabase query completed', {
             label,
@@ -1410,6 +1471,23 @@ async function loadDataDirectly() {
           });
         }
         return response;
+      }).catch(error => {
+        const duration = Number((lineSupabaseNow() - start).toFixed(1));
+        lineSupabaseInfoLog('Supabase query threw', {
+          label,
+          durationMs: duration,
+          attempt,
+          message: error?.message || String(error)
+        });
+        swallowLinePromise(recordLineSupabaseFailure({
+          source: 'line-direct-query',
+          label,
+          durationMs: duration,
+          attempt,
+          reason: 'direct-fetch',
+          error
+        }));
+        throw error;
       });
     };
 
