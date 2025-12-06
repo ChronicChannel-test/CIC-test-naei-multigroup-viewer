@@ -153,6 +153,7 @@ const systemAnalyticsEvents = new Set([
   'sbase_data_queried',
   'sbase_data_loaded',
   'sbase_data_error',
+  'json_data_loaded',
   'linechart_drawn'
 ]);
 let lineHasFullDataset = false;

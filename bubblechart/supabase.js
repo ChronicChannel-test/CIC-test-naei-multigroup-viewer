@@ -205,7 +205,8 @@ const systemAnalyticsEvents = new Set([
   'sbase_data_queried',
   'sbase_data_loaded',
   'sbase_data_error',
-  'bubble_chart_drawn'
+  'json_data_loaded',
+  'bubblechart_drawn'
 ]);
 let categoryMetadataCache = null;
 let categoryMetadataPromise = null;
