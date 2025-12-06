@@ -6,6 +6,8 @@
   'use strict';
 
   const TABLE_NAME = 'site_events';
+  const ERROR_TABLE_NAME = 'site_errors';
+  const ERROR_SEVERITIES = new Set(['warning', 'error', 'critical']);
   const SESSION_KEY = 'cic_site_session_id';
   const RESERVED_FIELDS = new Set(['label', 'event_label', 'pageSlug', 'page_slug', 'skipActivityTouch']);
   const MAX_QUEUE_LENGTH = 25;
@@ -17,7 +19,7 @@
     'sbase_data_queried',
     'sbase_data_loaded',
     'sbase_data_error',
-    'bubble_chart_drawn',
+    'bubblechart_drawn',
     'linechart_drawn'
   ]);
 
@@ -30,8 +32,9 @@
   const eventQueue = [];
   let flushTimer = null;
   let pendingFlush = null;
-  let cachedEndpoint = null;
+  let cachedRestBaseUrl = null;
   let cachedKey = null;
+  const endpointCache = new Map();
   let autoPageDrawnSent = false;
   let heartbeatTimer = null;
   let heartbeatEligible = false;
@@ -246,9 +249,9 @@
     }, FLUSH_DELAY_MS);
   }
 
-  function resolveSupabaseCredentials() {
-    if (cachedEndpoint && cachedKey) {
-      return { endpoint: cachedEndpoint, key: cachedKey };
+  function resolveSupabaseBaseConfig() {
+    if (cachedRestBaseUrl && cachedKey) {
+      return { base: cachedRestBaseUrl, key: cachedKey };
     }
     const runtimeConfig = window.SupabaseConfig || {};
     const envConfig = window.__NAEI_SUPABASE_CONFIG || window.__NAEI_SUPABASE_CONFIG__ || {};
@@ -257,9 +260,27 @@
     if (!url || !key) {
       return null;
     }
-    cachedEndpoint = `${url.replace(/\/$/, '')}/rest/v1/${TABLE_NAME}`;
+    cachedRestBaseUrl = `${url.replace(/\/$/, '')}/rest/v1`;
     cachedKey = key;
-    return { endpoint: cachedEndpoint, key: cachedKey };
+    endpointCache.clear();
+    return { base: cachedRestBaseUrl, key: cachedKey };
+  }
+
+  function resolveSupabaseCredentials(tableName = TABLE_NAME) {
+    const baseConfig = resolveSupabaseBaseConfig();
+    if (!baseConfig) {
+      return null;
+    }
+    const normalizedTable = tableName || TABLE_NAME;
+    if (endpointCache.has(normalizedTable)) {
+      return endpointCache.get(normalizedTable);
+    }
+    const credentials = {
+      endpoint: `${baseConfig.base}/${normalizedTable}`,
+      key: baseConfig.key
+    };
+    endpointCache.set(normalizedTable, credentials);
+    return credentials;
   }
 
   function isLikelyJwt(token) {
@@ -499,6 +520,9 @@
       trackInteraction,
       trackSystem
     };
+    window.SiteErrors = {
+      log: logSiteError
+    };
   }
 
   function registerLifecycleHooks() {
@@ -517,6 +541,111 @@
         startHeartbeatLoop({ resetTimer: true });
       }
     });
+  }
+
+  function normalizeSeverity(value) {
+    if (typeof value !== 'string') {
+      return 'error';
+    }
+    const normalized = value.trim().toLowerCase();
+    return ERROR_SEVERITIES.has(normalized) ? normalized : 'error';
+  }
+
+  function serializeDetails(value) {
+    if (value == null) {
+      return null;
+    }
+    if (value instanceof Error) {
+      return {
+        name: value.name,
+        message: value.message,
+        stack: value.stack
+      };
+    }
+    if (typeof value === 'string') {
+      return { message: value };
+    }
+    if (typeof value !== 'object') {
+      return { value };
+    }
+    try {
+      return JSON.parse(JSON.stringify(value, (_, nestedValue) => {
+        if (typeof nestedValue === 'function') {
+          return undefined;
+        }
+        if (typeof nestedValue === 'bigint') {
+          return Number(nestedValue);
+        }
+        return nestedValue;
+      }));
+    } catch (error) {
+      return {
+        note: 'Failed to serialize error details',
+        fallback: String(value)
+      };
+    }
+  }
+
+  function buildErrorRecord(meta = {}) {
+    if (!meta) {
+      return null;
+    }
+    const message = meta.message
+      || meta.error?.message
+      || (typeof meta === 'string' ? meta : null);
+    if (!message) {
+      return null;
+    }
+    const now = new Date().toISOString();
+    const errorTimestamp = meta.error_timestamp || meta.client_timestamp || now;
+    const slug = sanitizeSlug(meta.page_slug || meta.pageSlug || state.pageSlug);
+    return {
+      error_timestamp: errorTimestamp,
+      session_id: meta.session_id || state.sessionId || null,
+      page_slug: slug,
+      page_url: meta.page_url || (window.location ? window.location.href : null),
+      source: meta.source || 'unknown',
+      severity: normalizeSeverity(meta.severity),
+      error_code: meta.error_code || meta.error?.code || null,
+      message,
+      details: serializeDetails(meta.details || meta.error || meta.extra || null)
+    };
+  }
+
+  async function logSiteError(meta = {}) {
+    const record = buildErrorRecord(meta);
+    if (!record) {
+      return false;
+    }
+    const credentials = resolveSupabaseCredentials(ERROR_TABLE_NAME);
+    if (!credentials) {
+      return false;
+    }
+    const headers = {
+      'Content-Type': 'application/json',
+      apikey: credentials.key,
+      Prefer: 'return=minimal'
+    };
+    if (isLikelyJwt(credentials.key)) {
+      headers.Authorization = `Bearer ${credentials.key}`;
+    }
+
+    try {
+      const response = await fetch(credentials.endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify([record]),
+        keepalive: Boolean(meta.keepalive)
+      });
+      if (!response.ok) {
+        throw new Error(`Site error log failed: ${response.status}`);
+      }
+      logDebug('Logged site error:', record.source, record.severity);
+      return true;
+    } catch (error) {
+      console.warn('Site error logging failed:', error);
+      return false;
+    }
   }
 
   exposeApi();

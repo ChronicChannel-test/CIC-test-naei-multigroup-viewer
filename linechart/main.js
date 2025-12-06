@@ -30,9 +30,9 @@ let googleChartsReady = false;
 let googleChartsLoadPromise = null;
 let initialLoadComplete = false; // Track if initial chart load is done (prevent resize redraw)
 let initFailureNotified = false; // Ensure we only notify parent once on failure
+let chartReadyNotified = false; // Prevent duplicate chartReady messages
 let hydrationRefreshPending = false;
 let hydrationRefreshTimer = null;
-let bootstrapReadyNotified = false;
 let lastTrackedLineSelectionKey = null; // Avoid duplicate analytics events when selections stay the same
 const DEFAULT_LINE_SELECTIONS = {
   pollutant: 'PM2.5',
@@ -877,23 +877,6 @@ function sendContentHeightToParent(force = false) {
     requestAnimationFrame(() => updateChartWrapperHeight('post-height-send'));
   } catch (error) {
     console.error('Unable to send line chart content height to parent:', error);
-  }
-}
-
-function notifyParentBootstrapReady() {
-  if (bootstrapReadyNotified) {
-    return;
-  }
-  bootstrapReadyNotified = true;
-  try {
-    if (window.parent && window.parent !== window) {
-      window.parent.postMessage({
-        type: 'chartBootstrapReady',
-        chart: 'linechart'
-      }, '*');
-    }
-  } catch (error) {
-    // Parent messaging can fail if cross-origin; ignore
   }
 }
 
@@ -2233,10 +2216,7 @@ async function revealMainContent() {
 
                 setTimeout(() => {
                   updateUrlFromChartState();
-                  window.parent.postMessage({
-                    type: 'chartReady',
-                    chart: 'line'
-                  }, '*');
+                  notifyChartReady();
                   resolve();
                 }, 16);
               }, 16);
@@ -2436,7 +2416,6 @@ async function init() {
       pollutantUnits,
       categoryData
     } = await window.supabaseModule.loadData();
-    notifyParentBootstrapReady();
     const resolvedCategories = Array.isArray(categories) ? categories : (Array.isArray(groups) ? groups : []);
     const resolvedCategoryData = categoryData || {};
 
@@ -2525,18 +2504,35 @@ function notifyParentOfInitFailure(error) {
 
 // Add the chart ready message when the chart is fully loaded
 function notifyChartReady() {
+  if (chartReadyNotified) {
+    sendContentHeightToParent();
+    return;
+  }
+
+  chartReadyNotified = true;
+
   try {
-    // Add a small delay to ensure the chart is fully rendered
     setTimeout(() => {
-      if (window.parent && window.parent !== window) {
-        window.parent.postMessage({ 
-          type: 'chartReady', 
-          chart: 'line',
-          timestamp: new Date().toISOString()
-        }, '*');
+      try {
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage({
+            type: 'chartReady',
+            chart: 'line',
+            timestamp: new Date().toISOString()
+          }, '*');
+        }
+      } catch (postError) {
+        console.error('Failed to post line chartReady message:', postError);
       }
-      
-      // Re-enable animations for future updates
+
+      setTimeout(() => {
+        try {
+          sendContentHeightToParent(true);
+        } catch (heightError) {
+          console.error('Unable to send initial line chart height:', heightError);
+        }
+      }, 50);
+
       if (chart) {
         chart.setOptions({
           animation: {

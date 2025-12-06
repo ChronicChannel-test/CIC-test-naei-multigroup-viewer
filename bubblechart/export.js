@@ -954,7 +954,7 @@ async function downloadChartPNG() {
 
     // Track analytics
     if (window.Analytics && supabase) {
-      window.Analytics.trackAnalytics(supabase, 'bubble_chart_downloaded', {
+      window.Analytics.trackAnalytics(supabase, 'bubblechart_downloaded', {
         year: chartData.year,
         pollutant: chartData.pollutantName,
         category_count: categoryCount,
@@ -1220,7 +1220,7 @@ function showShareDialog() {
       showCopiedState(copyUrlBtn);
       
       if (window.Analytics && supabase) {
-        window.Analytics.trackAnalytics(supabase, 'share_url_copied', {
+        window.Analytics.trackAnalytics(supabase, 'bubblechart_share_url_copied', {
           year: chartData.year,
           pollutant: chartData.pollutantName,
           category_count: selectedCategoryCount
@@ -1254,7 +1254,7 @@ function showShareDialog() {
         showCopiedState(copyPngBtn);
         
         if (window.Analytics && supabase) {
-          window.Analytics.trackAnalytics(supabase, 'share_png_copied', {
+          window.Analytics.trackAnalytics(supabase, 'bubblechart_share_png_copied', {
             year: chartData.year,
             pollutant: chartData.pollutantName,
             category_count: selectedCategoryCount
@@ -1284,10 +1284,11 @@ function showShareDialog() {
       await copyChartImageSilently();
 
       if (window.Analytics && supabase) {
-        window.Analytics.trackAnalytics(supabase, 'email_share_copied', {
+        window.Analytics.trackAnalytics(supabase, 'bubblechart_share_email_opened', {
           year: chartData.year,
           pollutant: chartData.pollutantName,
-          category_count: selectedCategoryCount
+          category_count: selectedCategoryCount,
+          share_url: shareUrl
         });
       }
 
@@ -1392,7 +1393,7 @@ function exportData(format = 'csv') {
 
   // Track export analytics
   if (window.Analytics && supabase) {
-    window.Analytics.trackAnalytics(supabase, 'data_export', {
+    window.Analytics.trackAnalytics(supabase, 'bubblechart_data_export', {
       format: format,
       pollutant: pollutantName,
       year: year,

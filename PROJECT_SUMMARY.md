@@ -191,11 +191,11 @@ Updated version of the line chart viewer using shared resources:
 ## Analytics Events
 
 Standard events tracked across both applications:
-- `page_load` - Application initialized
-- `chart_drawn` / `scatter_chart_drawn` - Chart rendered
-- `share_url_copied` - Shareable URL copied
-- `share_png_copied` - Chart image copied
-- `chart_downloaded` / `scatter_chart_downloaded` - PNG downloaded
+- `page_drawn` / `page_seen` - Shared helper handles initial render plus 30s heartbeats after interaction
+- `bubblechart_seen` / `linechart_seen` - Chart view recorded the first time each iframe is visible (slug-prefixed naming)
+- `bubblechart_drawn` / `linechart_drawn` - Fired when a new pollutant/category/year selection finishes rendering
+- `bubblechart_downloaded`, `bubblechart_data_export`, `linechart_data_export` - Capture every CSV/XLSX/PNG export along with filenames and counts
+- `bubblechart_share_*` / `linechart_share_*` - Share dialog events (button open, URL copy, PNG copy, email launch) prefixed with the chart slug for easier analytics filtering
 
 Opt-out: Add `?analytics=off` to URL
 

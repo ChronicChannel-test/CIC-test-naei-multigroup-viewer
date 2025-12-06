@@ -846,7 +846,7 @@
     <strong>Contact:</strong> <a  href="mailto:info@chronicillnesschannel.co.uk" target="_blank" rel="noopener" class="text-blue-600hover:text-blue-800">info@chronicillnesschannel.co.uk</a>
       <br>
       <span style="font-size: 0.8em; color: #666; margin-top: 4px; display: inline-block;">
-        Explorer Version: v4.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.12.05
+        Explorer Version: v4.1 CIC-testdb (Line: v2.4, Bubble: v2.0)<span class="footer-break" aria-hidden="true"> </span> • Build: 2025.12.06
       </span>
     </footer>
 
@@ -913,6 +913,7 @@
     }
     
     const STATIC_CHART_IDS = new Set(['category-info', 'user-guide', 'resources']);
+    const ALL_CHART_IDS = new Set(['bubblechart', 'linechart', ...STATIC_CHART_IDS]);
     const CHART_SEQUENCE = ['bubblechart', 'linechart', 'category-info', 'user-guide', 'resources'];
     const TAB_ID_MAP = {
       'bubblechart': 'tab-bubblechart',
@@ -1034,12 +1035,7 @@
       linechart: false,
       'category-info': false
     };
-    const chartBootstrapState = {
-      bubblechart: false,
-      linechart: false
-    };
-    const BOOTSTRAP_REQUIRED_CHARTS = Object.keys(chartBootstrapState);
-    const BASE_REQUIRED_CHART_KEYS = ['bubblechart'];
+    const BASE_REQUIRED_CHART_KEYS = ['bubblechart', 'linechart'];
     let overlayRequiredChartKeys = [...BASE_REQUIRED_CHART_KEYS];
     let sharedDataBootstrapLaunched = false;
 
@@ -1346,15 +1342,11 @@
       return overlayRequiredChartKeys.every(key => Boolean(heightsReceived[key]));
     }
 
-    function areBootstrapChartsReady() {
-      return BOOTSTRAP_REQUIRED_CHARTS.every(key => chartBootstrapState[key]);
-    }
-
     function maybeHideOverlay() {
       if (overlayHidden) {
         return;
       }
-      if (!areBootstrapChartsReady() || !areRequiredHeightsReady()) {
+      if (!areAllChartsReady() || !areRequiredHeightsReady()) {
         return;
       }
       setTimeout(() => {
@@ -1367,20 +1359,27 @@
     function resolveChartFromPath() {
       try {
         const segments = (window.location.pathname || '').split('/').filter(Boolean);
-        if (segments.length === 0) {
+        if (!segments.length) {
           return null;
         }
 
-        let lastSegment = segments[segments.length - 1].toLowerCase();
-        lastSegment = lastSegment.replace(/\.html?$/, '');
+        const normalizeSegment = (value) => (value || '').toLowerCase().replace(/\.html?$/, '');
+        const inspectSegment = (segment) => {
+          const normalized = normalizeChartId(normalizeSegment(segment));
+          if (normalized && ALL_CHART_IDS.has(normalized)) {
+            return normalized;
+          }
+          return null;
+        };
 
-        if (STATIC_CHART_IDS.has(lastSegment)) {
+        const lastSegment = inspectSegment(segments[segments.length - 1]);
+        if (lastSegment) {
           return lastSegment;
         }
 
-        if (lastSegment === 'index' && segments.length > 1) {
-          const parentSegment = segments[segments.length - 2].toLowerCase().replace(/\.html?$/, '');
-          if (STATIC_CHART_IDS.has(parentSegment)) {
+        if (segments.length > 1) {
+          const parentSegment = inspectSegment(segments[segments.length - 2]);
+          if (parentSegment) {
             return parentSegment;
           }
         }
@@ -1396,17 +1395,23 @@
       const pathname = window.location.pathname || '/';
       const segments = pathname.split('/').filter(Boolean);
 
-      if (segments.length === 0) {
+      if (!segments.length) {
         return '/';
       }
 
       const workingSegments = [...segments];
 
+      const sanitizeSegment = (value) => (value || '').toLowerCase().replace(/\.html?$/, '');
+      const isChartSegment = (segment) => {
+        const normalized = normalizeChartId(sanitizeSegment(segment));
+        return normalized ? ALL_CHART_IDS.has(normalized) : false;
+      };
+
       const popIf = (predicate) => {
         if (!workingSegments.length) {
           return;
         }
-        const candidate = workingSegments[workingSegments.length - 1].toLowerCase();
+        const candidate = workingSegments[workingSegments.length - 1];
         if (predicate(candidate)) {
           workingSegments.pop();
           popIf(predicate);
@@ -1414,7 +1419,8 @@
       };
 
       popIf(segment => /\.[^/.]+$/.test(segment));
-      popIf(segment => STATIC_CHART_IDS.has(segment));
+      popIf(segment => STATIC_CHART_IDS.has(sanitizeSegment(segment)));
+      popIf(segment => isChartSegment(segment));
 
       if (!workingSegments.length) {
         return '/';
@@ -1909,7 +1915,7 @@
     
     // Simple loading overlay control - MESSAGE BASED APPROACH
     let overlayHidden = false;
-    const heightsReceived = { bubblechart: false, linechart: false, 'user-guide': false };
+    const heightsReceived = { bubblechart: false, linechart: false, 'category-info': false, 'user-guide': false };
     const OVERLAY_FAILSAFE_DELAY_MS = 12000;
     let overlayFailsafeTimer = null;
     
@@ -2066,16 +2072,6 @@
         }
       }
 
-      if (event.data && event.data.type === 'chartBootstrapReady') {
-        const rawChartKey = event.data.chart;
-        const chartKey = normalizeChartId(rawChartKey) || rawChartKey;
-        if (chartBootstrapState.hasOwnProperty(chartKey) && !chartBootstrapState[chartKey]) {
-          chartBootstrapState[chartKey] = true;
-          maybeHideOverlay();
-        }
-        return;
-      }
-      
       // Handle content height from iframe (sent once after initial render)
       if (event.data && event.data.type === 'contentHeight') {
         const rawChartKey = event.data.chart;

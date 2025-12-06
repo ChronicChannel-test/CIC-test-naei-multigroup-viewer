@@ -137,12 +137,12 @@ Category assignments:
 
 Standard analytics events tracked across applications:
 - `page_drawn` - Emitted automatically once per load when the DOM is ready
-- `interaction` - Custom label provided via `trackInteraction(label, data)`
 - `page_seen` - Heartbeat fired every 30s *after* a user interaction (and only while the tab remains visible); pauses automatically once the page has been idle for ~1 minute to approximate real dwell time
-- `bubble_chart_seen` / `linechart_seen` - Fired once per load when each iframe-backed tab becomes visible inside the main experience
-- `sbase_data_queried` - Chart has issued a Supabase dataset request (details include whether snapshots/queues are eligible)
-- `sbase_data_loaded` - Supabase delivered usable data and the chart hydrated successfully; metadata captures the source (cache, snapshot, hero, direct, etc.)
-- `sbase_data_error` - Supabase query failed or returned unusable data; payload includes the error message and elapsed time
+- `bubblechart_seen` / `linechart_seen` - Fired once per load when each iframe-backed tab becomes visible inside the main experience and captures the active selection
+- `bubblechart_drawn` / `linechart_drawn` - Fired whenever a new pollutant/category/year selection renders successfully
+- `bubblechart_downloaded`, `bubblechart_data_export`, `linechart_data_export` - Capture the various export buttons; payloads include filenames, formats, and counts
+- `bubblechart_share_*` / `linechart_share_*` - Family of share dialog actions (URL copy, PNG copy, email launch) prefixed by chart slug for simpler grouping
+- `sbase_data_queried` / `sbase_data_loaded` / `sbase_data_error` - Supabase lifecycle events with duration + source metadata
 
 Analytics can be disabled with URL parameter: `?analytics=off`
 

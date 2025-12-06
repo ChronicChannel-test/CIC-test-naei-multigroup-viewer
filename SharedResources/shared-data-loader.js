@@ -128,6 +128,57 @@ const DEFAULT_SNAPSHOT_PATHS = Array.from(new Set([
 let defaultSnapshotPromise = null;
 const HERO_DEFAULT_ACTIVITY_NAME = 'Activity Data';
 
+async function fetchDefaultSnapshotFromPaths() {
+  for (const candidate of DEFAULT_SNAPSHOT_PATHS) {
+    try {
+      sharedDataInfoLog('Attempting to fetch default snapshot', { candidate });
+      const fetchStart = sharedDataNow();
+      const response = await fetch(candidate, { cache: 'no-store' });
+      if (!response.ok) {
+        continue;
+      }
+      const snapshot = await response.json();
+      const duration = Number((sharedDataNow() - fetchStart).toFixed(1));
+      const counts = snapshot?.data
+        ? {
+            pollutants: snapshot.data.pollutants?.length || 0,
+            categories: snapshot.data.categories?.length || 0,
+            rows: snapshot.data.timeseries?.length || snapshot.data.rows?.length || 0,
+            years: snapshot.data.years?.length || 0
+          }
+        : null;
+      sharedDataInfoLog('Default snapshot loaded', {
+        candidate,
+        durationMs: duration,
+        counts
+      });
+      return snapshot;
+    } catch (error) {
+      sharedDataDebugLog(`Default snapshot fetch failed for ${candidate}:`, error);
+    }
+  }
+  sharedDataInfoLog('Default snapshot unavailable after checking configured paths');
+  return null;
+}
+
+function normalizeDefaultSnapshotPayload(snapshot) {
+  if (!snapshot?.data) {
+    return null;
+  }
+  const data = snapshot.data;
+  const categories = Array.isArray(data.categories)
+    ? data.categories
+    : (Array.isArray(data.groups) ? data.groups : []);
+
+  return {
+    pollutants: data.pollutants || [],
+    categories,
+    groups: categories,
+    rows: data.timeseries || data.rows || data.data || [],
+    generatedAt: snapshot.generatedAt || null
+  };
+}
+
 function uniqNumbers(values = []) {
   const deduped = [];
   const seen = new Set();
@@ -173,38 +224,12 @@ async function loadDefaultSnapshot() {
 
   if (!defaultSnapshotPromise) {
     defaultSnapshotPromise = (async () => {
-      for (const candidate of DEFAULT_SNAPSHOT_PATHS) {
-        try {
-          sharedDataInfoLog('Attempting to fetch default snapshot', { candidate });
-          const fetchStart = sharedDataNow();
-          const response = await fetch(candidate, { cache: 'no-store' });
-          if (!response.ok) {
-            continue;
-          }
-          const snapshot = await response.json();
-          window.SharedDataCache.defaultSnapshot = snapshot;
-          window.SharedDataCache.snapshotData = snapshot?.data || null;
-          const duration = (sharedDataNow() - fetchStart).toFixed(1);
-          const counts = snapshot?.data
-            ? {
-                pollutants: snapshot.data.pollutants?.length || 0,
-                categories: snapshot.data.categories?.length || 0,
-                rows: snapshot.data.timeseries?.length || snapshot.data.rows?.length || 0,
-                years: snapshot.data.years?.length || 0
-              }
-            : null;
-          sharedDataInfoLog('Default snapshot loaded', {
-            candidate,
-            durationMs: Number(duration),
-            counts
-          });
-          return snapshot;
-        } catch (error) {
-          sharedDataDebugLog(`Default snapshot fetch failed for ${candidate}:`, error);
-        }
+      const snapshot = await fetchDefaultSnapshotFromPaths();
+      if (snapshot) {
+        window.SharedDataCache.defaultSnapshot = snapshot;
+        window.SharedDataCache.snapshotData = snapshot.data || null;
       }
-      sharedDataInfoLog('Default snapshot unavailable after checking configured paths');
-      return null;
+      return snapshot;
     })();
   }
 
@@ -671,6 +696,12 @@ window.SharedDataLoader = {
   getAllNfrCodes,
   isDataLoaded,
   clearCache
+};
+
+window.SharedSnapshotLoader = window.SharedSnapshotLoader || {
+  fetchDefaultSnapshotDirect: fetchDefaultSnapshotFromPaths,
+  normalizeSnapshotPayload: normalizeDefaultSnapshotPayload,
+  getDefaultSnapshotPaths: () => DEFAULT_SNAPSHOT_PATHS.slice()
 };
 
 sharedDataDebugLog('Shared Data Loader initialized');
