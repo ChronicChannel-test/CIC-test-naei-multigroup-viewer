@@ -156,6 +156,7 @@ const systemAnalyticsEvents = new Set([
   'json_data_loaded',
   'linechart_drawn'
 ]);
+const LINE_SUPABASE_DATA_SOURCES = new Set(['hero', 'shared-bootstrap', 'shared-loader', 'direct', 'cache']);
 const LINE_FAILURE_EVENT_COOLDOWN_MS = 60000;
 const lineFailureEventScopes = new Map();
 let lineHasFullDataset = false;
@@ -737,6 +738,42 @@ function swallowLinePromise(promise) {
   }
 }
 
+function resolveLineLoadMode(source) {
+  switch (source) {
+    case 'hero':
+      return 'hero';
+    case 'shared-bootstrap':
+      return 'full-bootstrap';
+    case 'shared-loader':
+      return 'full-shared-loader';
+    case 'cache':
+      return 'full-cache';
+    case 'direct':
+      return 'full-direct';
+    default:
+      return 'unknown';
+  }
+}
+
+function emitLineDatasetLoadedMetrics({ source, rowsCount = 0, startedAt = null, fullDataset = true } = {}) {
+  if (!source || !LINE_SUPABASE_DATA_SOURCES.has(source)) {
+    return Promise.resolve(false);
+  }
+
+  const durationMs = typeof startedAt === 'number'
+    ? Number((lineSupabaseNow() - startedAt).toFixed(1))
+    : null;
+
+  return trackAnalytics('sbase_data_loaded', {
+    page: 'linechart',
+    source,
+    loadMode: resolveLineLoadMode(source),
+    durationMs,
+    rows: rowsCount,
+    fullDataset: Boolean(fullDataset)
+  });
+}
+
 function recordLineSupabaseFailure(meta = {}) {
   const error = meta.error;
   const message = meta.message || error?.message || 'Line chart Supabase request failed';
@@ -982,6 +1019,12 @@ function triggerLineFullDatasetBootstrap(sharedLoader, reason = 'line-chart') {
       categories: normalized.categories.length,
       rows: normalized.rows?.length || globalRows.length || 0
     });
+    swallowLinePromise(emitLineDatasetLoadedMetrics({
+      source,
+      rowsCount: normalized.rows?.length || globalRows.length || 0,
+      startedAt: start,
+      fullDataset: true
+    }));
     return normalized;
   };
 
@@ -1431,11 +1474,10 @@ async function loadData(options = {}) {
 
     lineSupabaseLog(`Loaded ${rows.length} timeseries rows; ${allPollutants.length} pollutants; ${allCategories.length} categories`);
 
-    await trackAnalytics('sbase_data_loaded', {
-      page: 'linechart',
-      source: datasetSource || 'unknown',
-      durationMs: Number((lineSupabaseNow() - loadStartedAt).toFixed(1)),
-      rows: rows.length,
+    await emitLineDatasetLoadedMetrics({
+      source: datasetSource,
+      rowsCount: rows.length,
+      startedAt: loadStartedAt,
       fullDataset: Boolean(datasetIsFull)
     });
 

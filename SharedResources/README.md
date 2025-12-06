@@ -142,7 +142,7 @@ Standard analytics events tracked across applications:
 - `bubblechart_drawn` / `linechart_drawn` - Fired whenever a new pollutant/category/year selection renders successfully
 - `bubblechart_downloaded`, `bubblechart_data_export`, `linechart_data_export` - Capture the various export buttons; payloads include filenames, formats, and counts
 - `bubblechart_share_*` / `linechart_share_*` - Family of share dialog actions (URL copy, PNG copy, email launch) prefixed by chart slug for simpler grouping
-- `sbase_data_queried` / `sbase_data_loaded` / `sbase_data_error` - Supabase lifecycle events with duration + source metadata
+- `sbase_data_queried` / `sbase_data_loaded` / `sbase_data_error` - Supabase lifecycle events with duration + source metadata (sources now include `hero`, `shared-bootstrap`, `shared-loader`, `cache`, `direct`)
 
 Analytics can be disabled with URL parameter: `?analytics=off`
 

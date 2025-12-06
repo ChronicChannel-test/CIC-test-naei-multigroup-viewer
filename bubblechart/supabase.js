@@ -208,6 +208,7 @@ const systemAnalyticsEvents = new Set([
   'json_data_loaded',
   'bubblechart_drawn'
 ]);
+const BUBBLE_SUPABASE_DATA_SOURCES = new Set(['hero', 'shared-bootstrap', 'shared-loader', 'direct', 'cache']);
 const BUBBLE_FAILURE_EVENT_COOLDOWN_MS = 60000;
 const bubbleFailureEventScopes = new Map();
 let categoryMetadataCache = null;
@@ -544,6 +545,42 @@ function swallowBubblePromise(promise) {
   }
 }
 
+function resolveBubbleLoadMode(source) {
+  switch (source) {
+    case 'hero':
+      return 'hero';
+    case 'shared-bootstrap':
+      return 'full-bootstrap';
+    case 'shared-loader':
+      return 'full-shared-loader';
+    case 'cache':
+      return 'full-cache';
+    case 'direct':
+      return 'full-direct';
+    default:
+      return 'unknown';
+  }
+}
+
+function emitBubbleDatasetLoadedMetrics({ source, rowsCount = 0, startedAt = null, fullDataset = true } = {}) {
+  if (!source || !BUBBLE_SUPABASE_DATA_SOURCES.has(source)) {
+    return Promise.resolve(false);
+  }
+
+  const durationMs = typeof startedAt === 'number'
+    ? Number((bubbleDataNow() - startedAt).toFixed(1))
+    : null;
+
+  return trackAnalytics('sbase_data_loaded', {
+    page: 'bubble_chart',
+    source,
+    loadMode: resolveBubbleLoadMode(source),
+    durationMs,
+    rows: rowsCount,
+    fullDataset: Boolean(fullDataset)
+  });
+}
+
 function recordBubbleSupabaseFailure(meta = {}) {
   const error = meta.error;
   const message = meta.message || error?.message || 'Bubble Supabase request failed';
@@ -743,6 +780,19 @@ function triggerBubbleFullDatasetBootstrap(sharedLoader, reason = 'bubble-chart'
       categories: payload.categories || [],
       rows: payload.timeseries || payload.rows || payload.data || []
     }, source);
+    const hydratedRows = Array.isArray(payload?.timeseries)
+      ? payload.timeseries.length
+      : Array.isArray(payload?.rows)
+        ? payload.rows.length
+        : Array.isArray(payload?.data)
+          ? payload.data.length
+          : 0;
+    swallowBubblePromise(emitBubbleDatasetLoadedMetrics({
+      source,
+      rowsCount: hydratedRows,
+      startedAt: start,
+      fullDataset: true
+    }));
     return payload;
   };
 
@@ -797,13 +847,12 @@ function triggerBubbleFullDatasetBootstrap(sharedLoader, reason = 'bubble-chart'
 
 async function loadData(options = {}) {
   const bubbleActive = isBubbleChartActive();
-  const snapshotOnlyMode = !bubbleActive;
-  const urlOverridesActive = snapshotOnlyMode ? false : hasUrlOverrides();
-  const { useDefaultSnapshot = snapshotOnlyMode ? true : !urlOverridesActive } = options;
+  const urlOverridesActive = hasUrlOverrides();
+  const { useDefaultSnapshot = !urlOverridesActive } = options;
 
   const defaultChartMode = Boolean(useDefaultSnapshot);
   const sharedLoader = await resolveSharedLoader();
-  const allowSupabaseHydration = bubbleActive;
+  const allowSupabaseHydration = options.allowSupabaseHydration !== false;
   const sharedSnapshotHelper = getBubbleSharedSnapshotHelper();
   const requestDefaultSnapshot = () => {
     if (sharedLoader?.loadDefaultSnapshot) {
@@ -823,7 +872,7 @@ async function loadData(options = {}) {
     hasUrlOverrides: urlOverridesActive,
     snapshotEligible: defaultChartMode,
     sharedLoaderAvailable: Boolean(sharedLoader),
-    inactiveChartMode: snapshotOnlyMode,
+    inactiveChartMode: !bubbleActive,
     timestamp: new Date().toISOString()
   };
 
@@ -1163,11 +1212,10 @@ async function loadData(options = {}) {
         });
     }
 
-    await trackAnalytics('sbase_data_loaded', {
-      page: 'bubble_chart',
-      source: latestDatasetSource || 'unknown',
-      durationMs: Number((bubbleDataNow() - loadStartedAt).toFixed(1)),
-      rows: rows.length,
+    await emitBubbleDatasetLoadedMetrics({
+      source: latestDatasetSource,
+      rowsCount: rows.length,
+      startedAt: loadStartedAt,
       fullDataset: Boolean(hasFullDataset)
     });
 
@@ -1183,7 +1231,7 @@ async function loadData(options = {}) {
       source: latestDatasetSource || 'unknown',
       durationMs: Number((bubbleDataNow() - loadStartedAt).toFixed(1)),
       error,
-      inactiveChartMode: snapshotOnlyMode,
+      inactiveChartMode: !bubbleActive,
       reason: 'load-data'
     });
 

@@ -2533,7 +2533,7 @@ function notifyChartReady() {
         }
       }, 50);
 
-      if (chart) {
+      if (chart && typeof chart.setOptions === 'function') {
         chart.setOptions({
           animation: {
             duration: 1000,

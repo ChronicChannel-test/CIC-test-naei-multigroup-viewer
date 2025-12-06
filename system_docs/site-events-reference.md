@@ -15,7 +15,7 @@ This document captures every `page_slug`/`event_type`/`event_label` combination 
 | --- | --- | --- | --- |
 | `interaction` | `bubblechart_seen` | First time the iframe (or standalone page) becomes visible (`bubblechart/index.html`) | `pageSlug` forced to `/bubblechart`; payload mirrors the share URL (pollutant, category IDs + flags, year) so this is the canonical “chart view” signal (only `page_seen` heartbeats remain excluded). |
 | `system` | `sbase_data_queried` | Supabase query/snapshot race begins in `bubblechart/supabase.js` | Records whether URL overrides were present, snapshot eligibility, and timestamp. |
-| `system` | `sbase_data_loaded` | Supabase-backed dataset load succeeds (hero or full fetch) | Includes precise data source (`hero`, `shared-bootstrap`, `shared-loader`, `direct`), the new `loadMode` field (`hero`, `full-bootstrap`, `full-shared-loader`, `full-direct`), duration, row count, and the `fullDataset` flag. |
+| `system` | `sbase_data_loaded` | Supabase-backed dataset load succeeds (hero, cache reuse, or full fetch) | Includes precise data source (`hero`, `shared-bootstrap`, `shared-loader`, `cache`, `direct`), the new `loadMode` field (`hero`, `full-bootstrap`, `full-shared-loader`, `full-cache`, `full-direct`), duration, row count, and the `fullDataset` flag. |
 | `system` | `json_data_loaded` | A bundled JSON snapshot hydrates the chart (default render or inactive-chart mode) | Captures snapshot duration, generation timestamp, row/pollutant/category counts, and the `page` identifier so we can monitor offline-only loads. |
 | `system` | `sbase_data_error` | Dataset load throws | Captures error message + source + duration for debugging fetch failures. |
 | `system` | `bubblechart_drawn` | User commits a *new* combo of year/pollutant/categories (`bubblechart/main.js`) | Deduped via JSON selection key; payload lists pollutant name, category IDs, and counts. |
@@ -33,7 +33,7 @@ _Note:_ `bubblechart/main.js` explicitly calls `trackAnalytics('page_drawn', {ap
 | --- | --- | --- | --- |
 | `interaction` | `linechart_seen` | iframe/page becomes visible (`linechart/index.html`) | Mirrors the bubble logic and includes the active pollutant, category list, and year range so it can double as the official chart view/selection log (only `page_seen` heartbeats are ignored). |
 | `system` | `sbase_data_queried` | Line shared-loader kicks off (`linechart/supabase.js`) | Tracks overrides, snapshot eligibility, shared loader availability. |
-| `system` | `sbase_data_loaded` | Supabase-backed dataset load succeeds (hero or full fetch) | Emits source (`hero`, `shared-bootstrap`, `shared-loader`, `direct`), `loadMode` (hero/full-variant), duration, row count, and the `fullDataset` flag. |
+| `system` | `sbase_data_loaded` | Supabase-backed dataset load succeeds (hero, cache reuse, or full fetch) | Emits source (`hero`, `shared-bootstrap`, `shared-loader`, `cache`, `direct`), `loadMode` (hero/full variants incl. `full-cache`), duration, row count, and the `fullDataset` flag. |
 | `system` | `json_data_loaded` | The default JSON snapshot hydrates the chart before Supabase wins | Includes snapshot generation timestamp, duration, and row/pollutant/category counts for offline/inactive renders. |
 | `system` | `sbase_data_error` | Dataset load fails | Error message + source + duration. |
 | `system` | `linechart_drawn` | New selection of pollutant, categories, or year range is rendered (`linechart/main.js`) | Includes year span, category count, and pollutant identifier. |
