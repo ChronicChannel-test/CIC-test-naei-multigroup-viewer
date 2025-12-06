@@ -28,10 +28,10 @@ flowchart TD
   O -- yes --> P[apply snapshot rows, mark partial]
   O -- no --> Q
   Q --> R{Shared loader fallback available?}
-  R -- yes --> S[load shared data (full)]
+  R -- yes --> S[shared-loader full dataset]
   R -- no --> T{Hero dataset available?}
   T -- yes --> U[apply hero dataset, partial]
-  T -- no --> V[direct Supabase fetch (full)]
+  T -- no --> V[direct Supabase full fetch]
   K & N & P & S & U & V --> W[applyDataset + emit analytics]
 ```
 
@@ -64,7 +64,7 @@ flowchart TD
   N -- yes --> D
   N -- no --> O{Hero dataset available?}
   O -- yes --> P[apply hero dataset, partial + schedule full load]
-  O -- no --> Q[loadDataDirectly() full fetch]
+  O -- no --> Q[direct Supabase full fetch]
   H & K & P & Q & D --> R[applyLineDataset]
   R --> S{Full dataset?}
   S -- yes --> T[mark full, emit analytics]
