@@ -5,19 +5,15 @@ This note captures the current control flow for the first stage of data loading 
 ## Bubble Chart — `loadData()`
 
 **Key checkpoints**
-- Determines whether the bubble chart is the active tab via `isBubbleChartActive()`. The result (today) drives `snapshotOnlyMode` and blocks downstream Supabase hydration if the chart is not active.
-- Emits `sbase_data_queried` before any fetch to log overrides, snapshot eligibility, and whether the shared loader is available.
-- Prefers cached full datasets from the shared loader, then tries an immediate JSON snapshot if default mode is allowed. Snapshot success also kicks off a background `triggerBubbleHydration` if Supabase can run.
-- When nothing is cached, it starts a race between a shared Supabase bootstrap and another snapshot fetch. The first winner populates the chart; Supabase wins mark the dataset “full,” while snapshots keep `hasFullDataset = false`.
-- Remaining fallbacks fetch the hero dataset (partial Supabase) or run the full direct Supabase query stack. All stages update `latestDatasetSource` for analytics and hydration listeners.
+- Always emits `sbase_data_queried` before touching loaders so analytics can see override/snapshot eligibility.
+- Prefers cached full datasets from the shared loader; otherwise, it short-circuits through the JSON snapshot for the first render while Supabase hydration races in the background.
+- The race pits a shared Supabase bootstrap against the snapshot promise. Supabase wins mark the dataset "full"; snapshots keep `hasFullDataset = false` but still trigger `triggerBubbleHydration`.
+- If the race does not land on Supabase, the loader continues by requesting the hero dataset, then `SharedDataLoader.loadSharedData`, and finally a direct Supabase fetch.
+- Every path updates `latestDatasetSource`, merges selector metadata when partial, and reuses the shared loader’s cached payload so both charts avoid redundant queries.
 
 ```mermaid
 flowchart TD
-  A[loadData invoked] --> B{isBubbleChartActive?}
-  B -- yes --> C[allow Supabase hydration]
-  B -- no --> D[snapshotOnlyMode=true]
-  C --> E[track sbase_data_queried]
-  D --> E
+  A[loadData invoked] --> E[track sbase_data_queried]
   E --> F{Shared loader cache ready?}
   F -- yes --> G[use cached full dataset]
   F -- no --> H{Can short-circuit snapshot?}
@@ -43,10 +39,10 @@ flowchart TD
 
 **Key checkpoints**
 - Logs snapshot eligibility + overrides, then emits `sbase_data_queried` before touching any loader.
-- Checks the shared loader cache first. If empty, evaluates whether it can immediately render from the default snapshot (same gating as bubble, minus the “inactive tab” concept).
-- When both a Supabase bootstrap and a snapshot are viable, it runs `waitForFirstDatasetCandidate` to race them. Supabase wins yield `datasetSource = 'shared-bootstrap'`, while snapshots keep the dataset partial.
-- After the race, it retries the shared loader cache (in case bootstrap-filled it), then falls back to the hero dataset for partial Supabase hydration. Hero success triggers a background full dataset schedule.
-- If all else fails, it invokes `loadDataDirectly()` to hit Supabase for pollutants, categories, and timeseries. Every successful path feeds `applyLineDataset`, potentially triggers hydration, and (until the latest change) emitted `sbase_data_loaded` analytics.
+- Checks the shared loader cache first. If empty, evaluates whether it can immediately render from the default snapshot.
+- When both a Supabase bootstrap and a snapshot are viable, it runs `waitForFirstDatasetCandidate` to race them. Supabase wins yield `datasetSource = 'shared-bootstrap'`, while snapshots keep the dataset partial but still schedule hydration.
+- After the race, it retries the shared loader cache (in case bootstrap-filled it), then falls back to the hero dataset for partial Supabase hydration. Hero success schedules a background full dataset load.
+- If all else fails, it invokes `loadDataDirectly()` to hit Supabase for pollutants, categories, and timeseries. Every successful path feeds `applyLineDataset` and may emit `sbase_data_loaded` when the source is Supabase-backed.
 
 ```mermaid
 flowchart TD
@@ -68,7 +64,7 @@ flowchart TD
   N -- yes --> D
   N -- no --> O{Hero dataset available?}
   O -- yes --> P[apply hero dataset, partial + schedule full load]
-  O -- no --> Q[loadDataDirectly() → full]
+  O -- no --> Q[loadDataDirectly() -> full]
   H & K & P & Q & D --> R[applyLineDataset]
   R --> S{Full dataset?}
   S -- yes --> T[mark full, emit analytics]
