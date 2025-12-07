@@ -137,7 +137,7 @@ Category assignments:
 
 Standard analytics events tracked across applications:
 - `page_drawn` - Emitted automatically once per load when the DOM is ready
-- `page_seen` - Heartbeat fired every 30s *after* a user interaction (and only while the tab remains visible); pauses automatically once the page has been idle for ~1 minute to approximate real dwell time
+- `bubblechart_page_seen`, `linechart_page_seen`, `category_info_page_seen`, `resources_embed_page_seen`, `user_guide_page_seen` - Page-specific heartbeat emitted every 30s while the tab stays focused and there has been recent activity (explicit interaction or passive scroll/move); pauses automatically once idle for ~1 minute to approximate dwell time
 - `bubblechart_seen` / `linechart_seen` - Fired once per load when each iframe-backed tab becomes visible inside the main experience and captures the active selection
 - `bubblechart_drawn` / `linechart_drawn` - Fired whenever a new pollutant/category/year selection renders successfully
 - `bubblechart_downloaded`, `bubblechart_data_export`, `linechart_data_export` - Capture the various export buttons; payloads include filenames, formats, and counts

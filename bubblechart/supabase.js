@@ -911,18 +911,53 @@ async function loadData(options = {}) {
 
     const haveData = () => pollutants.length && categories.length && rows.length;
 
-    if (sharedLoader?.isDataLoaded()) {
-      const cachedData = sharedLoader.getCachedData();
-      pollutants = cachedData.pollutants;
-      categories = selectCategoriesArray(cachedData);
-      rows = cachedData.timeseries;
-      hasFullDataset = true;
-      latestDatasetSource = 'cache';
-      bubbleDataInfoLog('Bubble chart hydrated from shared cache', {
-        pollutants: pollutants.length,
-        categories: categories.length,
-        rows: rows.length
-      });
+    if (sharedLoader && typeof sharedLoader.getCachedData === 'function') {
+      try {
+        if (sharedLoader.isDataLoaded?.()) {
+          const cachedData = sharedLoader.getCachedData();
+          const cachedPollutants = Array.isArray(cachedData?.pollutants) ? cachedData.pollutants : [];
+          const cachedCategories = selectCategoriesArray(cachedData);
+          const cachedRows = Array.isArray(cachedData?.timeseries)
+            ? cachedData.timeseries
+            : (Array.isArray(cachedData?.rows) ? cachedData.rows : []);
+          const cacheComplete = cachedPollutants.length && cachedCategories.length && cachedRows.length;
+
+          if (cacheComplete) {
+            pollutants = cachedPollutants;
+            categories = cachedCategories;
+            rows = cachedRows;
+            hasFullDataset = true;
+            latestDatasetSource = 'cache';
+            bubbleDataInfoLog('Bubble chart hydrated from shared cache', {
+              pollutants: pollutants.length,
+              categories: categories.length,
+              rows: rows.length
+            });
+          } else {
+            swallowBubblePromise(recordBubbleSupabaseFailure({
+              source: 'cache',
+              label: 'shared-cache',
+              reason: 'cache-empty',
+              severity: 'warning',
+              message: 'Shared loader cache returned incomplete dataset',
+              details: {
+                pollutantCount: cachedPollutants.length,
+                categoryCount: cachedCategories.length,
+                rowCount: cachedRows.length
+              }
+            }));
+          }
+        }
+      } catch (error) {
+        bubbleDataInfoLog('Shared loader cache read failed', error?.message || error);
+        swallowBubblePromise(recordBubbleSupabaseFailure({
+          source: 'cache',
+          label: 'shared-cache',
+          reason: 'cache-read',
+          severity: 'warning',
+          error
+        }));
+      }
     }
 
     const canShortCircuitSnapshot = !haveData() && defaultChartMode && snapshotSourceAvailable && !sharedLoader?.isDataLoaded?.();
@@ -1119,6 +1154,7 @@ async function loadData(options = {}) {
           });
         } catch (error) {
           console.error('Shared loader failed, falling back to direct load:', error);
+          const directFetchStartedAt = bubbleDataNow();
           const result = await loadDataDirectly();
           pollutants = result.pollutants;
           categories = selectCategoriesArray(result);
@@ -1130,8 +1166,15 @@ async function loadData(options = {}) {
             categories: categories.length,
             rows: rows.length
           });
+          swallowBubblePromise(emitBubbleDatasetLoadedMetrics({
+            source: 'direct',
+            rowsCount: Array.isArray(result?.rows) ? result.rows.length : 0,
+            startedAt: directFetchStartedAt,
+            fullDataset: true
+          }));
         }
       } else {
+        const directFetchStartedAt = bubbleDataNow();
         const result = await loadDataDirectly();
         pollutants = result.pollutants;
         categories = selectCategoriesArray(result);
@@ -1143,6 +1186,12 @@ async function loadData(options = {}) {
           categories: categories.length,
           rows: rows.length
         });
+        swallowBubblePromise(emitBubbleDatasetLoadedMetrics({
+          source: 'direct',
+          rowsCount: Array.isArray(result?.rows) ? result.rows.length : 0,
+          startedAt: directFetchStartedAt,
+          fullDataset: true
+        }));
       }
     }
 
@@ -1211,13 +1260,6 @@ async function loadData(options = {}) {
           supabaseDebugWarn('Unable to load full category metadata before hydration:', error.message || error);
         });
     }
-
-    await emitBubbleDatasetLoadedMetrics({
-      source: latestDatasetSource,
-      rowsCount: rows.length,
-      startedAt: loadStartedAt,
-      fullDataset: Boolean(hasFullDataset)
-    });
 
     if (!hasFullDataset && allowSupabaseHydration) {
       triggerBubbleHydration(sharedLoader, 'post-load');

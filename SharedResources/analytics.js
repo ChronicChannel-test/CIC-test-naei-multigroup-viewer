@@ -14,6 +14,16 @@
   const FLUSH_DELAY_MS = 2000;
   const HEARTBEAT_INTERVAL_MS = 30000;
   const HEARTBEAT_IDLE_TIMEOUT_MS = 60000;
+  const PAGE_HEARTBEAT_LABELS = new Map([
+    ['/bubblechart', 'bubblechart_page_seen'],
+    ['/linechart', 'linechart_page_seen'],
+    ['/category-info', 'category_info_page_seen'],
+    ['/resources-embed', 'resources_embed_page_seen'],
+    ['/user-guide', 'user_guide_page_seen']
+  ]);
+  const HEARTBEAT_LABELS = new Set(PAGE_HEARTBEAT_LABELS.values());
+  const PASSIVE_ACTIVITY_EVENTS = ['pointermove', 'wheel', 'scroll', 'keydown', 'touchstart'];
+  const PASSIVE_ACTIVITY_THROTTLE_MS = 2500;
   const SYSTEM_EVENT_LABELS = new Set([
     'page_drawn',
     'sbase_data_queried',
@@ -40,6 +50,8 @@
   let heartbeatEligible = false;
   let heartbeatRunning = false;
   let heartbeatCount = 0;
+  let passiveListenersRegistered = false;
+  let lastPassiveActivityAt = 0;
 
   const state = {
     sessionId: loadSessionId(),
@@ -131,6 +143,18 @@
     } catch (error) {
       return '/';
     }
+  }
+
+  function resolveHeartbeatLabel(slug) {
+    const normalized = slug ? sanitizeSlug(slug) : sanitizeSlug(state.pageSlug);
+    if (!normalized) {
+      return null;
+    }
+    return PAGE_HEARTBEAT_LABELS.get(normalized) || null;
+  }
+
+  function isHeartbeatLabel(label) {
+    return typeof label === 'string' && HEARTBEAT_LABELS.has(label);
   }
 
   function getUserCountry() {
@@ -235,8 +259,31 @@
     }
     eventQueue.push(record);
     logDebug('Queued analytics event:', record.event_type, record.event_label, record.page_slug);
+    notifyEventObserver(record);
     scheduleFlush();
     return true;
+  }
+
+  function notifyEventObserver(record) {
+    try {
+      if (!record || typeof window === 'undefined') {
+        return;
+      }
+      const observer = window.__SITE_ANALYTICS_EVENT_OBSERVER__;
+      if (typeof observer !== 'function') {
+        return;
+      }
+      observer({
+        event_type: record.event_type,
+        event_label: record.event_label,
+        page_slug: record.page_slug,
+        event_data: record.event_data,
+        session_id: record.session_id,
+        event_timestamp: record.event_timestamp
+      });
+    } catch (error) {
+      // Ignore observer errors so analytics never break pages
+    }
   }
 
   function scheduleFlush() {
@@ -360,10 +407,44 @@
       label: label || 'interaction'
     });
     const queued = queueEvent(record);
-    if (!skipActivityTouch && label !== 'page_seen') {
+    if (!skipActivityTouch && !isHeartbeatLabel(label)) {
       markUserActivity();
     }
     return Promise.resolve(queued);
+  }
+
+  function trackChartInteraction(eventLabel, meta = {}, options = {}) {
+    const trackerMeta = { ...(meta || {}) };
+    const chartType = options.chartType || trackerMeta.chart_type || null;
+    const pageSlugOption = options.pageSlug || options.slug || null;
+    const existingSlug = trackerMeta.pageSlug || trackerMeta.page_slug || null;
+    const finalSlug = pageSlugOption || existingSlug || state.pageSlug;
+
+    if (chartType && !trackerMeta.chart_type) {
+      trackerMeta.chart_type = chartType;
+    }
+    if (finalSlug && !trackerMeta.pageSlug) {
+      trackerMeta.pageSlug = sanitizeSlug(finalSlug);
+    }
+    if (finalSlug && !trackerMeta.page_slug) {
+      trackerMeta.page_slug = sanitizeSlug(finalSlug);
+    }
+
+    const directTracker = window.SiteAnalytics?.trackInteraction
+      || window.Analytics?.trackInteraction
+      || (window.Analytics?.trackAnalytics
+        ? (label, payload) => window.Analytics.trackAnalytics(null, label, payload)
+        : null);
+
+    if (typeof directTracker === 'function') {
+      try {
+        return Promise.resolve(directTracker(eventLabel, trackerMeta));
+      } catch (error) {
+        console.warn('Interaction tracker failed:', error);
+      }
+    }
+
+    return Promise.resolve(false);
   }
 
   function trackSystem(label, meta = {}) {
@@ -417,6 +498,28 @@
     }
   }
 
+  function handlePassiveActivityEvent() {
+    if (analyticsDisabled || document.visibilityState === 'hidden') {
+      return;
+    }
+    const now = Date.now();
+    if (now - lastPassiveActivityAt < PASSIVE_ACTIVITY_THROTTLE_MS) {
+      return;
+    }
+    lastPassiveActivityAt = now;
+    markUserActivity();
+  }
+
+  function registerPassiveActivityListeners() {
+    if (passiveListenersRegistered || typeof document === 'undefined') {
+      return;
+    }
+    PASSIVE_ACTIVITY_EVENTS.forEach(eventName => {
+      document.addEventListener(eventName, handlePassiveActivityEvent, { passive: true });
+    });
+    passiveListenersRegistered = true;
+  }
+
   function markUserActivity() {
     state.lastInteractionAt = Date.now();
     if (!heartbeatEligible || analyticsDisabled || document.visibilityState === 'hidden') {
@@ -433,10 +536,27 @@
   }
 
   function shouldSendHeartbeat() {
+    const hasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
     return heartbeatEligible
       && !analyticsDisabled
       && document.visibilityState !== 'hidden'
+      && hasFocus
       && hasRecentActivity();
+  }
+
+  function captureHeartbeatSnapshot() {
+    return {
+      pageSlug: state.pageSlug,
+      heartbeatEligible,
+      heartbeatRunning,
+      heartbeatCount,
+      lastInteractionAt: state.lastInteractionAt,
+      resolvedLabel: resolveHeartbeatLabel(),
+      visibilityState: document.visibilityState,
+      analyticsDisabled,
+      autoPageDrawnSent,
+      hasRecentActivity: hasRecentActivity()
+    };
   }
 
   function clearHeartbeatTimer() {
@@ -450,9 +570,14 @@
     if (!shouldSendHeartbeat()) {
       return;
     }
+    const heartbeatLabel = resolveHeartbeatLabel();
+    if (!heartbeatLabel) {
+      pauseHeartbeatLoop();
+      return;
+    }
     heartbeatCount += 1;
     const dwellSeconds = Math.max(0, Math.round((Date.now() - (state.pageOpenedAt || Date.now())) / 1000));
-    trackInteraction('page_seen', {
+    trackInteraction(heartbeatLabel, {
       dwell_seconds: dwellSeconds,
       heartbeat_interval_seconds: HEARTBEAT_INTERVAL_MS / 1000,
       heartbeat_count: heartbeatCount,
@@ -505,6 +630,7 @@
       trackPageDrawn,
       trackInteraction,
       trackSystem,
+      getHeartbeatSnapshot: captureHeartbeatSnapshot,
       flush: flushQueue,
       getSessionId: () => state.sessionId,
       getUserCountry,
@@ -520,8 +646,15 @@
       trackInteraction,
       trackSystem
     };
+    window.ChartInteractionTracker = {
+      track: trackChartInteraction
+    };
+    window.trackChartInteraction = trackChartInteraction;
     window.SiteErrors = {
       log: logSiteError
+    };
+    window.SiteAnalyticsDebug = {
+      getHeartbeatSnapshot: captureHeartbeatSnapshot
     };
   }
 
@@ -650,5 +783,6 @@
 
   exposeApi();
   registerLifecycleHooks();
+  registerPassiveActivityListeners();
   autoTrackPageDrawn();
 })();

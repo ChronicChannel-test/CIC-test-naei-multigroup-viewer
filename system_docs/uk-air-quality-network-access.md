@@ -11,7 +11,7 @@ Each row lists a network that operates monitors within the United Kingdom, wheth
 | Scottish Air Quality Network (`scottishairquality.scot`) | UK-only (Scotland) | JSON + CSV downloads (`https://www.scottishairquality.scot/data/data-downloads`). |
 | Wales Air Quality Network (`airquality.gov.wales`) | UK-only (Wales) | CSV/JSON API plus ArcGIS feature layers (`https://airquality.gov.wales/data`). |
 | Northern Ireland Air (`airqualityni.co.uk`) | UK-only (Northern Ireland) | CSV downloads and JSON feed (`https://www.airqualityni.co.uk/air-quality-data`). |
-| London Air Quality Network (LAQN / LondonAir) | UK-only (Greater London) | REST/JSON & CSV API documented at `https://www.londonair.org.uk/londonair/guide/api.aspx`. |
+| London Air Quality Network (LAQN / LondonAir) | UK-only (Greater London) | REST/JSON & CSV API documented at `https://www.londonair.org.uk/Londonair/API/`. |
 | Breathe London Network (AQMesh pods) | UK-only (Greater London) | REST/JSON API + bulk CSV at `https://www.breathelondon.org/api`. |
 | Greater Manchester Combined Authority AQ Network (Clean Air GM) | UK-only (Greater Manchester) | ArcGIS REST & CSV endpoints linked from `https://cleanairgm.com/data/`. |
 | Birmingham ENVIZ / West Midlands local authority network | UK-only (West Midlands) | ArcGIS REST feature service + CSV exports published via `https://www.birmingham.gov.uk/info/20076/pollution/1763/air_quality/4`. |

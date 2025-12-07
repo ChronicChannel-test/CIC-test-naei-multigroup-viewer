@@ -14,6 +14,18 @@ function sanitizeFilenameSegment(value) {
     .replace(/^-+|-+$/g, '')
     || 'NA';
 }
+const lineChartTracker = () => window.ChartInteractionTracker?.track || window.trackChartInteraction;
+
+function trackLineShareEvent(eventLabel, meta = {}) {
+  const tracker = lineChartTracker();
+  if (typeof tracker === 'function') {
+    return tracker(eventLabel, meta, {
+      chartType: 'line_chart',
+      pageSlug: '/linechart'
+    });
+  }
+  return Promise.resolve(false);
+}
 
 function formatCsvCell(value) {
   if (window.NAEICsvUtils?.formatCsvCell) {
@@ -105,11 +117,8 @@ function exportData(format = 'csv') {
     filename: filenameBase
   };
 
-  if (window.supabaseModule?.trackAnalytics) {
-      window.supabaseModule
-        .trackAnalytics('linechart_data_export', exportAnalyticsPayload)
-      .catch(err => console.warn('Export analytics tracking failed:', err));
-  }
+  trackLineShareEvent('linechart_data_export', exportAnalyticsPayload)
+    .catch(err => console.warn('Export analytics tracking failed:', err));
 
   // Use the global year keys / labels determined earlier
   const yearsAll = window.globalYears || [];
@@ -392,9 +401,7 @@ function setupShareButton() {
         ? (parseInt(document.getElementById('endYear').value) - parseInt(document.getElementById('startYear').value) + 1) 
         : null
     };
-    if (window.supabaseModule?.trackAnalytics) {
-        window.supabaseModule.trackAnalytics('linechart_share_button_click', shareAnalyticsPayload);
-    }
+    trackLineShareEvent('linechart_share_button_click', shareAnalyticsPayload);
     
     // Show share options
     showShareDialog(shareUrl);
@@ -515,15 +522,13 @@ function showShareDialog(shareUrl) {
       await navigator.clipboard.writeText(displayShareUrl);
       showCopiedState(copyUrlBtn);
 
-      if (window.supabaseModule?.trackAnalytics) {
-        window.supabaseModule.trackAnalytics('linechart_share_url_copied', {
-          pollutant: pollutantName,
-          category_count: selectedCategories.length,
-          start_year: startYear,
-          end_year: endYear,
-          has_year_range: !!(startYear && endYear)
-        });
-      }
+      trackLineShareEvent('linechart_share_url_copied', {
+        pollutant: pollutantName,
+        category_count: selectedCategories.length,
+        start_year: startYear,
+        end_year: endYear,
+        has_year_range: !!(startYear && endYear)
+      });
 
       setTimeout(() => {
         resetButtonState(copyUrlBtn, copyUrlDefaultHtml, copyUrlDefaultBg);
@@ -550,14 +555,12 @@ function showShareDialog(shareUrl) {
 
         showCopiedState(copyPngBtn);
 
-        if (window.supabaseModule?.trackAnalytics) {
-          window.supabaseModule.trackAnalytics('linechart_share_png_copied', {
-            pollutant: pollutantName,
-            category_count: selectedCategories.length,
-            start_year: startYear,
-            end_year: endYear
-          });
-        }
+        trackLineShareEvent('linechart_share_png_copied', {
+          pollutant: pollutantName,
+          category_count: selectedCategories.length,
+          start_year: startYear,
+          end_year: endYear
+        });
 
         setTimeout(() => {
           resetButtonState(copyPngBtn, copyPngDefaultHtml, copyPngDefaultBg);
@@ -601,16 +604,14 @@ function showShareDialog(shareUrl) {
         })
       : null;
 
-    if (window.supabaseModule?.trackAnalytics) {
-      window.supabaseModule.trackAnalytics('linechart_share_email_opened', {
-        pollutant: pollutantName,
-        category_count: selectedCategories.length,
-        start_year: startYear,
-        end_year: endYear,
-        has_year_range: !!(startYear && endYear),
-        share_url: shareUrl
-      });
-    }
+    trackLineShareEvent('linechart_share_email_opened', {
+      pollutant: pollutantName,
+      category_count: selectedCategories.length,
+      start_year: startYear,
+      end_year: endYear,
+      has_year_range: !!(startYear && endYear),
+      share_url: shareUrl
+    });
 
     if (emailPayload && window.EmailShareHelper?.openEmailClient) {
       window.EmailShareHelper.openEmailClient(emailPayload);
