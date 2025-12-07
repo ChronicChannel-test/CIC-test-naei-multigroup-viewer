@@ -12,7 +12,7 @@ A dedicated `site_errors` table captures detailed failure context for the live d
 | `session_id` | `text` | Mirrors the lightweight analytics session when available. Helpful for joining back to `site_events`. |
 | `page_slug` | `text` | Normalized path (e.g. `/bubblechart`, `/linechart`). |
 | `page_url` | `text` | Full URL where the failure occurred. |
-| `source` | `text` | Component identifier (`bubblechart_supabase`, `linechart_supabase`, etc.). |
+| `source` | `text` | Component identifier (`bubble-supabase`, `hero-dataset`, `linechart-supabase`, `shared-data-loader`, etc.). |
 | `severity` | `text` | One of `warning`, `error`, `critical`. Defaults to `error`. |
 | `error_code` | `text` | Optional machine-friendly code (`42501`, `FetchError`, etc.). |
 | `message` | `text` | Human-readable summary. |
@@ -24,8 +24,9 @@ Key indexes: `recorded_at DESC`, `error_timestamp DESC`, `page_slug`, `severity`
 
 | Source | What gets logged | Severity | Detail payload |
 | --- | --- | --- | --- |
-| `bubblechart_supabase` | Any failure while hydrating the scatter/bubble dataset (shared loader bootstrap, direct Supabase fetches, selector metadata). | `error` unless explicitly downgraded. | Dataset source (`cache`, `shared-loader`, `direct`, etc.), query metadata (did the request use URL overrides / snapshot?), render duration, plus the JS stack. |
-| `linechart_supabase` | Same as above but for the multiseries line chart module. | `error` | Includes whether the snapshot path was eligible, shared loader availability, dataset source, durations, and stack traces. |
+| `bubble-supabase` (and stage-specific labels such as `hero-dataset`, `shared-loader`, `snapshot-helper`) | Any failure while hydrating the scatter/bubble dataset (shared loader bootstrap, direct Supabase fetches, selector metadata). | `error` unless explicitly downgraded. | Dataset source (`cache`, `shared-loader`, `direct`, etc.), query metadata (did the request use URL overrides / snapshot?), render duration, plus the JS stack. |
+| `linechart-supabase` | Same as above but for the multiseries line chart module. | `error` | Includes whether the snapshot path was eligible, shared loader availability, dataset source, durations, and stack traces. |
+| `shared-data-loader` | SharedResources loader failures that occur before either chart module runs (bootstrap dataset fetches, hero dataset fallbacks, etc.). | `error` | Captures the label of the failing stage, retry counts, duration, and stack so we can debug loader-level regressions independent of a specific chart. |
 
 Other modules should follow the same pattern: emit a concise `sbase_data_error` row to `site_events`, then immediately call `window.SiteErrors.log({...})` with the richer context so tooling can diagnose regressions.
 

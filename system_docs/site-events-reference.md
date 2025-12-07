@@ -7,13 +7,15 @@ This document captures every `page_slug`/`event_type`/`event_label` combination 
 | page_slug examples | event_type | event_label | When it fires | Notes |
 | --- | --- | --- | --- | --- |
 | `/home`, `/bubblechart`, `/linechart`, `/category-info`, `/resources-embed`, `/user-guide`, dev test pages | `system` | `page_drawn` | Exactly once per load, when DOM is ready | Includes viewport + screen metadata; automatic unless `window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__` is set. |
-| `/bubblechart`, `/linechart` | `interaction` | `page_seen` | Every 30s heartbeat after the user interacts and while the tab stays visible | Carries dwell seconds + heartbeat count; dashboards should filter out if they only want deliberate actions. |
+
+Heartbeat pings now use slug-specific labels (for example `bubblechart_page_seen`, `linechart_page_seen`, `category_info_page_seen`) rather than the generic `page_seen`. See the sections below for each slug’s label.
 
 ## `/bubblechart`
 
 | event_type | event_label | Trigger | Key metadata |
 | --- | --- | --- | --- |
 | `interaction` | `bubblechart_seen` | First time the iframe (or standalone page) becomes visible (`bubblechart/index.html`) | `pageSlug` forced to `/bubblechart`; payload mirrors the share URL (pollutant, category IDs + flags, year) so this is the canonical “chart view” signal (only `page_seen` heartbeats remain excluded). |
+| `interaction` | `bubblechart_page_seen` | Every 30s heartbeat after the user interacts and while the bubble chart tab stays visible | Carries dwell seconds, heartbeat interval, and heartbeat count; dashboards can filter it out when only deliberate actions are needed. |
 | `system` | `sbase_data_queried` | Supabase query/snapshot race begins in `bubblechart/supabase.js` | Records whether URL overrides were present, snapshot eligibility, and timestamp. |
 | `system` | `sbase_data_loaded` | Supabase-backed dataset load succeeds (hero, cache reuse, or full fetch) | Includes precise data source (`hero`, `shared-bootstrap`, `shared-loader`, `cache`, `direct`), the new `loadMode` field (`hero`, `full-bootstrap`, `full-shared-loader`, `full-cache`, `full-direct`), duration, row count, and the `fullDataset` flag. |
 | `system` | `json_data_loaded` | A bundled JSON snapshot hydrates the chart (default render or inactive-chart mode) | Captures snapshot duration, generation timestamp, row/pollutant/category counts, and the `page` identifier so we can monitor offline-only loads. |
@@ -32,6 +34,7 @@ _Note:_ `bubblechart/main.js` explicitly calls `trackAnalytics('page_drawn', {ap
 | event_type | event_label | Trigger | Key metadata |
 | --- | --- | --- | --- |
 | `interaction` | `linechart_seen` | iframe/page becomes visible (`linechart/index.html`) | Mirrors the bubble logic and includes the active pollutant, category list, and year range so it can double as the official chart view/selection log (only `page_seen` heartbeats are ignored). |
+| `interaction` | `linechart_page_seen` | Every 30s heartbeat after the user interacts and while the line chart tab stays visible | Includes dwell seconds, heartbeat interval, and heartbeat count; filter out if you need only explicit actions. |
 | `system` | `sbase_data_queried` | Line shared-loader kicks off (`linechart/supabase.js`) | Tracks overrides, snapshot eligibility, shared loader availability. |
 | `system` | `sbase_data_loaded` | Supabase-backed dataset load succeeds (hero, cache reuse, or full fetch) | Emits source (`hero`, `shared-bootstrap`, `shared-loader`, `cache`, `direct`), `loadMode` (hero/full variants incl. `full-cache`), duration, row count, and the `fullDataset` flag. |
 | `system` | `json_data_loaded` | The default JSON snapshot hydrates the chart before Supabase wins | Includes snapshot generation timestamp, duration, and row/pollutant/category counts for offline/inactive renders. |
@@ -45,6 +48,16 @@ _Note:_ `bubblechart/main.js` explicitly calls `trackAnalytics('page_drawn', {ap
 
 ## Other live slugs
 
-Pages like `/category-info`, `/resources-embed`, `/user-guide`, and `/home` only load `SharedResources/analytics.js` without additional manual calls. They therefore emit **only** the two global signals (`page_drawn` and heartbeat `page_seen`). Dev/test harnesses behave the same way but use their literal path (for example `/linechart/test-dependencies.html`).
+Pages like `/category-info`, `/resources-embed`, and `/user-guide` only load `SharedResources/analytics.js` without additional manual calls. They therefore emit the global `page_drawn` plus their own slug-specific heartbeat events:
+
+| page_slug | event_label |
+| --- | --- |
+| `/category-info` | `category_info_page_seen` |
+| `/resources-embed` | `resources_embed_page_seen` |
+| `/user-guide` | `user_guide_page_seen` |
+
+Each heartbeat fires every 30 seconds after user activity while the tab stays visible, carrying the same dwell/interval/count metadata described above.
+
+The homepage ( `/` ) currently emits only the automatic `page_drawn` system event because it is not included in the heartbeat label map inside `SharedResources/analytics.js`.
 
 If new interactions are added, prefer routing them through `window.SiteAnalytics.trackInteraction(label, meta)` so these tables remain accurate and the dashboard continues to group events consistently. The only embed-specific slug today is `resources-embed` (that module runs inside other pages), whereas `category-info` and `user-guide` load as full standalone views, so their slugs don’t need extra suffixes.
