@@ -26,7 +26,7 @@ jobs:
         uses: actions/configure-pages@v5
 
       - name: Write Supabase runtime config
-        working-directory: air-pollution-emissions-data-explorer
+        working-directory: .
         env:
           SUPABASE_URL: ${{ secrets.NAEI_SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.NAEI_SUPABASE_PUBLISHABLE_KEY }}
