@@ -20,6 +20,7 @@ This directory contains shared assets and modules used by multiple NAEI data vis
 Centralized Supabase database connection configuration.
 - Exports: `SupabaseConfig.initSupabaseClient()`
 - Used by all applications to connect to the NAEI database
+- **Requires** `window.__NAEI_SUPABASE_CONFIG` to be defined *before* loading the script. Load the generated `SharedResources/supabase-env.js` (see below) or set the global manually at deployment time. The script now throws immediately if the runtime config is missing so that misconfigured environments fail fast instead of silently connecting to the wrong Supabase project.
 
 #### `analytics.js`
 Lightweight site-wide analytics helper.
@@ -55,6 +56,7 @@ Base styling shared across all NAEI viewers:
 <link rel="stylesheet" href="../SharedResources/common-styles.css">
 
 <!-- Scripts -->
+<script src="../SharedResources/supabase-env.js"></script>
 <script src="../SharedResources/supabase-config.js"></script>
 <script src="../SharedResources/analytics.js"></script>
 <script src="../SharedResources/colors.js"></script>
@@ -62,6 +64,8 @@ Base styling shared across all NAEI viewers:
 <!-- Images -->
 <img src="../SharedResources/images/CIC - Square - Border - Words - Alpha 360x360.png" alt="CIC Logo">
 ```
+
+Load order matters: `supabase-env.js` (generated via `scripts/generate-supabase-env.js` or manually injected at deploy time) must run before `supabase-config.js` so the global `window.__NAEI_SUPABASE_CONFIG` is available. The repo now ships `supabase-env.template.js` instead of a live credential file—copy/rename it locally or recreate it in CI, but never commit the generated `supabase-env.js`. If you inject the values inline via your hosting platform, emit the snippet before `supabase-config.js` as well.
 
 ### In JavaScript
 ```javascript

@@ -27,8 +27,9 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 - Serve the repository with any static file server (`python -m http.server`, `npx serve`, etc.) so the Supabase client can resolve relative paths.
 - Configure Supabase credentials once via `.env` + `npm run supabase:env`:
 	1. Copy `.env.example` to `.env.local` (or `.env`) and drop in your test/live project values (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, optional `SUPABASE_STORAGE_KEY_BASE`). Backend/CLI scripts can also read `SUPABASE_SECRET_KEY` if you include it.
-	2. Run `npm run supabase:env` (or `SUPABASE_ENV_FILE=.env.live npm run supabase:env`) to regenerate `SharedResources/supabase-env.js`.
-	3. The runtime `SharedResources/supabase-config.js` now auto-detects `window.__NAEI_SUPABASE_CONFIG`, so switching environments only requires rerunning the script with a different env file—no manual edits across multiple HTML files.
+	2. Run `npm run supabase:env` (or `SUPABASE_ENV_FILE=.env.live npm run supabase:env`) to regenerate `SharedResources/supabase-env.js`. The generated file is gitignored on purpose—keep it locally (or recreate it in CI) so secrets never land in the repo.
+	3. Prefer automation, but if you need to hand-edit the values, copy `SharedResources/supabase-env.template.js` to `supabase-env.js` and fill in the placeholders.
+	4. The runtime `SharedResources/supabase-config.js` now auto-detects `window.__NAEI_SUPABASE_CONFIG`, so switching environments only requires rerunning the script with a different env file—no manual edits across multiple HTML files.
 - Supabase functions live under `supabase/functions/` and can be deployed via the Supabase CLI when backend updates are needed.
 
 ### Supabase API Key Migration (2025+)
