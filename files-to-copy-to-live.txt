@@ -1,9 +1,7 @@
-
 PROJECT_SUMMARY.md
 README.md
 SharedResources/README.md
 SharedResources/analytics.js
-XXXX SharedResources/default-chart-data.json
 SharedResources/docs/README.md
 SharedResources/shared-data-loader.js
 SharedResources/supabase-config.js
@@ -14,11 +12,9 @@ bubblechart/index.html
 bubblechart/main.js
 bubblechart/supabase.js
 category-info/embed.html
-
 index.html
 linechart/ANALYTICS_SETUP.md
 linechart/README_v2.4.md
-XXXXX linechart/daily_aggregation_4am.sql
 linechart/export.js
 linechart/index.html
 linechart/main.js

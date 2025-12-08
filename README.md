@@ -23,6 +23,8 @@ This workspace hosts the shared v3.0 shell plus the current bubble (v2.0) and li
 - Per-page slugs are inferred from `body[data-page-slug]`; set `window.__SITE_ANALYTICS_DISABLE_AUTO_PAGEVIEW__ = true` before loading the script if a view should remain silent.
 - For a quick local view of the data, open `../CIC-test-data-explorer-analytics/site-analytics-dashboard.html` from the private repo (serve it via `npx serve` or similar). It now pulls from `site_event_daily_summary`, `site_event_country_summary`, `site_event_session_summary`, and the latest `site_events` rows to render overview cards (including Avg Session Length), tables, and recent activity—no deployment needed.
 
+> For a concise summary of how the helper works (plus runtime flags like `?analytics=off`), see [`ANALYTICS_OVERVIEW.md`](./ANALYTICS_OVERVIEW.md).
+
 ## Working Locally
 - Serve the repository with any static file server (`python -m http.server`, `npx serve`, etc.) so the Supabase client can resolve relative paths.
 - Configure Supabase credentials once via `.env` + `npm run supabase:env`:
