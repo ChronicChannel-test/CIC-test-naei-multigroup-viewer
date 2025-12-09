@@ -7,4 +7,5 @@
 /CIC-test-Archive-Charts/DataExplorer-Archive/v4dot0-DataExplorer/node_modules
 .env
 SharedResources/supabase-env.js
+SharedResources/supabase-env.template.js
 site-analytics-dashboard.html
