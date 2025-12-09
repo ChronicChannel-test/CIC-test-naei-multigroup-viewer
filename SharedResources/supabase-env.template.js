@@ -5,5 +5,7 @@
 window.__NAEI_SUPABASE_CONFIG = Object.freeze({
   url: "https://YOUR-PROJECT.supabase.co",
   key: "sb-publishable-XXXX",
-  storageKeyBase: "sb-your-project-auth-token"
+  storageKeyBase: "sb-your-project-auth-token",
+  authStorageScope: "app", // Optional: 'global' | 'app' | 'route'
+  // authStorageKeySuffix: "linechart" // Optional explicit slug override
 });
