@@ -5,7 +5,7 @@
 
 // Distinct color palette for up to 10 series
 const distinctPalette = [
-  '#E6194B', // Red
+  '#E42020', // Red
   '#3CB44B', // Green
   '#FFE119', // Yellow
   '#4363D8', // Blue

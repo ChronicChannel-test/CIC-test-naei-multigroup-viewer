@@ -1500,6 +1500,14 @@ async function revealMainContent() {
         setTimeout(() => {
           updateChartWrapperHeight('post-load');
           notifyParentChartReady().finally(resolve);
+          // Fallback: force a resize/draw after layout settles to avoid blank chart until devtools resize
+          setTimeout(() => {
+            try {
+              window.dispatchEvent(new Event('resize'));
+              drawChart(true);
+            } catch (err) {
+            }
+          }, 120);
         }, 16);
       }, 16);
       });
@@ -2337,11 +2345,12 @@ async function drawChart(skipHeightUpdate = false) {
 
       const dataPoint = dataPoints.find(dp => String(dp.categoryId) === String(categoryMatch.id));
       if (dataPoint) {
+        const displayName = getCategoryDisplayTitle(categoryMatch);
+        const color = window.Colors?.getColorForCategory ? window.Colors.getColorForCategory(displayName) : null;
         comparisonData.push({
           ...dataPoint,
-          displayName: getCategoryDisplayName(
-            categoryMatch.category_title || categoryMatch.group_name || categoryMatch.title || name
-          )
+          displayName,
+          color
         });
       }
     });
@@ -2371,7 +2380,9 @@ async function drawChart(skipHeightUpdate = false) {
         energyFollowerName: energyFollower.displayName,
         pollutionRatio,
         energyRatio,
-        replacementPollution
+        replacementPollution,
+        pollutionColor: pollutionLeader.color,
+        energyColor: energyLeader.color
       };
 
       updateComparisonStatement(statement);
@@ -2471,7 +2482,9 @@ function updateComparisonStatement(statement) {
       energyFollowerName,
       pollutionRatio,
       energyRatio,
-      replacementPollution
+      replacementPollution,
+      pollutionColor,
+      energyColor
     } = statement || {};
 
     if (!pollutantName || !pollutionLeaderName || !pollutionFollowerName || !energyLeaderName || !energyFollowerName) {
@@ -2500,20 +2513,27 @@ function updateComparisonStatement(statement) {
       <div class="comparison-layout">
         <div class="comparison-row">
           <div class="comparison-arrow up red" aria-hidden="true"></div>
-          <div class="comparison-card card-orange">
-            <div class="comparison-card__title">${pollutionLeaderName}</div>
-            <div class="comparison-card__body">${pollutantName} pollution is <span class="comparison-number">${formatRatio(pollutionRatio)}x</span> higher than ${pollutionFollowerName}</div>
+          <div class="comparison-card" style="background:${pollutionColor || '#f5a000'};">
+            <div class="comparison-card-line comparison-card-line-large">${pollutionLeaderName}</div>
+            <div class="comparison-card-line comparison-card-line-small">${pollutantName} pollution</div>
+            <div class="comparison-card-line comparison-card-line-large">${formatRatio(pollutionRatio)} times</div>
+            <div class="comparison-card-line comparison-card-line-small">higher than ${pollutionFollowerName}</div>
           </div>
-          <div class="comparison-card card-blue">
-            <div class="comparison-card__title">${energyLeaderName}</div>
-            <div class="comparison-card__body">provide <span class="comparison-number">${formatRatio(energyRatio)}x</span> more energy than ${energyFollowerName}</div>
+          <div class="comparison-card" style="background:${energyColor || '#0a77c4'};">
+            <div class="comparison-card-line comparison-card-line-large">${energyLeaderName}</div>
+            <div class="comparison-card-line comparison-card-line-small">Energy</div>
+            <div class="comparison-card-line comparison-card-line-large">${formatRatio(energyRatio)} times</div>
+            <div class="comparison-card-line comparison-card-line-small">${energyFollowerName}</div>
           </div>
           <div class="comparison-arrow up green" aria-hidden="true"></div>
         </div>
 
-        <div class="comparison-warning-row">
+        <div class="comparison-warning-wrap">
           <div class="comparison-warning-icon" aria-hidden="true"></div>
-          <div class="comparison-warning-text">If ${pollutionLeaderName} replaced ${energyLeaderName}, ${pollutantName} pollution would be ${formatValueWithUnit(replacementPollution)}.</div>
+          <div class="comparison-warning-row">
+            <div class="comparison-warning-text">If ${pollutionLeaderName} replaced ${energyLeaderName}, ${pollutantName} pollution would be ${formatValueWithUnit(replacementPollution)}.</div>
+          </div>
+          <div class="comparison-warning-icon" aria-hidden="true"></div>
         </div>
       </div>
     `;
