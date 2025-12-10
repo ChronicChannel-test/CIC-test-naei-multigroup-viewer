@@ -1949,15 +1949,15 @@ function refreshButtons() {
     const existingCheckbox = row.querySelector('.comparison-checkbox');
     const wasChecked = existingCheckbox ? existingCheckbox.checked : false;
     
-    // Remove all existing checkboxes and buttons to rebuild them cleanly
-    const existingCheckboxes = row.querySelectorAll('.category-checkbox');
-    existingCheckboxes.forEach(checkbox => checkbox.remove());
-    const existingRemoveButtons = row.querySelectorAll('.remove-btn');
-    existingRemoveButtons.forEach(btn => btn.remove());
+    // Remove all existing checkboxes/buttons/wraps to rebuild them cleanly
+    row.querySelectorAll('.category-checkbox').forEach(checkbox => checkbox.remove());
+    row.querySelectorAll('.comparison-checkbox-wrap').forEach(wrap => wrap.remove());
+    row.querySelectorAll('.remove-btn').forEach(btn => btn.remove());
 
     // Add remove button only if there are 2 or more categories
+    let removeBtn = null;
     if (rows.length >= 2) {
-      const removeBtn = document.createElement('button');
+      removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'remove-btn';
       removeBtn.innerHTML = '<span class="remove-icon" aria-hidden="true"></span> Remove Category';
@@ -1973,35 +1973,39 @@ function refreshButtons() {
       };
       row.appendChild(removeBtn);
     }
-    
-    // Comparison statement checkboxes disabled per requirements
-    // if (rows.length >= 2) {
-    //   const comparisonCheckbox = document.createElement('input');
-    //   comparisonCheckbox.type = 'checkbox';
-    //   comparisonCheckbox.className = 'category-checkbox comparison-checkbox';
-    //   
-    //   // Determine checked state
-    //   const rowIndex = Array.from(rows).indexOf(row);
-    //   
-    //   // Priority: 1) Preserve existing state, 2) Use URL flags on initial load, 3) Default to unchecked
-    //   if (existingCheckbox) {
-    //     // Preserve the current state for existing rows
-    //     comparisonCheckbox.checked = wasChecked;
-    //   } else if (initialComparisonFlags.length > 0 && rowIndex < initialComparisonFlags.length) {
-    //     // Use comparison flag from URL (on initial load only)
-    //     comparisonCheckbox.checked = initialComparisonFlags[rowIndex];
-    //   } else {
-    //     // Default to unchecked for new categories
-    //     comparisonCheckbox.checked = false;
-    //   }
-    //   
-    //   comparisonCheckbox.style.width = '18px';
-    //   comparisonCheckbox.style.height = '18px';
-    //   comparisonCheckbox.style.marginLeft = '50px';
-    //   comparisonCheckbox.title = 'Include in comparison statement';
-    //   comparisonCheckbox.addEventListener('change', refreshCheckboxes);
-    //   row.appendChild(comparisonCheckbox);
-    // }
+
+    // Comparison statement checkboxes are now active (max 2)
+    if (rows.length >= 2) {
+      const comparisonWrap = document.createElement('label');
+      comparisonWrap.className = 'comparison-checkbox-wrap';
+      comparisonWrap.title = 'Toggle to include this category in the comparison statement';
+
+      const comparisonCheckbox = document.createElement('input');
+      comparisonCheckbox.type = 'checkbox';
+      comparisonCheckbox.className = 'category-checkbox comparison-checkbox';
+
+      // Determine checked state
+      const rowIndex = Array.from(rows).indexOf(row);
+
+      // Priority: 1) Preserve existing state, 2) Use URL flags on initial load, 3) Default to first two rows
+      if (existingCheckbox) {
+        comparisonCheckbox.checked = wasChecked;
+      } else if (initialComparisonFlags.length > 0 && rowIndex < initialComparisonFlags.length) {
+        comparisonCheckbox.checked = initialComparisonFlags[rowIndex];
+      } else {
+        comparisonCheckbox.checked = rowIndex < 2;
+      }
+
+      comparisonCheckbox.addEventListener('change', refreshCheckboxes);
+
+      const checkboxLabel = document.createElement('span');
+      checkboxLabel.className = 'comparison-checkbox-label';
+      checkboxLabel.textContent = 'Compare';
+
+      comparisonWrap.appendChild(comparisonCheckbox);
+      comparisonWrap.appendChild(checkboxLabel);
+      row.appendChild(comparisonWrap);
+    }
   });
   
   // Clear initialComparisonFlags after first use
@@ -2069,6 +2073,30 @@ function refreshCheckboxes() {
   
   // Update the comparison statement based on checked boxes count
   drawChart();
+}
+
+// Return the category names (display titles) that are currently selected for comparison
+function getComparisonSelections() {
+  const rows = document.querySelectorAll('#categoryContainer .categoryRow');
+  return Array.from(rows)
+    .map(row => {
+      const checkbox = row.querySelector('.comparison-checkbox');
+      const select = row.querySelector('select');
+      if (checkbox && checkbox.checked && select && select.value) {
+        return select.value;
+      }
+      return null;
+    })
+    .filter(Boolean);
+}
+
+function safeRatio(numerator, denominator) {
+  const num = Number(numerator);
+  const den = Number(denominator);
+  if (!Number.isFinite(num) || !Number.isFinite(den) || den === 0) {
+    return Infinity;
+  }
+  return num / den;
 }
 
 // Update checkbox behavior when adding a new category
@@ -2295,40 +2323,62 @@ async function drawChart(skipHeightUpdate = false) {
   }
 
   // Update the comparison statement based on checked comparison checkboxes
-  const checkedCheckboxes = document.querySelectorAll('.comparison-checkbox:checked');
-  const checkedCount = checkedCheckboxes.length;
-  
-  
-  if (checkedCount >= 2) {
-    const dataPoints = window.supabaseModule.getScatterData(selectedYear, selectedPollutantId, selectedCategoryIds);
-    const category1 = dataPoints[0];
-    const category2 = dataPoints[1];
+  const comparisonSelections = getComparisonSelections();
+  if (comparisonSelections.length >= 2) {
+    const dataPoints = window.supabaseModule.getScatterData(selectedYear, selectedPollutantId, selectedCategoryIds) || [];
+    const usedSelections = comparisonSelections.slice(0, 2);
+    const comparisonData = [];
 
-    const higherPolluter = category1.pollutantValue > category2.pollutantValue ? category1 : category2;
-    const lowerPolluter = category1.pollutantValue > category2.pollutantValue ? category2 : category1;
+    usedSelections.forEach(name => {
+      const categoryMatch = allCategories.find(g => getCategoryDisplayTitle(g) === name);
+      if (!categoryMatch) {
+        return;
+      }
 
-    const pollutionRatio = lowerPolluter.pollutantValue !== 0 ? higherPolluter.pollutantValue / lowerPolluter.pollutantValue : Infinity;
-    const heatRatio = higherPolluter.actDataValue !== 0 ? lowerPolluter.actDataValue / higherPolluter.actDataValue : Infinity;
+      const dataPoint = dataPoints.find(dp => String(dp.categoryId) === String(categoryMatch.id));
+      if (dataPoint) {
+        comparisonData.push({
+          ...dataPoint,
+          displayName: getCategoryDisplayName(
+            categoryMatch.category_title || categoryMatch.group_name || categoryMatch.title || name
+          )
+        });
+      }
+    });
 
-    const pollutantName = window.supabaseModule.getPollutantName(selectedPollutantId);
+    if (comparisonData.length >= 2) {
+      const [first, second] = comparisonData;
+      const pollutantName = window.supabaseModule.getPollutantName(selectedPollutantId);
+      const pollutantUnit = window.supabaseModule.getPollutantUnit(selectedPollutantId) || 'kt';
 
-    // Get display names for categories
-    const higherPolluter_displayName = getCategoryDisplayName(
-      higherPolluter.categoryName || higherPolluter.groupName || `Category ${higherPolluter.categoryId}`
-    );
-    const lowerPolluter_displayName = getCategoryDisplayName(
-      lowerPolluter.categoryName || lowerPolluter.groupName || `Category ${lowerPolluter.categoryId}`
-    );
+      const pollutionLeader = first.pollutantValue >= second.pollutantValue ? first : second;
+      const pollutionFollower = pollutionLeader === first ? second : first;
 
-    // Create enhanced comparison statement with arrows and calculated values
-    const statement = {
-      line1: `${higherPolluter_displayName} emit ${pollutionRatio.toFixed(1)} times more ${pollutantName} than ${lowerPolluter_displayName}`,
-      line2: `yet produce around ${heatRatio.toFixed(1)} times less heat nationally`,
-      pollutionRatio: pollutionRatio,
-      heatRatio: heatRatio,
-      pollutantName: pollutantName
-    };
-    updateComparisonStatement(statement);
+      const energyLeader = first.actDataValue >= second.actDataValue ? first : second;
+      const energyFollower = energyLeader === first ? second : first;
+
+      const pollutionRatio = safeRatio(pollutionLeader.pollutantValue, pollutionFollower.pollutantValue);
+      const energyRatio = safeRatio(energyLeader.actDataValue, energyFollower.actDataValue);
+
+      const replacementPollution = pollutionRatio * pollutionFollower.pollutantValue;
+
+      const statement = {
+        pollutantName,
+        pollutantUnit,
+        pollutionLeaderName: pollutionLeader.displayName,
+        pollutionFollowerName: pollutionFollower.displayName,
+        energyLeaderName: energyLeader.displayName,
+        energyFollowerName: energyFollower.displayName,
+        pollutionRatio,
+        energyRatio,
+        replacementPollution
+      };
+
+      updateComparisonStatement(statement);
+    } else {
+      // Hide comparison statement when data is insufficient
+      hideComparisonStatement();
+    }
   } else {
     // Hide comparison statement when less than 2 checkboxes checked
     hideComparisonStatement();
@@ -2401,77 +2451,73 @@ function getCategoryDisplayName(categoryName) {
     'Ecodesign Stove - Ready To Burn': 'Ecodesign stoves burning Ready to Burn wood',
     'Gas Boilers': 'gas boilers'
   };
-  return displayNames[categoryName] || categoryName.toLowerCase();
+  if (displayNames[categoryName]) {
+    return displayNames[categoryName];
+  }
+  return typeof categoryName === 'string' ? categoryName : '';
 }
 
 function updateComparisonStatement(statement) {
   const comparisonDiv = ensureComparisonDivExists();
   if (comparisonDiv) {
-    comparisonDiv.style.display = 'block'; // Make sure it's visible
-    if (typeof statement === 'object' && statement.line1 && statement.line2) {
-      // Responsive design using JavaScript-calculated sizes based on window width
-      const windowWidth = window.innerWidth;
-      
-      // Responsive scaling - optimized breakpoints
-      let baseScale;
-      if (windowWidth <= 480) {
-        baseScale = 0.5; // Mobile phones
-      } else if (windowWidth <= 768) {
-        baseScale = 0.65; // Tablets
-      } else if (windowWidth <= 1024) {
-        baseScale = 0.8; // Small laptops
-      } else if (windowWidth <= 1440) {
-        baseScale = 0.9; // Standard desktops
-      } else {
-        baseScale = 1.0; // Large screens
-      }
-      
-      const triangleWidth = Math.floor(180 * baseScale);
-      const triangleHeight = Math.floor(140 * baseScale);
-      const triangleBorder = Math.floor(90 * baseScale);
-      const triangleBorderHeight = Math.floor(140 * baseScale);
-      const triangleTextSize = Math.max(Math.floor(18 * baseScale), 12); // Minimum 12px
-      const centerTextSize = Math.max(Math.floor(26 * baseScale), 16); // Minimum 16px
-      const containerPadding = Math.floor(25 * baseScale);
-      const containerHeight = Math.floor(140 * baseScale);
-      const centerPadding = Math.floor(30 * baseScale);
-      
-      comparisonDiv.innerHTML = `
-        <div style="background: #FEAE00 !important; background-image: none !important; padding: ${containerPadding}px; margin: 0 auto; border-radius: 25px; display: flex; justify-content: space-between; align-items: center; min-height: ${containerHeight}px; box-sizing: border-box; width: calc(100% - 140px); position: relative; border: none; box-shadow: none;">
-          
-          <!-- Left Triangle (UP) -->
-          <div style="position: relative; width: ${triangleWidth}px; height: ${triangleHeight}px; display: flex; align-items: center; justify-content: center;">
-            <div style="width: 0; height: 0; border-left: ${triangleBorder}px solid transparent; border-right: ${triangleBorder}px solid transparent; border-bottom: ${triangleBorderHeight}px solid #dc2626; position: relative;">
-            </div>
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -25%); color: white; font-weight: bold; font-size: ${triangleTextSize}px; text-align: center; line-height: 1.2;">
-              ${statement.pollutionRatio.toFixed(1)} x<br>${statement.pollutantName}
-            </div>
-          </div>
+    comparisonDiv.style.display = 'block';
 
-          <!-- Center Text -->
-          <div style="flex: 1; text-align: center; color: white; font-weight: bold; font-size: ${centerTextSize}px; line-height: 1.4; padding: 0 ${centerPadding}px;">
-            ${statement.line1}<br><br>${statement.line2}
-          </div>
+    const {
+      pollutantName,
+      pollutantUnit,
+      pollutionLeaderName,
+      pollutionFollowerName,
+      energyLeaderName,
+      energyFollowerName,
+      pollutionRatio,
+      energyRatio,
+      replacementPollution
+    } = statement || {};
 
-          <!-- Right Triangle (DOWN) -->
-          <div style="position: relative; width: ${triangleWidth}px; height: ${triangleHeight}px; display: flex; align-items: center; justify-content: center;">
-            <div style="width: 0; height: 0; border-left: ${triangleBorder}px solid transparent; border-right: ${triangleBorder}px solid transparent; border-top: ${triangleBorderHeight}px solid #dc2626; position: relative;">
-            </div>
-            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -75%); color: white; font-weight: bold; font-size: ${triangleTextSize}px; text-align: center; line-height: 1.2;">
-              ${statement.heatRatio.toFixed(1)}x<br>less<br>heat
-            </div>
-          </div>
-
-        </div>
-      `;
-    } else {
-      // Simple format for fallback
-      comparisonDiv.innerHTML = `
-        <div style="background: #f97316; padding: 15px; margin: 15px auto; border-radius: 8px; text-align: center; color: white; font-weight: bold; max-width: 1000px;">
-          ${statement}
-        </div>
-      `;
+    if (!pollutantName || !pollutionLeaderName || !pollutionFollowerName || !energyLeaderName || !energyFollowerName) {
+      hideComparisonStatement();
+      return;
     }
+
+    const formatRatio = (value) => {
+      if (!Number.isFinite(value)) return '∞';
+      if (value >= 100) return value.toFixed(0);
+      if (value >= 10) return value.toFixed(1);
+      return value.toFixed(2);
+    };
+
+    const formatValueWithUnit = (value) => {
+      if (!Number.isFinite(value)) return '—';
+      const unit = pollutantUnit || '';
+      const formattedValue = value.toLocaleString(undefined, {
+        maximumFractionDigits: 1,
+        minimumFractionDigits: 0
+      });
+      return `${formattedValue}${unit ? ` ${unit}` : ''}`;
+    };
+
+    comparisonDiv.innerHTML = `
+      <div class="comparison-layout">
+        <div class="comparison-row">
+          <div class="comparison-arrow up red" aria-hidden="true"></div>
+          <div class="comparison-card card-orange">
+            <div class="comparison-card__title">${pollutionLeaderName}</div>
+            <div class="comparison-card__body">${pollutantName} pollution is <span class="comparison-number">${formatRatio(pollutionRatio)}x</span> higher than ${pollutionFollowerName}</div>
+          </div>
+          <div class="comparison-card card-blue">
+            <div class="comparison-card__title">${energyLeaderName}</div>
+            <div class="comparison-card__body">provide <span class="comparison-number">${formatRatio(energyRatio)}x</span> more energy than ${energyFollowerName}</div>
+          </div>
+          <div class="comparison-arrow up green" aria-hidden="true"></div>
+        </div>
+
+        <div class="comparison-warning-row">
+          <div class="comparison-warning-icon" aria-hidden="true"></div>
+          <div class="comparison-warning-text">If ${pollutionLeaderName} replaced ${energyLeaderName}, ${pollutantName} pollution would be ${formatValueWithUnit(replacementPollution)}.</div>
+        </div>
+      </div>
+    `;
+
     comparisonDiv.className = 'comparison-statement';
   }
 }

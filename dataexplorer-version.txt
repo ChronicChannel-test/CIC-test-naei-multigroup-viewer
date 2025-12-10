@@ -1,1 +1,1 @@
-v4.11 CIC-testdb
+v4.2 CIC-testdb
