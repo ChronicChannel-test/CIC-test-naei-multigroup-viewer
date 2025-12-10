@@ -1627,7 +1627,7 @@ function publishLineChartViewMeta(meta) {
   if (!meta) {
     return;
   }
-  window.__LINE_CHART_VIEW_META__ = meta;
+  window.__LINECHART_VIEW_META__ = meta;
   try {
     window.dispatchEvent(new CustomEvent('lineChartViewMeta', { detail: meta }));
   } catch (error) {

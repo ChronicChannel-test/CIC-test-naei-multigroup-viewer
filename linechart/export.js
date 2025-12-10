@@ -20,7 +20,7 @@ function trackLineShareEvent(eventLabel, meta = {}) {
   const tracker = lineChartTracker();
   if (typeof tracker === 'function') {
     return tracker(eventLabel, meta, {
-      chartType: 'line_chart',
+      chartType: 'linechart',
       pageSlug: '/linechart'
     });
   }

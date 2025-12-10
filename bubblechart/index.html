@@ -53,7 +53,7 @@
   
   <!-- Shared styles -->
   <link rel="stylesheet" href="../SharedResources/common-styles.css?v=inter1">
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=20251210a">
   <style>
     /* Hide social media sidebar when embedded in iframe */
     .sidebar-socials {
@@ -265,8 +265,8 @@
         tryTrackSeen();
       }
 
-      if (window.__BUBBLE_CHART_VIEW_META__) {
-        handleMetaUpdate(window.__BUBBLE_CHART_VIEW_META__);
+      if (window.__BUBBLECHART_VIEW_META__) {
+        handleMetaUpdate(window.__BUBBLECHART_VIEW_META__);
       }
 
       window.addEventListener('bubbleChartViewMeta', (event) => {

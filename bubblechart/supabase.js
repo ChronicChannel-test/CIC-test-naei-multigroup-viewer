@@ -107,10 +107,16 @@ function normalizeChartId(value) {
     return null;
   }
   const normalized = String(value).trim().toLowerCase();
-  if (normalized === '1' || normalized === 'bubble' || normalized === 'bubble-chart') {
+  if (normalized === '1'
+    || normalized === 'bubble'
+    || normalized === 'bubblechart'
+    || normalized === 'bubble-chart') {
     return '1';
   }
-  if (normalized === '2' || normalized === 'line' || normalized === 'line-chart') {
+  if (normalized === '2'
+    || normalized === 'line'
+    || normalized === 'linechart'
+    || normalized === 'line-chart') {
     return '2';
   }
   return normalized;
@@ -365,7 +371,10 @@ function parseIdList(value) {
   if (!value) {
     return [];
   }
-  return value.split(',').map(part => Number(part.trim())).filter(num => Number.isFinite(num));
+  return value
+    .split(',')
+    .map(part => parseInt(part.trim(), 10))
+    .filter(num => Number.isFinite(num));
 }
 
 function parseNameList(value) {
@@ -525,7 +534,7 @@ async function trackAnalytics(eventName, details = {}) {
   return performAnalyticsWrite(eventName, details);
 }
 
-function shouldEmitBubbleFailureEvent(scopeKey = 'bubble_chart', forceEvent = false) {
+function shouldEmitBubbleFailureEvent(scopeKey = 'bubblechart', forceEvent = false) {
   if (forceEvent) {
     bubbleFailureEventScopes.set(scopeKey, Date.now());
     return true;
@@ -572,7 +581,7 @@ function emitBubbleDatasetLoadedMetrics({ source, rowsCount = 0, startedAt = nul
     : null;
 
   return trackAnalytics('sbase_data_loaded', {
-    page: 'bubble_chart',
+    page: 'bubblechart',
     source,
     loadMode: resolveBubbleLoadMode(source),
     durationMs,
@@ -590,7 +599,7 @@ function recordBubbleSupabaseFailure(meta = {}) {
   const inactiveChartMode = typeof meta.inactiveChartMode === 'boolean' ? meta.inactiveChartMode : undefined;
   const reason = meta.reason || null;
   const analyticsPayload = {
-    page: 'bubble_chart',
+    page: 'bubblechart',
     source,
     message,
     durationMs,
@@ -601,7 +610,7 @@ function recordBubbleSupabaseFailure(meta = {}) {
   };
 
   const pageSlug = meta.pageSlug || '/bubblechart';
-  const scopeKey = meta.scopeKey || 'bubble_chart';
+  const scopeKey = meta.scopeKey || 'bubblechart';
   const shouldEmitAnalytics = shouldEmitBubbleFailureEvent(scopeKey, Boolean(meta.forceEvent));
 
   const tasks = [];
@@ -868,7 +877,7 @@ async function loadData(options = {}) {
   let snapshotPromise = null;
   const loadStartedAt = bubbleDataNow();
   const queryDetails = {
-    page: 'bubble_chart',
+    page: 'bubblechart',
     hasUrlOverrides: urlOverridesActive,
     snapshotEligible: defaultChartMode,
     sharedLoaderAvailable: Boolean(sharedLoader),
@@ -1005,7 +1014,7 @@ async function loadData(options = {}) {
           });
 
           await trackAnalytics('json_data_loaded', {
-            page: 'bubble_chart',
+            page: 'bubblechart',
             durationMs: snapshotDuration,
             generatedAt: normalizedSnapshot?.generatedAt || snapshot.generatedAt || null,
             rows: rows.length,
@@ -1103,7 +1112,7 @@ async function loadData(options = {}) {
             }
           });
           await trackAnalytics('json_data_loaded', {
-            page: 'bubble_chart',
+            page: 'bubblechart',
             durationMs: snapshotDuration,
             generatedAt: snapshot.generatedAt || null,
             rows: rows.length,

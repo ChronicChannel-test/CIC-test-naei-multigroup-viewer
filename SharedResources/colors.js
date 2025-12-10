@@ -30,6 +30,39 @@ const categoryBaseColor = {
 let colorCache = {};
 let availableColors = [...distinctPalette];
 
+const stoveFireplaceMatchers = [
+  'stove',
+  'fireplace',
+  'chiminea',
+  'fire pit',
+  'fire-pit',
+  'bonfire'
+];
+
+const restrictedGreens = new Set([
+  '#3CB44B', // Bright green
+  '#BCF60C'  // Lime
+]);
+
+function isStoveOrFireplace(name = '') {
+  const lower = String(name).toLowerCase();
+  return stoveFireplaceMatchers.some(token => lower.includes(token));
+}
+
+function pickNextAvailableColor(disallowed = new Set()) {
+  const usedColors = new Set(Object.values(colorCache));
+  const unrestricted = availableColors.filter(color => !usedColors.has(color));
+  const filtered = unrestricted.filter(color => !disallowed.has(color));
+  if (filtered.length) {
+    return filtered[0];
+  }
+  if (unrestricted.length) {
+    return unrestricted[0];
+  }
+  // Fall back to palette cycling if we somehow exhausted every shade
+  return distinctPalette[usedColors.size % distinctPalette.length];
+}
+
 /**
  * Reset the color assignment system
  */
@@ -49,14 +82,20 @@ function getColorForCategory(name) {
 
   const lower = name.toLowerCase();
   const cat = Object.keys(categoryBaseColor).find(c => lower.includes(c));
+  const treatAsStoveFireplace = isStoveOrFireplace(name);
 
   // Prefer category color if available
   let baseColor = cat ? categoryBaseColor[cat] : null;
   let chosenColor = baseColor;
 
+  if (chosenColor && treatAsStoveFireplace && restrictedGreens.has(chosenColor)) {
+    chosenColor = null; // Force re-selection to avoid green shades
+  }
+
   // Avoid duplicates: if base color already used, pick next available
   if (!chosenColor || Object.values(colorCache).includes(chosenColor)) {
-    chosenColor = availableColors.find(c => !Object.values(colorCache).includes(c));
+    const disallowed = treatAsStoveFireplace ? restrictedGreens : new Set();
+    chosenColor = pickNextAvailableColor(disallowed);
   }
 
   // Fallback to any color if palette exhausted (shouldn't happen with ≤10)

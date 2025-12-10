@@ -33,7 +33,7 @@ function trackBubbleShareEvent(eventLabel, meta = {}) {
   const tracker = bubbleChartTracker();
   if (typeof tracker === 'function') {
     return tracker(eventLabel, meta, {
-      chartType: 'bubble_chart',
+      chartType: 'bubblechart',
       pageSlug: '/bubblechart'
     });
   }
