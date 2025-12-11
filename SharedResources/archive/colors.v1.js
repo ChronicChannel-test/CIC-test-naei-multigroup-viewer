@@ -1,6 +1,7 @@
 /**
- * Shared Color Palette Module
- * Provides consistent color assignment across NAEI data viewers
+ * Archived Color Palette Module
+ * Provides the original v1.0 heuristics (December 2025)
+ * This file is kept for reference while v2.0 work progresses.
  */
 
 // Distinct color palette for up to 10 series
@@ -40,7 +41,7 @@ const stoveFireplaceMatchers = [
 ];
 
 const restrictedGreens = new Set([
-  '#3CB44B', // Green
+  '#3CB44B', // Bright green
   '#BCF60C'  // Lime
 ]);
 
@@ -59,6 +60,7 @@ function pickNextAvailableColor(disallowed = new Set()) {
   if (unrestricted.length) {
     return unrestricted[0];
   }
+  // Fall back to palette cycling if we somehow exhausted every shade
   return distinctPalette[usedColors.size % distinctPalette.length];
 }
 
@@ -88,7 +90,7 @@ function getColorForCategory(name) {
   let chosenColor = baseColor;
 
   if (chosenColor && treatAsStoveFireplace && restrictedGreens.has(chosenColor)) {
-    chosenColor = null;
+    chosenColor = null; // Force re-selection to avoid green shades
   }
 
   // Avoid duplicates: if base color already used, pick next available
@@ -124,7 +126,7 @@ function setColorForCategory(name, color) {
 }
 
 // Export color functions and constants
-window.Colors = {
+window.ColorsV1 = {
   distinctPalette,
   categoryBaseColor,
   resetColorSystem,

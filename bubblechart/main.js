@@ -2552,6 +2552,13 @@ async function drawChart(skipHeightUpdate = false) {
   }
   window.ChartRenderer.clearMessage();
 
+  // Ensure category colors follow UI order every draw
+  if (typeof window.Colors?.resetColorSystem === 'function') {
+    window.Colors.resetColorSystem();
+    const orderedNames = getSelectedCategories();
+    orderedNames.forEach(name => window.Colors.getColorForCategory?.(name));
+  }
+
   if (!selectedYear) {
     window.ChartRenderer.showMessage('Please select a year', 'warning');
     return;
@@ -2589,9 +2596,6 @@ async function drawChart(skipHeightUpdate = false) {
   if (Number.isFinite(latestEstimate)) {
     window.__BUBBLE_PRE_LEGEND_ESTIMATE = latestEstimate;
   }
-
-  // Reset colors for new chart
-  window.Colors.resetColorSystem();
 
   // Draw chart
   try {
