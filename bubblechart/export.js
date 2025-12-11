@@ -266,12 +266,21 @@ async function generateChartImage() {
 
           const pollutantName = chartData.pollutantName;
           const pollutantUnit = chartData.pollutantUnit;
+          const pollutantUnitMeta = window.EmissionUnits?.getUnitMeta
+            ? window.EmissionUnits.getUnitMeta(pollutantUnit)
+            : null;
+          const isActivityPollutant = window.EmissionUnits?.isActivityUnit
+            ? window.EmissionUnits.isActivityUnit(pollutantUnitMeta || pollutantUnit)
+            : false;
+          const normalizedPollutantName = pollutantName || 'Selected Pollutant';
+          const chartTitleText = isActivityPollutant
+            ? 'Activity Data'
+            : `UK ${normalizedPollutantName} Emissions`;
           const year = chartData.year;
           const padding = 50;
-          const yearHeight = 152; // Space tuned for 120px year label plus additional top offset
-          const titleHeight = 162; // Space for enlarged pollutant title
-          const subtitleHeight = 40; // Space for subtitle line
-          const headerText = 'UK Air Pollution/Emissions';
+          const legendTopGap = 90; // Visual breathing room between year label and legend
+          const yearFontSize = 140;
+          const yearLineHeight = yearFontSize + 30;
           const baseChartWidth = chartContainer?.offsetWidth || chartWidth;
           const logicalCanvasWidth = baseChartWidth + padding * 2;
           const isNarrowExport = logicalCanvasWidth < 768;
@@ -287,19 +296,20 @@ async function generateChartImage() {
           // Set up the final canvas dimensions
           const measureCanvas = document.createElement('canvas');
           const measureCtx = measureCanvas.getContext('2d');
-          const buildHeaderMetrics = width => {
-            const headerFontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-            const maxWidth = Math.max(300, width - 200);
+          const buildChartTitleMetrics = width => {
+            const titleFontFamily = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+            const maxWidth = Math.max(320, width - 220);
             let fontSize = 90;
-            const minFontSize = 60;
-            let font = `700 ${fontSize}px ${headerFontFamily}`;
+            const minFontSize = 55;
+            let font = `600 ${fontSize}px ${titleFontFamily}`;
+            const titleSample = chartTitleText || '';
             measureCtx.font = font;
-            while (measureCtx.measureText(headerText).width > maxWidth && fontSize > minFontSize) {
+            while (measureCtx.measureText(titleSample).width > maxWidth && fontSize > minFontSize) {
               fontSize -= 2;
-              font = `700 ${fontSize}px ${headerFontFamily}`;
+              font = `600 ${fontSize}px ${titleFontFamily}`;
               measureCtx.font = font;
             }
-            const lineHeight = fontSize + 40;
+            const lineHeight = fontSize + 32;
             return {
               font,
               fontSize,
@@ -508,12 +518,13 @@ async function generateChartImage() {
             };
           };
 
-          const headerMetrics = buildHeaderMetrics(canvasWidth);
+          const titleMetrics = buildChartTitleMetrics(canvasWidth);
           const footerLayout = buildFooterLayout(canvasWidth);
           const legendLayout = buildLegendLayout(canvasWidth, chartData);
           const efTextLineHeight = 70;
           const legendSpacing = legendLayout.rows.length ? efTextLineHeight * 2 : 0;
           const legendHeight = legendLayout.totalHeight + legendSpacing;
+          const titleBlockHeight = titleMetrics.height + yearLineHeight + legendTopGap;
 
           let bannerConfig = null;
           if (isNarrowExport) {
@@ -541,7 +552,7 @@ async function generateChartImage() {
           const bannerExtraHeight = bannerConfig ? bannerConfig.spacingTop + bannerConfig.height + bannerConfig.spacingBottom : 0;
 
           const canvas = document.createElement('canvas');
-          const canvasHeight = headerMetrics.height + yearHeight + titleHeight + legendHeight + chartHeight + footerLayout.totalHeight + bannerExtraHeight + padding * 2;
+          const canvasHeight = titleBlockHeight + legendHeight + chartHeight + footerLayout.totalHeight + bannerExtraHeight + padding * 2;
           canvas.width = canvasWidth;
           canvas.height = canvasHeight;
           const ctx = canvas.getContext('2d');
@@ -552,26 +563,19 @@ async function generateChartImage() {
           ctx.fillStyle = '#ffffff';
           ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-          // Year - Above title (larger than title)
-          ctx.font = headerMetrics.font;
+          // Title (new layout matches on-screen header)
+          ctx.font = titleMetrics.font;
           ctx.fillStyle = '#000000';
           ctx.textAlign = 'center';
-          const headerBaseline = padding + headerMetrics.fontSize;
-          ctx.fillText(headerText, canvasWidth / 2, headerBaseline);
+          const titleBaseline = padding + titleMetrics.fontSize;
+          ctx.fillText(chartTitleText, canvasWidth / 2, titleBaseline);
 
-          const yearTopOffset = padding + headerMetrics.height + 90;
-
-          ctx.font = 'bold 120px system-ui, sans-serif'; // Dramatically larger than title
-          ctx.fillText(year, canvasWidth / 2, yearTopOffset);
-
-          // Title - Pollutant name
-          ctx.font = 'bold 95px system-ui, sans-serif'; // Larger title while remaining below year size
-          ctx.fillStyle = '#000000';
-          ctx.textAlign = 'center';
-          ctx.fillText(`${pollutantName}${pollutantUnit ? " - " + pollutantUnit : ""}`, canvasWidth / 2, padding + headerMetrics.height + yearHeight + 55);
+          const yearBaseline = padding + titleMetrics.height + yearFontSize;
+          ctx.font = `700 ${yearFontSize}px system-ui, sans-serif`;
+          ctx.fillText(year, canvasWidth / 2, yearBaseline);
 
           // Custom Legend - Larger Font and Dots (starts after title area)
-          let legendY = padding + headerMetrics.height + yearHeight + 155; // 100px baseline gap below pollutant title
+          let legendY = padding + titleMetrics.height + yearLineHeight + legendTopGap; // matches new spacing below year label
           legendLayout.rows.forEach(({ entries, width }) => {
             let x = (canvasWidth - width) / 2;
             entries.forEach(({ dotColor, text, entryWidth }) => {
@@ -669,7 +673,7 @@ async function generateChartImage() {
           legendY = efTextY + lines.length * efTextLineHeight;
 
           // Chart Image - with precise clipping on top and right only (no borders there)
-          const chartY = padding + headerMetrics.height + yearHeight + titleHeight + legendHeight + 20; // Tight gap before chart
+          const chartY = padding + titleBlockHeight + legendHeight + 20; // Tight gap before chart
           
           // Chart area boundaries from chart-renderer.js (scaled by exportScale = 3)
           const exportScale = 3;

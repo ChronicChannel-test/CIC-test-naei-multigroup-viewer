@@ -299,10 +299,20 @@ async function drawBubbleChart(year, pollutantId, categoryIds) {
       return seriesVisibility[categoryIndex];
     });
 
+    const pollutantName = window.supabaseModule.getPollutantName(pollutantId);
+    const pollutantUnit = window.supabaseModule.getPollutantUnit(pollutantId);
+    const pollutantUnitMeta = window.EmissionUnits?.getUnitMeta(pollutantUnit);
+    const buildAxisLabel = (label, unit) => unit ? `${label} (${unit})` : label;
+    const pollutantAxisUnit = window.EmissionUnits?.formatAxisLabel(pollutantUnitMeta) || pollutantUnit || '';
+    const actDataId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
+    const activityUnit = window.supabaseModule.getPollutantUnit(actDataId);
+    const activityUnitMeta = window.EmissionUnits?.getUnitMeta(activityUnit);
+    const activityAxisUnit = window.EmissionUnits?.formatAxisLabel(activityUnitMeta) || activityUnit || 'TJ';
+
     // Prepare Google DataTable for scatter chart with bubble-like styling
     const data = new google.visualization.DataTable();
-    data.addColumn('number', 'Activity Data (TJ)');
-    data.addColumn('number', `${window.supabaseModule.getPollutantName(pollutantId)} (${window.supabaseModule.getPollutantUnit(pollutantId)})`);
+    data.addColumn('number', buildAxisLabel('Activity Data', activityAxisUnit));
+    data.addColumn('number', buildAxisLabel('Emissions', pollutantAxisUnit));
     data.addColumn({type: 'string', role: 'tooltip'});
   data.addColumn({type: 'string', role: 'style'});
 
@@ -315,28 +325,8 @@ async function drawBubbleChart(year, pollutantId, categoryIds) {
   });
   
   // Determine conversion factor based on pollutant unit (BEFORE calculating EFs)
-  const pollutantUnit = window.supabaseModule.getPollutantUnit(pollutantId);
-  let conversionFactor;
-  switch(pollutantUnit.toLowerCase()) {
-    case 't':
-    case 'tonnes':
-      conversionFactor = 1000; // t × 10^3 → g/GJ
-      break;
-    case 'grams international toxic equivalent':
-      conversionFactor = 1000; // g × 10^3 → g/GJ (since 1 TJ = 1000 GJ)
-      break;
-    case 'kilotonne':
-    case 'kilotonne/kt co2 equivalent':
-    case 'kt co2 equivalent':
-      conversionFactor = 1000000; // kt × 10^6 → g/GJ
-      break;
-    case 'kg':
-      conversionFactor = 1; // kg × 10^0 → g/GJ (kg/TJ = g/GJ)
-      break;
-    default:
-      conversionFactor = 1000000; // Default fallback
-      chartLoggerWarn(`Unknown pollutant unit: ${pollutantUnit}, using default conversion`);
-  }
+  const conversionFactor = window.EmissionUnits?.getConversionFactor(pollutantUnitMeta || pollutantUnit)
+    ?? 1000000;
   
   // Calculate all EF values first to determine dynamic scale factor (use visible points only)
   const allEFs = orderedVisiblePoints.map(p => p.EF !== undefined ? p.EF : (p.actDataValue !== 0 ? (p.pollutantValue / p.actDataValue) * conversionFactor : 0));
@@ -409,7 +399,9 @@ async function drawBubbleChart(year, pollutantId, categoryIds) {
     // All EF values are converted to g/GJ
     // Use more decimal places for very small values
     const efDisplay = emissionFactor < 0.01 ? emissionFactor.toFixed(8) : emissionFactor.toFixed(2);
-    const tooltip = `${point.categoryName}\nActivity: ${point.actDataValue.toLocaleString()} TJ\nEmissions: ${point.pollutantValue.toLocaleString()} ${pollutantUnit}\nEmission Factor: ${efDisplay} g/GJ`;
+    const activityUnitLabel = window.EmissionUnits?.formatValueLabel(activityUnitMeta || activityUnit, point.actDataValue) || activityAxisUnit;
+    const emissionUnitLabel = window.EmissionUnits?.formatValueLabel(pollutantUnitMeta || pollutantUnit, point.pollutantValue) || pollutantAxisUnit;
+    const tooltip = `${point.categoryName}\nActivity: ${point.actDataValue.toLocaleString()}${activityUnitLabel ? ` ${activityUnitLabel}` : ''}\nEmissions: ${point.pollutantValue.toLocaleString()}${emissionUnitLabel ? ` ${emissionUnitLabel}` : ''}\nEmission Factor: ${efDisplay} g/GJ`;
 
     data.addRow([
       point.actDataValue, // X-axis
@@ -420,16 +412,11 @@ async function drawBubbleChart(year, pollutantId, categoryIds) {
   });
   
   // Chart options
-  const pollutantName = window.supabaseModule.getPollutantName(pollutantId);
-  // pollutantUnit already declared above
-  const actDataId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
-  const activityUnit = window.supabaseModule.getPollutantUnit(actDataId);
-  
-  
-  // Format title and axis labels for bubble chart
-  const chartTitle = `${pollutantName} - ${pollutantUnit}`;
-  const yAxisTitle = `${pollutantName} - ${pollutantUnit}`;
-  const xAxisTitle = activityUnit ? `Activity Data - ${activityUnit}` : 'Activity Data - TJ';
+  const isActivityPollutant = window.EmissionUnits?.isActivityUnit(pollutantUnitMeta || pollutantUnit);
+  const chartTitleText = isActivityPollutant ? 'Activity Data' : `UK ${pollutantName} Emissions`;
+  const yAxisLabelBase = isActivityPollutant ? 'Activity Data' : `${pollutantName} Emissions`;
+  const yAxisTitle = buildAxisLabel(yAxisLabelBase, pollutantAxisUnit);
+  const xAxisTitle = buildAxisLabel('Activity Data', activityAxisUnit);
 
   // Create a custom title element with two lines
     const chartTitleElement = document.getElementById('chartTitle');
@@ -438,20 +425,18 @@ async function drawBubbleChart(year, pollutantId, categoryIds) {
       chartTitleElement.style.textAlign = 'center';
       chartTitleElement.style.marginBottom = '6px';
 
-      // Add year as the first line
+      const titleElement = document.createElement('div');
+      titleElement.className = 'chart-title__pollutant';
+      titleElement.textContent = chartTitleText;
+
       const yearElement = document.createElement('div');
       yearElement.className = 'chart-title__year-range';
       yearElement.textContent = `${year}`;
 
-      // Add pollutant and emission unit as the second line
-      const pollutantElement = document.createElement('div');
-      pollutantElement.className = 'chart-title__pollutant';
-      pollutantElement.textContent = `${yAxisTitle}`;
-
       // Clear previous content and append new elements
       chartTitleElement.innerHTML = '';
+      chartTitleElement.appendChild(titleElement);
       chartTitleElement.appendChild(yearElement);
-      chartTitleElement.appendChild(pollutantElement);
     }
 
     // Set a fixed height for the chart container to prevent layout shifts (same as line chart)

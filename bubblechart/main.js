@@ -2173,6 +2173,10 @@ function formatDynamicNumber(value) {
 }
 
 function getEmissionFactorConversionFactor(pollutantUnit) {
+  const helperFactor = window.EmissionUnits?.getConversionFactor(pollutantUnit);
+  if (Number.isFinite(helperFactor)) {
+    return helperFactor;
+  }
   const unit = typeof pollutantUnit === 'string' ? pollutantUnit.toLowerCase() : '';
   switch (unit) {
     case 't':
@@ -2198,55 +2202,6 @@ function convertEmissionFactorToGramsPerGJ(emissionFactor, pollutantUnit) {
   }
   const factor = getEmissionFactorConversionFactor(pollutantUnit);
   return emissionFactor * factor;
-}
-
-function stripUnitAnnotations(unitLabel) {
-  if (typeof unitLabel !== 'string') {
-    return unitLabel || '';
-  }
-  const stripped = unitLabel.replace(/\s*\(.*?\)/g, '').trim();
-  return stripped || unitLabel.trim();
-}
-
-function pluralizeUnitLabel(unitLabel, quantity) {
-  if (typeof unitLabel !== 'string') {
-    return unitLabel || '';
-  }
-
-  const trimmed = unitLabel.trim();
-  if (!trimmed) {
-    return '';
-  }
-
-  const absoluteQuantity = Math.abs(Number(quantity));
-  const requiresPlural = Number.isFinite(absoluteQuantity) ? Math.abs(absoluteQuantity - 1) >= 1e-9 : true;
-  if (!requiresPlural) {
-    return trimmed;
-  }
-
-  const parts = trimmed.split(/\s+/);
-  const lastWord = parts.pop();
-
-  if (!lastWord) {
-    return trimmed;
-  }
-
-  const isAlphabetic = /^[a-z]+$/i.test(lastWord);
-  const alreadyPlural = lastWord.toLowerCase().endsWith('s');
-  if (!isAlphabetic || alreadyPlural) {
-    parts.push(lastWord);
-    return parts.join(' ');
-  }
-
-  let pluralized;
-  if (lastWord.toLowerCase().endsWith('y') && !/[aeiou]y$/i.test(lastWord)) {
-    pluralized = `${lastWord.slice(0, -1)}ies`;
-  } else {
-    pluralized = `${lastWord}s`;
-  }
-
-  parts.push(pluralized);
-  return parts.join(' ');
 }
 
 function calculateEmissionFactor(dataPoint) {
@@ -2914,6 +2869,9 @@ function updateComparisonStatement(statement) {
       warningDetails = {}
     } = statement || {};
 
+    const pollutantUnitMeta = window.EmissionUnits?.getUnitMeta(pollutantUnit);
+    const activityUnitMeta = window.EmissionUnits?.getUnitMeta(activityUnit);
+
     if (!pollutantName || !pollutionLeaderName || !pollutionFollowerName || !energyLeaderName || !energyFollowerName) {
       hideComparisonStatement();
       return;
@@ -2937,29 +2895,34 @@ function updateComparisonStatement(statement) {
         maximumFractionDigits: 1,
         minimumFractionDigits: 0
       });
-      const unitLabel = pollutantUnit || '';
-      const pluralUnit = unitLabel ? pluralizeUnitLabel(unitLabel, value) : '';
-      const display = pluralUnit ? `${formattedValue} ${pluralUnit}` : formattedValue;
+      const unitLabel = window.EmissionUnits?.formatValueLabel(pollutantUnitMeta || pollutantUnit, value) || '';
+      const display = unitLabel ? `${formattedValue} ${unitLabel}` : formattedValue;
       return {
         display,
         valueText: formattedValue,
-        unitText: pluralUnit
+        unitText: unitLabel
       };
     };
 
-    const energyUnitLabel = activityUnit || 'TJ';
-    const energyUnitLabelCalc = stripUnitAnnotations(energyUnitLabel) || energyUnitLabel;
-
-    const formatDetailedPollution = (value) => {
+    const formatDetailedPollution = (value, { context = 'value' } = {}) => {
       const formatted = formatDynamicNumber(value);
       if (formatted === null) return '—';
-      return pollutantUnit ? `${formatted} ${pollutantUnit}` : formatted;
+      const unitLabel = window.EmissionUnits?.formatValueLabel(
+        pollutantUnitMeta || pollutantUnit,
+        value,
+        { context }
+      ) || pollutantUnit || '';
+      return unitLabel ? `${formatted} ${unitLabel}` : formatted;
     };
 
     const formatDetailedEnergy = (value, { useCalcUnit = false } = {}) => {
       const formatted = formatDynamicNumber(value);
       if (formatted === null) return '—';
-      const unitLabel = useCalcUnit ? energyUnitLabelCalc : energyUnitLabel;
+      const unitLabel = window.EmissionUnits?.formatValueLabel(
+        activityUnitMeta || activityUnit,
+        value,
+        { context: useCalcUnit ? 'calc' : 'value' }
+      ) || activityUnit || 'TJ';
       return unitLabel ? `${formatted} ${unitLabel}` : formatted;
     };
 
@@ -3048,7 +3011,9 @@ function updateComparisonStatement(statement) {
     if (Number.isFinite(pollutionRatio)
       && Number.isFinite(pollutionNumeratorValue)
       && Number.isFinite(pollutionDenominatorValue)) {
-      pollutionFormulaLines.push(`${formatDetailedPollution(pollutionNumeratorValue)} ÷ ${formatDetailedPollution(pollutionDenominatorValue)} = ${formatRatio(pollutionRatio)}x`);
+      const numeratorLabel = formatDetailedPollution(pollutionNumeratorValue, { context: 'calc' });
+      const denominatorLabel = formatDetailedPollution(pollutionDenominatorValue, { context: 'calc' });
+      pollutionFormulaLines.push(`${numeratorLabel} ÷ ${denominatorLabel} = ${formatRatio(pollutionRatio)}x`);
       const pollutionDirection = ratioIndicatesLower ? '(lower pollution)' : '(higher pollution)';
       pollutionFormulaLines.push(pollutionDirection);
     }
@@ -3107,7 +3072,7 @@ function updateComparisonStatement(statement) {
     const warningFormulaSummary = (Number.isFinite(warningTotalEnergy)
       && Number.isFinite(warningEmissionFactor)
       && Number.isFinite(replacementPollution))
-      ? `${formatDetailedEnergy(warningTotalEnergy, { useCalcUnit: true })} x ${formatEmissionFactorDetailed(warningEmissionFactor)} = ${formatDetailedPollution(replacementPollution)}`
+      ? `${formatDetailedEnergy(warningTotalEnergy, { useCalcUnit: true })} x ${formatEmissionFactorDetailed(warningEmissionFactor)} = ${formatDetailedPollution(replacementPollution, { context: 'calc' })}`
       : null;
 
     const buildWarningTooltip = () => {
