@@ -223,6 +223,10 @@ let sharedLoaderReference = null;
 let bubbleInitialDatasetInfo = null;
 let bubbleFullDatasetPromise = null;
 let fullDatasetToastShown = false;
+const CATEGORY_ALL_SOURCES_TOKEN = '__ALL_SOURCES__';
+const CATEGORY_ALL_FUELS_TOKEN = '__ALL_FUELS__';
+let categoryCompositionMapCache = null;
+let categoryCompositionMapPromise = null;
 
 function sortNumericList(values = []) {
   return values.slice().sort((a, b) => a - b);
@@ -682,6 +686,7 @@ async function ensureAllCategoryMetadata(sharedLoader) {
   const cachedCategories = getCachedCategoryMetadata(sharedLoader);
   if (Array.isArray(cachedCategories) && cachedCategories.length) {
     categoryMetadataCache = cachedCategories;
+    resetCategoryCompositionCache();
     return categoryMetadataCache;
   }
 
@@ -696,6 +701,7 @@ async function ensureAllCategoryMetadata(sharedLoader) {
         throw response.error;
       }
       categoryMetadataCache = response.data || [];
+      resetCategoryCompositionCache();
       return categoryMetadataCache;
     })().catch(error => {
       console.error('Failed to fetch category metadata:', error);
@@ -734,6 +740,290 @@ function mergeCategoryCollections(primary = [], secondary = []) {
   secondary.forEach(push);
 
   return merged;
+}
+
+function resetCategoryCompositionCache() {
+  categoryCompositionMapCache = null;
+  categoryCompositionMapPromise = null;
+}
+
+function isCategoryNullToken(value) {
+  if (value === null || value === undefined) {
+    return true;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return !trimmed || trimmed.toLowerCase() === 'null';
+  }
+  return false;
+}
+
+function normalizeCategoryValue(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  if (typeof value === 'string') {
+    return value.trim();
+  }
+  return String(value).trim();
+}
+
+function splitCategoryMultiValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map(normalizeCategoryValue)
+      .filter(entry => entry && !isCategoryNullToken(entry));
+  }
+  const normalized = normalizeCategoryValue(value);
+  if (!normalized || isCategoryNullToken(normalized)) {
+    return [];
+  }
+  if (!/[;\n]/.test(normalized)) {
+    return [normalized];
+  }
+  return normalized
+    .split(/[;\n]+/)
+    .map(entry => entry.trim())
+    .filter(entry => entry && !isCategoryNullToken(entry));
+}
+
+function splitCategoryCodeList(value) {
+  const normalized = normalizeCategoryValue(value);
+  if (!normalized) {
+    return [];
+  }
+  return normalized
+    .split(/[;,\n]+/)
+    .map(entry => entry.trim())
+    .filter(entry => entry && !isCategoryNullToken(entry));
+}
+
+function buildCategoryCompositionMap(rows = []) {
+  const map = new Map();
+  rows.forEach(row => {
+    const id = Number(row?.id ?? row?.category_id);
+    if (!Number.isFinite(id)) {
+      return;
+    }
+    const title = normalizeCategoryValue(row?.category_title || row?.group_name || row?.name);
+    let entry = map.get(id);
+    if (!entry) {
+      entry = {
+        id,
+        title,
+        sources: new Set(),
+        activities: new Set(),
+        sourceToActivities: new Map(),
+        nfrCodes: new Set(),
+        coversAllSources: false,
+        coversAllFuels: false,
+        hasSourceSignals: false,
+        hasActivitySignals: false
+      };
+      map.set(id, entry);
+    }
+
+    const sourceValues = splitCategoryMultiValue(row?.source_name ?? row?.source ?? row?.Source);
+    const activityValues = splitCategoryMultiValue(row?.activity_name ?? row?.activity ?? row?.Activity);
+    const nfrValues = splitCategoryCodeList(row?.nfr_code ?? row?.nfr_codes ?? '');
+
+    if (nfrValues.length) {
+      entry.hasSourceSignals = true;
+      nfrValues.forEach(code => entry.nfrCodes.add(code));
+    }
+
+    if (!sourceValues.length) {
+      entry.coversAllSources = true;
+      sourceValues.push(CATEGORY_ALL_SOURCES_TOKEN);
+    } else {
+      entry.hasSourceSignals = true;
+    }
+
+    if (!activityValues.length) {
+      entry.coversAllFuels = true;
+      activityValues.push(CATEGORY_ALL_FUELS_TOKEN);
+    } else {
+      entry.hasActivitySignals = true;
+    }
+
+    sourceValues.forEach(source => {
+      if (source !== CATEGORY_ALL_SOURCES_TOKEN) {
+        entry.sources.add(source);
+      }
+      let activitySet = entry.sourceToActivities.get(source);
+      if (!activitySet) {
+        activitySet = new Set();
+        entry.sourceToActivities.set(source, activitySet);
+      }
+      activityValues.forEach(activity => {
+        if (activity !== CATEGORY_ALL_FUELS_TOKEN) {
+          entry.activities.add(activity);
+        }
+        activitySet.add(activity);
+      });
+    });
+  });
+  return map;
+}
+
+function doesActivitySetCoverAllFuels(activitySet) {
+  if (!activitySet || !activitySet.size) {
+    return true;
+  }
+  return activitySet.has(CATEGORY_ALL_FUELS_TOKEN);
+}
+
+function collectContainerActivitySet(container, sourceKey) {
+  const merged = new Set();
+  const specificSet = container.sourceToActivities.get(sourceKey);
+  const globalSet = container.sourceToActivities.get(CATEGORY_ALL_SOURCES_TOKEN);
+  if (specificSet) {
+    specificSet.forEach(value => merged.add(value));
+  }
+  if (globalSet) {
+    globalSet.forEach(value => merged.add(value));
+  }
+  return merged;
+}
+
+function evaluateCategorySubset(candidate, container) {
+  if (!candidate || !container) {
+    return null;
+  }
+
+  const candidateHasSources = candidate.hasSourceSignals || candidate.nfrCodes.size;
+  if (!candidateHasSources) {
+    return null;
+  }
+
+  if (!candidate.sourceToActivities.size && candidate.nfrCodes.size) {
+    if (!container.nfrCodes.size) {
+      return null;
+    }
+    const subset = Array.from(candidate.nfrCodes).every(code => container.nfrCodes.has(code));
+    return subset;
+  }
+
+  const containerSupportsAllSources = container.coversAllSources || container.sourceToActivities.has(CATEGORY_ALL_SOURCES_TOKEN);
+  if (!containerSupportsAllSources && !container.sourceToActivities.size) {
+    return null;
+  }
+
+  for (const [sourceKey, candidateActivities] of candidate.sourceToActivities.entries()) {
+    const normalizedSource = sourceKey || CATEGORY_ALL_SOURCES_TOKEN;
+    const sourceCovered = normalizedSource === CATEGORY_ALL_SOURCES_TOKEN
+      ? containerSupportsAllSources
+      : containerSupportsAllSources
+        || container.sourceToActivities.has(normalizedSource)
+        || container.sources.has(normalizedSource);
+
+    if (!sourceCovered) {
+      return false;
+    }
+
+    if (doesActivitySetCoverAllFuels(candidateActivities)) {
+      if (container.coversAllFuels) {
+        continue;
+      }
+      const containerActivities = collectContainerActivitySet(container, normalizedSource);
+      if (!doesActivitySetCoverAllFuels(containerActivities)) {
+        return false;
+      }
+      continue;
+    }
+
+    if (container.coversAllFuels) {
+      continue;
+    }
+
+    const containerActivities = collectContainerActivitySet(container, normalizedSource);
+    if (!containerActivities.size) {
+      return false;
+    }
+    if (doesActivitySetCoverAllFuels(containerActivities)) {
+      continue;
+    }
+
+    for (const activity of candidateActivities) {
+      if (activity === CATEGORY_ALL_FUELS_TOKEN) {
+        if (!doesActivitySetCoverAllFuels(containerActivities)) {
+          return false;
+        }
+        continue;
+      }
+      if (!containerActivities.has(activity)) {
+        return false;
+      }
+    }
+  }
+
+  if (candidate.nfrCodes.size && container.nfrCodes.size) {
+    const subset = Array.from(candidate.nfrCodes).every(code => container.nfrCodes.has(code));
+    if (!subset) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+async function ensureCategoryCompositionMap(sharedLoader) {
+  if (categoryCompositionMapCache) {
+    return categoryCompositionMapCache;
+  }
+  if (!categoryCompositionMapPromise) {
+    categoryCompositionMapPromise = (async () => {
+      const metadataRows = await ensureAllCategoryMetadata(sharedLoader);
+      if (!Array.isArray(metadataRows) || !metadataRows.length) {
+        return null;
+      }
+      categoryCompositionMapCache = buildCategoryCompositionMap(metadataRows);
+      return categoryCompositionMapCache;
+    })().catch(error => {
+      categoryCompositionMapPromise = null;
+      throw error;
+    });
+  }
+  return categoryCompositionMapPromise;
+}
+
+async function getCategoryMetadataMap(sharedLoader) {
+  try {
+    const loader = sharedLoader || await resolveSharedLoader();
+    return await ensureCategoryCompositionMap(loader);
+  } catch (error) {
+    supabaseDebugWarn('Category metadata map unavailable:', error?.message || error);
+    return null;
+  }
+}
+
+async function assessCategoryInclusion(candidateId, containerId, options = {}) {
+  const childId = Number(candidateId);
+  const parentId = Number(containerId);
+  if (!Number.isFinite(childId) || !Number.isFinite(parentId)) {
+    return { included: null, reason: 'invalid-id' };
+  }
+
+  try {
+    const loader = options.sharedLoader || await resolveSharedLoader();
+    const map = await ensureCategoryCompositionMap(loader);
+    if (!map) {
+      return { included: null, reason: 'missing-map' };
+    }
+    const candidate = map.get(childId);
+    const container = map.get(parentId);
+    if (!candidate || !container) {
+      return { included: null, reason: 'missing-category' };
+    }
+    const evaluation = evaluateCategorySubset(candidate, container);
+    if (evaluation === null) {
+      return { included: null, reason: 'inconclusive' };
+    }
+    return { included: evaluation === true, reason: 'evaluated' };
+  } catch (error) {
+    supabaseDebugWarn('assessCategoryInclusion failed:', error?.message || error);
+    return { included: null, reason: 'error' };
+  }
 }
 
 function waitForFirstDatasetCandidate(promises = [], logError = () => {}) {
@@ -1263,7 +1553,8 @@ async function loadData(options = {}) {
           if (!Array.isArray(metadata) || !metadata.length) {
             return;
           }
-          categoryMetadataCache = mergeCategoryCollections(metadata, categoryMetadataCache || []);
+            categoryMetadataCache = mergeCategoryCollections(metadata, categoryMetadataCache || []);
+            resetCategoryCompositionCache();
         })
         .catch(error => {
           supabaseDebugWarn('Unable to load full category metadata before hydration:', error.message || error);
@@ -1796,6 +2087,9 @@ try {
     getCategoryName,
     getPollutantShortName,
     getCategoryShortTitle,
+    getCategoryMetadataMap: () => getCategoryMetadataMap().catch(() => categoryCompositionMapCache || null),
+    getCachedCategoryMetadataMap: () => categoryCompositionMapCache,
+    assessCategoryInclusion,
     get allPollutants() { return allPollutants; },
     get allCategories() { return allCategories; },
     get allCategoriesList() { return allCategoriesList; },

@@ -2296,6 +2296,53 @@ function estimateReplacementPollution(replacementSource, baselineSource) {
   };
 }
 
+async function requestCategoryInclusionAssessment(candidateCategoryId, containerCategoryId) {
+  if (!window.supabaseModule) {
+    return null;
+  }
+  const childId = Number(candidateCategoryId);
+  const parentId = Number(containerCategoryId);
+  if (!Number.isFinite(childId) || !Number.isFinite(parentId)) {
+    return null;
+  }
+
+  const assessor = typeof window.supabaseModule.assessCategoryInclusion === 'function'
+    ? window.supabaseModule.assessCategoryInclusion
+    : null;
+
+  if (!assessor) {
+    return null;
+  }
+
+  try {
+    return await assessor(childId, parentId);
+  } catch (error) {
+    console.warn('Category inclusion assessment failed:', error);
+    return null;
+  }
+}
+
+async function buildReplacementInclusionNote(polluterDataPoint, baselineDataPoint) {
+  if (!polluterDataPoint || !baselineDataPoint) {
+    return null;
+  }
+  const assessment = await requestCategoryInclusionAssessment(
+    polluterDataPoint.categoryId,
+    baselineDataPoint.categoryId
+  );
+  if (assessment?.included) {
+    const polluterName = polluterDataPoint.displayName || polluterDataPoint.categoryName;
+    const baselineName = baselineDataPoint.displayName || baselineDataPoint.categoryName;
+    if (polluterName && baselineName) {
+      return {
+        text: `${polluterName} is already included in ${baselineName}`,
+        reason: assessment.reason || 'evaluated'
+      };
+    }
+  }
+  return null;
+}
+
 function selectLeaderFollower(dataPoints = [], metricAccessor = () => NaN) {
   if (!Array.isArray(dataPoints) || dataPoints.length < 2) {
     return { leader: null, follower: null };
@@ -2651,50 +2698,67 @@ async function drawChart(skipHeightUpdate = false) {
 
       let replacementDetails = null;
       let replacementPollution = null;
+      let replacementInclusion = null;
 
       if (warningPolluter && warningBaseline) {
-        const estimate = estimateReplacementPollution(warningPolluter, warningBaseline);
-        if (estimate) {
+        replacementInclusion = await buildReplacementInclusionNote(warningPolluter, warningBaseline);
+        const baselineOnlyEnergy = normalizeNumber(warningBaseline?.actDataValue);
+        const polluterEmissionFactor = Number.isFinite(warningPolluter?.emissionFactor)
+          ? warningPolluter.emissionFactor
+          : calculateEmissionFactor(warningPolluter);
+
+        if (replacementInclusion && Number.isFinite(baselineOnlyEnergy) && baselineOnlyEnergy > 0 && Number.isFinite(polluterEmissionFactor)) {
+          replacementPollution = polluterEmissionFactor * baselineOnlyEnergy;
           replacementDetails = {
             polluter: warningPolluter,
             baseline: warningBaseline,
-            emissionFactor: estimate.emissionFactor,
-            totalActivity: estimate.totalActivity,
-            calcSource: 'ef'
+            emissionFactor: polluterEmissionFactor,
+            totalActivity: baselineOnlyEnergy,
+            calcSource: 'baseline-only'
           };
-          replacementPollution = estimate.value;
-        } else {
-          const fallbackEmissionFactor = Number.isFinite(warningPolluter?.emissionFactor)
-            ? warningPolluter.emissionFactor
-            : calculateEmissionFactor(warningPolluter);
-          const fallbackTotalEnergy = sumActivityValues(
-            warningPolluter?.actDataValue,
-            warningBaseline?.actDataValue
-          );
+        }
 
-          if (Number.isFinite(fallbackEmissionFactor) && fallbackTotalEnergy > 0) {
-            replacementPollution = fallbackEmissionFactor * fallbackTotalEnergy;
+        if (!replacementPollution) {
+          const estimate = estimateReplacementPollution(warningPolluter, warningBaseline);
+          if (estimate) {
             replacementDetails = {
               polluter: warningPolluter,
               baseline: warningBaseline,
-              emissionFactor: fallbackEmissionFactor,
-              totalActivity: fallbackTotalEnergy,
-              calcSource: 'fallback-energy'
+              emissionFactor: estimate.emissionFactor,
+              totalActivity: estimate.totalActivity,
+              calcSource: 'ef'
             };
-          } else if (warningFallback) {
-            const ratioFallback = safeRatio(warningPolluter?.pollutantValue, warningFallback?.pollutantValue);
-            const fallbackValue = Number.isFinite(ratioFallback)
-              ? ratioFallback * warningFallback.pollutantValue
-              : null;
-            if (Number.isFinite(fallbackValue)) {
-              replacementPollution = fallbackValue;
+            replacementPollution = estimate.value;
+          } else {
+            const fallbackTotalEnergy = sumActivityValues(
+              warningPolluter?.actDataValue,
+              warningBaseline?.actDataValue
+            );
+
+            if (Number.isFinite(polluterEmissionFactor) && fallbackTotalEnergy > 0) {
+              replacementPollution = polluterEmissionFactor * fallbackTotalEnergy;
               replacementDetails = {
                 polluter: warningPolluter,
                 baseline: warningBaseline,
-                emissionFactor: fallbackEmissionFactor || null,
-                totalActivity: fallbackTotalEnergy || null,
-                calcSource: 'ratio-fallback'
+                emissionFactor: polluterEmissionFactor,
+                totalActivity: fallbackTotalEnergy,
+                calcSource: 'fallback-energy'
               };
+            } else if (warningFallback) {
+              const ratioFallback = safeRatio(warningPolluter?.pollutantValue, warningFallback?.pollutantValue);
+              const fallbackValue = Number.isFinite(ratioFallback)
+                ? ratioFallback * warningFallback.pollutantValue
+                : null;
+              if (Number.isFinite(fallbackValue)) {
+                replacementPollution = fallbackValue;
+                replacementDetails = {
+                  polluter: warningPolluter,
+                  baseline: warningBaseline,
+                  emissionFactor: polluterEmissionFactor || null,
+                  totalActivity: fallbackTotalEnergy || null,
+                  calcSource: 'ratio-fallback'
+                };
+              }
             }
           }
         }
@@ -2732,7 +2796,8 @@ async function drawChart(skipHeightUpdate = false) {
               ?? (Number.isFinite(warningPolluter?.emissionFactor)
                 ? warningPolluter.emissionFactor
                 : calculateEmissionFactor(warningPolluter)),
-            calcSource: replacementDetails?.calcSource || null
+            calcSource: replacementDetails?.calcSource || null,
+            inclusion: replacementInclusion || null
           }
         };
 
@@ -2850,6 +2915,9 @@ function updateComparisonStatement(statement) {
       return;
     }
 
+    const ratioIndicatesLower = pollutionRelation === 'lower'
+      || (!pollutionRelation && Number.isFinite(pollutionRatio) && pollutionRatio < 1);
+
     const formatRatio = (value) => {
       if (!Number.isFinite(value)) return '∞';
       if (value >= 100) return value.toFixed(0);
@@ -2938,11 +3006,26 @@ function updateComparisonStatement(statement) {
       `;
     };
 
-    const buildCalcRow = (label, detail) => {
-      if (!detail) {
+    const buildCalcRow = (label, detailLines) => {
+      if (!Array.isArray(detailLines) || !detailLines.length) {
         return '';
       }
-      return `<div class="comparison-tooltip__calc-row"><span>${escapeHtml(label)}</span><span>${detail}</span></div>`;
+      const detailHtml = detailLines
+        .map((line, index) => `<span class="comparison-tooltip__calc-detail-line${index === 0 ? ' comparison-tooltip__calc-detail-line--primary' : ''}">${escapeHtml(line)}</span>`)
+        .join('');
+      return `
+        <div class="comparison-tooltip__calc-row">
+          <span>${escapeHtml(label)}</span>
+          <span class="comparison-tooltip__calc-detail">${detailHtml}</span>
+        </div>
+      `;
+    };
+
+    const buildCalcNote = (message) => {
+      if (!message) {
+        return '';
+      }
+      return `<div class="comparison-tooltip__note"><strong>Note: ${escapeHtml(message)}</strong></div>`;
     };
 
     const leftPrimaryMetrics = getCategoryMetrics(comparisonData.leftPrimary);
@@ -2957,25 +3040,31 @@ function updateComparisonStatement(statement) {
       ? leftPrimaryMetrics?.pollution
       : leftSecondaryMetrics?.pollution;
 
-    const pollutionFormula = (Number.isFinite(pollutionRatio)
+    const pollutionFormulaLines = [];
+    if (Number.isFinite(pollutionRatio)
       && Number.isFinite(pollutionNumeratorValue)
-      && Number.isFinite(pollutionDenominatorValue))
-      ? `${formatDetailedPollution(pollutionNumeratorValue)} ÷ ${formatDetailedPollution(pollutionDenominatorValue)} = ${formatRatio(pollutionRatio)}x ${pollutionRelation ? `(${pollutionRelation} pollution)` : ''}`
-      : '';
+      && Number.isFinite(pollutionDenominatorValue)) {
+      pollutionFormulaLines.push(`${formatDetailedPollution(pollutionNumeratorValue)} ÷ ${formatDetailedPollution(pollutionDenominatorValue)} = ${formatRatio(pollutionRatio)}x`);
+      const pollutionDirection = ratioIndicatesLower ? '(lower pollution)' : '(higher pollution)';
+      pollutionFormulaLines.push(pollutionDirection);
+    }
 
-    const energyFormula = (Number.isFinite(energyRatio)
+    const energyFormulaLines = [];
+    if (Number.isFinite(energyRatio)
       && Number.isFinite(energyPrimaryMetrics?.energy)
-      && Number.isFinite(energySecondaryMetrics?.energy))
-      ? `${formatDetailedEnergy(energyPrimaryMetrics.energy, { useCalcUnit: true })} ÷ ${formatDetailedEnergy(energySecondaryMetrics.energy, { useCalcUnit: true })} = ${formatRatio(energyRatio)}x ${(Number.isFinite(energyRatio) && energyRatio < 1) ? '(lower energy)' : '(higher energy)'}`
-      : '';
+      && Number.isFinite(energySecondaryMetrics?.energy)) {
+      energyFormulaLines.push(`${formatDetailedEnergy(energyPrimaryMetrics.energy, { useCalcUnit: true })} ÷ ${formatDetailedEnergy(energySecondaryMetrics.energy, { useCalcUnit: true })} = ${formatRatio(energyRatio)}x`);
+      const energyDirection = Number.isFinite(energyRatio) && energyRatio < 1 ? '(lower energy)' : '(higher energy)';
+      energyFormulaLines.push(energyDirection);
+    }
 
     const buildComparisonTooltip = () => {
       if (!leftPrimaryMetrics || !leftSecondaryMetrics) {
         return '';
       }
       const calcMarkup = [
-        buildCalcRow('Pollution ratio', pollutionFormula),
-        buildCalcRow('Energy ratio', energyFormula)
+        buildCalcRow('Pollution ratio', pollutionFormulaLines),
+        buildCalcRow('Energy ratio', energyFormulaLines)
       ].filter(Boolean).join('');
       return `
         <div class="comparison-tooltip" role="tooltip" aria-hidden="true">
@@ -2995,14 +3084,23 @@ function updateComparisonStatement(statement) {
     const warningEmissionFactor = Number.isFinite(warningDetails.emissionFactor)
       ? warningDetails.emissionFactor
       : warningPolluterMetrics?.emissionFactor;
+    const usesBaselineOnlyCalc = warningDetails?.calcSource === 'baseline-only';
 
-    const totalEnergyLine = (Number.isFinite(warningTotalEnergy)
-      && Number.isFinite(warningPolluterMetrics?.energy)
-      && Number.isFinite(warningBaselineMetrics?.energy))
-      ? `${formatDetailedEnergy(warningPolluterMetrics.energy, { useCalcUnit: true })} + ${formatDetailedEnergy(warningBaselineMetrics.energy, { useCalcUnit: true })} = ${formatDetailedEnergy(warningTotalEnergy, { useCalcUnit: true })}`
-      : (Number.isFinite(warningTotalEnergy) ? formatDetailedEnergy(warningTotalEnergy, { useCalcUnit: true }) : '—');
+    const totalEnergySummary = (() => {
+      if (!Number.isFinite(warningTotalEnergy)) {
+        return '—';
+      }
+      if (usesBaselineOnlyCalc && Number.isFinite(warningBaselineMetrics?.energy)) {
+        return `${formatDetailedEnergy(warningBaselineMetrics.energy, { useCalcUnit: true })} (baseline energy)`;
+      }
+      if (Number.isFinite(warningPolluterMetrics?.energy)
+        && Number.isFinite(warningBaselineMetrics?.energy)) {
+        return `${formatDetailedEnergy(warningPolluterMetrics.energy, { useCalcUnit: true })} + ${formatDetailedEnergy(warningBaselineMetrics.energy, { useCalcUnit: true })} = ${formatDetailedEnergy(warningTotalEnergy, { useCalcUnit: true })}`;
+      }
+      return formatDetailedEnergy(warningTotalEnergy, { useCalcUnit: true });
+    })();
 
-    const warningFormula = (Number.isFinite(warningTotalEnergy)
+    const warningFormulaSummary = (Number.isFinite(warningTotalEnergy)
       && Number.isFinite(warningEmissionFactor)
       && Number.isFinite(replacementPollution))
       ? `${formatDetailedEnergy(warningTotalEnergy, { useCalcUnit: true })} x ${formatEmissionFactorDetailed(warningEmissionFactor)} = ${formatDetailedPollution(replacementPollution)}`
@@ -3012,9 +3110,16 @@ function updateComparisonStatement(statement) {
       if (!warningPolluterMetrics || !warningBaselineMetrics) {
         return '';
       }
+      const inclusionNoteText = typeof warningDetails?.inclusion?.text === 'string'
+        ? warningDetails.inclusion.text
+        : null;
+      const energyDetailLines = totalEnergySummary ? [totalEnergySummary] : [];
+      const pollutionEstimateLines = warningFormulaSummary
+        ? [warningFormulaSummary]
+        : ['Calculation unavailable for this selection'];
       const warningCalcMarkup = [
-          buildCalcRow('Total energy demand', totalEnergyLine),
-          buildCalcRow('Pollution estimate', warningFormula || 'Calculation unavailable for this selection')
+          inclusionNoteText ? buildCalcNote(inclusionNoteText) : buildCalcRow('Energy', energyDetailLines),
+          buildCalcRow('Pollution estimate', pollutionEstimateLines)
         ].filter(Boolean).join('');
 
       return `
@@ -3040,13 +3145,13 @@ function updateComparisonStatement(statement) {
     const pollutionLeaderLabel = `<span class="comparison-warning-entity">${escapeHtml(pollutionLeaderName)}</span>`;
     const energyLeaderLabel = `<span class="comparison-warning-entity">${escapeHtml(energyLeaderName)}</span>`;
 
-    const ratioIndicatesLower = pollutionRelation === 'lower'
-      || (!pollutionRelation && Number.isFinite(pollutionRatio) && pollutionRatio < 1);
     const pollutionArrowClass = ratioIndicatesLower ? 'comparison-arrow down green' : 'comparison-arrow up red';
     const pollutionRatioLine = `${formatRatio(pollutionRatio)} times`;
-    const pollutionSecondaryLine = ratioIndicatesLower
-      ? `lower than ${pollutionFollowerName}`
-      : `higher than ${pollutionFollowerName}`;
+    const pollutionRatioFollowerLine = pollutionFollowerName
+      ? (ratioIndicatesLower ? `lower than ${pollutionFollowerName}` : `higher than ${pollutionFollowerName}`)
+      : (ratioIndicatesLower ? 'lower pollution' : 'higher pollution');
+
+    const energyFollowerLine = energyFollowerName || '';
 
     const comparisonDivMarkup = `
       <div class="comparison-layout">
@@ -3056,14 +3161,14 @@ function updateComparisonStatement(statement) {
             <div class="comparison-card-line comparison-card-line-large">${pollutionLeaderName}</div>
             <div class="comparison-card-line comparison-card-line-small">${pollutantName} pollution</div>
             <div class="comparison-card-line comparison-card-line-large">${pollutionRatioLine}</div>
-            <div class="comparison-card-line comparison-card-line-small">${pollutionSecondaryLine}</div>
+            <div class="comparison-card-line comparison-card-line-small">${pollutionRatioFollowerLine}</div>
             ${sharedTooltipMarkup}
           </div>
           <div class="comparison-card" tabindex="0" aria-label="${escapeHtml(`Show detailed energy metrics for ${energyLeaderName}`)}" style="background:${energyColor || '#0a77c4'};">
             <div class="comparison-card-line comparison-card-line-large">${energyLeaderName}</div>
             <div class="comparison-card-line comparison-card-line-small">Energy</div>
             <div class="comparison-card-line comparison-card-line-large">${formatRatio(energyRatio)} times</div>
-            <div class="comparison-card-line comparison-card-line-small">${energyFollowerName}</div>
+            <div class="comparison-card-line comparison-card-line-small">${energyFollowerLine}</div>
             ${sharedTooltipMarkup}
           </div>
           <div class="comparison-arrow up green" aria-hidden="true"></div>

@@ -1236,8 +1236,28 @@ body {
   font-weight: 600;
 }
 
-.comparison-tooltip__calc-row span:last-child {
+.comparison-tooltip__calc-detail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   text-align: right;
+  gap: 2px;
+}
+
+.comparison-tooltip__calc-detail-line--primary {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.comparison-tooltip__note {
+  font-size: 0.85rem;
+  color: #1d2939;
+  font-weight: 700;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: #fff4e5;
+  text-align: left;
+  margin-bottom: 6px;
 }
 
 .comparison-tooltip--warning {
