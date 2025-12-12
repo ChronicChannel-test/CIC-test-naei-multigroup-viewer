@@ -40,6 +40,18 @@ const chartLoggerWarn = (() => {
   return () => {};
 })();
 
+function comparisonDebugLog(message, payload) {
+  const logger = typeof window !== 'undefined' ? window.__bubbleComparisonDebugLog : null;
+  if (typeof logger !== 'function') {
+    return;
+  }
+  try {
+    logger(message, payload);
+  } catch (error) {
+    // comparison debug logging is best-effort only
+  }
+}
+
 // Provide a minimal fallback palette when shared Colors module fails to load
 if (!window.Colors) {
   console.warn('Colors module not found for bubble chart – using fallback palette.');
@@ -517,6 +529,16 @@ async function drawBubbleChart(year, pollutantId, categoryIds) {
         paddingBottom,
         appliedChartHeight
       });
+  comparisonDebugLog('chart renderer sizing', {
+    appliedChartHeight,
+    chartTopOffset,
+    paddingBottom,
+    availableHeight,
+    wrapperHeight: wrapperRect?.height || null,
+    clampResult,
+    preLegendEstimate,
+    pendingComparisonChromeHeight: Boolean(window.__bubblePendingComparisonChromeHeight)
+  });
   const effectiveWrapperHeight = clampResult?.finalHeight
     || (wrapperRect ? Math.round(wrapperRect.height) : null);
 

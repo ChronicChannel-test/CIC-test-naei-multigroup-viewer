@@ -139,6 +139,31 @@ function detectMobileExperience() {
 const IS_MOBILE_EXPERIENCE = detectMobileExperience();
 window.__NAEI_DISABLE_BUBBLE_TUTORIAL__ = IS_MOBILE_EXPERIENCE;
 
+  const DEFAULT_COMPARISON_DEBUG = true;
+  const COMPARISON_DEBUG_PREFIX = '[comparison-debug]';
+  const HAS_OWN = Object.prototype.hasOwnProperty;
+
+  function isComparisonDebugEnabled() {
+    if (typeof window !== 'undefined' && window && HAS_OWN.call(window, '__NAEI_COMPARISON_DEBUG__')) {
+      return Boolean(window.__NAEI_COMPARISON_DEBUG__);
+    }
+    return DEFAULT_COMPARISON_DEBUG;
+  }
+
+  function comparisonDebugLog(message, payload) {
+    if (!isComparisonDebugEnabled()) {
+      return;
+    }
+    const timestamp = new Date().toISOString();
+    if (payload !== undefined) {
+      console.log(COMPARISON_DEBUG_PREFIX, timestamp, message, payload);
+      return;
+    }
+    console.log(COMPARISON_DEBUG_PREFIX, timestamp, message);
+  }
+
+  window.__bubbleComparisonDebugLog = comparisonDebugLog;
+
 // Application state
 let selectedYear = null;
 let selectedPollutantId = null;
@@ -146,6 +171,21 @@ let chartRenderCallback = null; // Callback for when chart finishes rendering
 let selectedCategoryIds = [];
 let initialComparisonFlags = []; // Store comparison flags from URL for initial checkbox state
 let lastTrackedBubbleSelectionKey = null; // Prevent duplicate analytics events for unchanged selections
+let comparisonStatementVisible = false; // Track whether comparison cards are currently rendered
+let pendingComparisonChromeRefresh = null; // Debounce chart redraws triggered by comparison layout changes
+let pendingComparisonRedraw = null; // Collapse rapid comparison checkbox toggles into a single redraw
+  let pendingComparisonChromeHeight = false; // Indicates comparison chrome visibility changed and needs height sync
+  window.__bubblePendingComparisonChromeHeight = pendingComparisonChromeHeight;
+  function setPendingComparisonChromeHeight(nextValue) {
+    pendingComparisonChromeHeight = Boolean(nextValue);
+    window.__bubblePendingComparisonChromeHeight = pendingComparisonChromeHeight;
+    return pendingComparisonChromeHeight;
+  }
+let comparisonMeasurementDiv = null;
+let lastMeasuredComparisonChromeHeight = 0;
+window.__bubbleComparisonChromeHeight = 0;
+let suppressWrapperObserverUntil = 0; // Timestamp (ms) until which wrapper resize observer callbacks are ignored
+const WRAPPER_OBSERVER_SUPPRESS_MS = 450;
 const MIN_CHART_WRAPPER_HEIGHT = 480;
 const MIN_CHART_CANVAS_HEIGHT = 420;
 const CHART_HEADER_BUFFER = 10; // spacing between title/legend and chart
@@ -181,6 +221,46 @@ const layoutHeightManager = window.LayoutHeightManager?.create({
   minHeightDelta: MIN_HEIGHT_DELTA,
   heightDebounce: 250
 });
+
+// Keep the latest comparison chrome measurement synced so other modules (renderer/layout manager)
+// can reserve the correct amount of space before DOM updates land.
+function persistComparisonChromeHeight(value) {
+  const numeric = Number(value);
+  const safeValue = Number.isFinite(numeric) && numeric > 0
+    ? Math.round(numeric)
+    : 0;
+  lastMeasuredComparisonChromeHeight = safeValue;
+  window.__bubbleComparisonChromeHeight = safeValue;
+  return safeValue;
+}
+
+function suppressWrapperHeightObserver(durationMs = WRAPPER_OBSERVER_SUPPRESS_MS) {
+  const duration = Math.max(0, Number(durationMs) || 0);
+  if (duration <= 0) {
+    suppressWrapperObserverUntil = 0;
+    return;
+  }
+  suppressWrapperObserverUntil = Date.now() + duration;
+    comparisonDebugLog('suppressWrapperHeightObserver', {
+      durationMs: duration,
+      resumeInMs: suppressWrapperObserverUntil - Date.now()
+    });
+}
+
+function shouldIgnoreWrapperObserverTick() {
+    if (!suppressWrapperObserverUntil) {
+      return false;
+    }
+    const now = Date.now();
+    if (now < suppressWrapperObserverUntil) {
+      comparisonDebugLog('wrapper observer tick ignored', {
+        remainingMs: suppressWrapperObserverUntil - now,
+        pendingComparisonChromeHeight
+      });
+      return true;
+    }
+    return false;
+}
 
 if (layoutHeightManager) {
   window.__bubbleLayoutHeightManager = layoutHeightManager;
@@ -404,6 +484,92 @@ function setupParentNavigationForwarding(sourceLabel = 'bubble') {
 
 setupParentNavigationForwarding('bubble');
 
+function ensureComparisonMeasurementDiv() {
+  if (comparisonMeasurementDiv && document.body.contains(comparisonMeasurementDiv)) {
+    return comparisonMeasurementDiv;
+  }
+  const measurementDiv = document.createElement('div');
+  measurementDiv.id = 'comparisonMeasurementDiv';
+  measurementDiv.className = 'comparison-statement comparison-statement--measurement';
+  measurementDiv.style.position = 'absolute';
+  measurementDiv.style.visibility = 'hidden';
+  measurementDiv.style.pointerEvents = 'none';
+  measurementDiv.style.left = '-9999px';
+  measurementDiv.style.top = '-9999px';
+  measurementDiv.style.width = 'auto';
+  document.body.appendChild(measurementDiv);
+  comparisonMeasurementDiv = measurementDiv;
+  return comparisonMeasurementDiv;
+}
+
+function getComparisonMeasurementWidth() {
+  const container = document.getElementById('comparisonContainer')
+    || document.querySelector('.chart-wrapper');
+  if (!container) {
+    return null;
+  }
+  const rect = container.getBoundingClientRect();
+  if (!rect || !rect.width) {
+    return null;
+  }
+  return Math.round(rect.width);
+}
+
+function updateComparisonMeasurement(markup) {
+  if (!markup) {
+    persistComparisonChromeHeight(0);
+    if (comparisonMeasurementDiv) {
+      comparisonMeasurementDiv.innerHTML = '';
+    }
+    return 0;
+  }
+  const measurementDiv = ensureComparisonMeasurementDiv();
+  const widthCandidate = getComparisonMeasurementWidth();
+  if (Number.isFinite(widthCandidate) && widthCandidate > 0) {
+    measurementDiv.style.width = `${widthCandidate}px`;
+  } else {
+    measurementDiv.style.width = '';
+  }
+  measurementDiv.innerHTML = markup;
+  const measured = getElementHeight(measurementDiv);
+  if (Number.isFinite(measured) && measured >= 0) {
+    persistComparisonChromeHeight(measured);
+  }
+  comparisonDebugLog('comparison measurement update', {
+    measuredHeight: lastMeasuredComparisonChromeHeight,
+    width: widthCandidate
+  });
+  return lastMeasuredComparisonChromeHeight;
+}
+
+function clearComparisonMeasurement() {
+  persistComparisonChromeHeight(0);
+  if (comparisonMeasurementDiv) {
+    comparisonMeasurementDiv.innerHTML = '';
+  }
+}
+
+function measureChartChromeHeight() {
+  const chartTitle = document.getElementById('chartTitle');
+  const customLegend = document.getElementById('customLegend');
+  const comparisonDiv = document.getElementById('comparisonDiv');
+  const titleHeight = getElementHeight(chartTitle);
+  const legendHeight = getElementHeight(customLegend);
+  const baseChromeHeight = CHART_HEADER_BUFFER + titleHeight + legendHeight;
+  let visibleComparisonHeight = 0;
+  if (comparisonDiv && comparisonDiv.style.display !== 'none') {
+    visibleComparisonHeight = getElementHeight(comparisonDiv);
+    if (Number.isFinite(visibleComparisonHeight) && visibleComparisonHeight >= 0) {
+      persistComparisonChromeHeight(visibleComparisonHeight);
+    }
+  }
+  return {
+    base: baseChromeHeight,
+    comparison: visibleComparisonHeight,
+    total: baseChromeHeight + visibleComparisonHeight
+  };
+}
+
 function updateChartWrapperHeight(contextLabel = 'init') {
   const viewportHeight = Math.round(
     IS_EMBEDDED
@@ -429,18 +595,37 @@ function updateChartWrapperHeight(contextLabel = 'init') {
     return;
   }
 
+  const chromeMetrics = measureChartChromeHeight();
+  const baseChromeHeight = chromeMetrics?.base || 0;
+  const visibleComparisonChrome = chromeMetrics?.comparison || 0;
+  const anticipatedComparisonChrome = (!visibleComparisonChrome && pendingComparisonChromeHeight)
+    ? Math.max(0, lastMeasuredComparisonChromeHeight)
+    : visibleComparisonChrome;
+  const totalChromeForLogging = baseChromeHeight + anticipatedComparisonChrome;
+  const chromeBufferForEstimate = CHART_HEADER_BUFFER;
   const estimatedChartHeight = layoutHeightManager
     ? layoutHeightManager.estimateChartHeight({
         viewportHeight,
         footerReserve,
-        chromeBuffer: CHART_HEADER_BUFFER
+        chromeBuffer: chromeBufferForEstimate
       })
     : Math.max(
         MIN_CHART_CANVAS_HEIGHT,
-        viewportHeight - footerReserve - CHART_HEADER_BUFFER
+        viewportHeight - footerReserve - chromeBufferForEstimate
       );
 
   window.__NAEI_LAST_CHART_HEIGHT = estimatedChartHeight;
+  comparisonDebugLog('updateChartWrapperHeight', {
+    context: contextLabel,
+    viewportHeight,
+    footerReserve,
+    baseChromeHeight,
+    anticipatedComparisonChrome,
+    chromeBuffer: totalChromeForLogging,
+    chromeBufferUsedForEstimate: chromeBufferForEstimate,
+    estimatedChartHeight,
+    pendingComparisonChromeHeight
+  });
   return estimatedChartHeight;
 
   /*
@@ -2004,7 +2189,10 @@ function refreshButtons() {
         comparisonCheckbox.checked = rowIndex < 2;
       }
 
-      comparisonCheckbox.addEventListener('change', (event) => refreshCheckboxes(event.target));
+      comparisonCheckbox.addEventListener('change', (event) => refreshCheckboxes(event.target, {
+        scheduleRedraw: true,
+        reason: 'comparison-checkbox'
+      }));
 
       const checkboxLabel = document.createElement('span');
       checkboxLabel.className = 'comparison-checkbox-label';
@@ -2049,7 +2237,8 @@ function refreshButtons() {
 }
 
 // Ensure checkboxes are only checked for two categories at once
-function refreshCheckboxes(triggeredCheckbox = null) {
+function refreshCheckboxes(triggeredCheckbox = null, options = {}) {
+  const { scheduleRedraw = false, reason = 'comparison-toggle' } = options || {};
   const checkboxes = Array.from(document.querySelectorAll('.comparison-checkbox'));
   const checkboxOrder = new Map();
   checkboxes.forEach((checkbox, index) => checkboxOrder.set(checkbox, index));
@@ -2082,8 +2271,9 @@ function refreshCheckboxes(triggeredCheckbox = null) {
     checkbox.style.cursor = 'pointer';
   });
   
-  // Update the comparison statement based on checked boxes count
-  drawChart();
+  if (scheduleRedraw) {
+    scheduleComparisonRedraw(reason);
+  }
 }
 
 // Return the category names (display titles) that are currently selected for comparison
@@ -2099,6 +2289,249 @@ function getComparisonSelections() {
       return null;
     })
     .filter(Boolean);
+}
+
+async function syncComparisonStatement({
+  selectedCategoryIds = null,
+  allCategories = null,
+  comparisonSelections = null,
+  dataPoints = null
+} = {}) {
+  if (!selectedYear || !selectedPollutantId) {
+    hideComparisonStatement();
+    return;
+  }
+
+  const categoryList = Array.isArray(allCategories) && allCategories.length
+    ? allCategories
+    : (window.supabaseModule.allCategories || []);
+
+  const resolvedCategoryIds = Array.isArray(selectedCategoryIds) && selectedCategoryIds.length
+    ? selectedCategoryIds
+    : (getSelectedCategories()
+        .map(name => {
+          const category = categoryList.find(g => getCategoryDisplayTitle(g) === name);
+          return category ? category.id : null;
+        })
+        .filter(id => id !== null));
+
+  if (!resolvedCategoryIds.length) {
+    hideComparisonStatement();
+    return;
+  }
+
+  const resolvedSelections = Array.isArray(comparisonSelections)
+    ? comparisonSelections
+    : getComparisonSelections();
+
+  if (resolvedSelections.length < 2) {
+    hideComparisonStatement();
+    return;
+  }
+
+  const scatterData = Array.isArray(dataPoints)
+    ? dataPoints
+    : (window.supabaseModule.getScatterData(selectedYear, selectedPollutantId, resolvedCategoryIds) || []);
+
+  const usedSelections = resolvedSelections.slice(0, 2);
+  const comparisonData = [];
+
+  usedSelections.forEach(name => {
+    const categoryMatch = categoryList.find(g => getCategoryDisplayTitle(g) === name);
+    if (!categoryMatch) {
+      return;
+    }
+
+    const dataPoint = scatterData.find(dp => String(dp.categoryId) === String(categoryMatch.id));
+    if (dataPoint) {
+      const displayName = getCategoryDisplayTitle(categoryMatch);
+      const color = window.Colors?.getColorForCategory
+        ? window.Colors.getColorForCategory(displayName)
+        : null;
+      comparisonData.push({
+        ...dataPoint,
+        displayName,
+        color
+      });
+    }
+  });
+
+  if (comparisonData.length < 2) {
+    hideComparisonStatement();
+    return;
+  }
+
+  const pollutantName = window.supabaseModule.getPollutantName(selectedPollutantId);
+  const pollutantUnit = window.supabaseModule.getPollutantUnit(selectedPollutantId) || 'kt';
+  const activityUnitId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
+  const activityUnit = (activityUnitId && window.supabaseModule.getPollutantUnit(activityUnitId)) || 'TJ';
+
+  const enrichedComparisonData = comparisonData.map(dataPoint => ({
+    ...dataPoint,
+    emissionFactor: calculateEmissionFactor(dataPoint)
+  }));
+
+  const { leader: pollutionLeader, follower: pollutionFollower } = selectLeaderFollower(
+    enrichedComparisonData,
+    (dataPoint) => normalizeNumber(dataPoint?.pollutantValue)
+  );
+
+  const { leader: energyLeader, follower: energyFollower } = selectLeaderFollower(
+    enrichedComparisonData,
+    (dataPoint) => normalizeNumber(dataPoint?.actDataValue)
+  );
+
+  const { leader: efLeaderRaw, follower: efFollowerRaw } = selectLeaderFollower(
+    enrichedComparisonData,
+    (dataPoint) => Number(dataPoint?.emissionFactor)
+  );
+
+  let leftLeader = energyFollower;
+  let leftFollower = energyLeader;
+
+  if (!leftLeader || !leftFollower) {
+    leftLeader = efLeaderRaw || pollutionLeader;
+    leftFollower = efFollowerRaw || pollutionFollower;
+  }
+
+  const pollutionRatioSourceLeader = leftLeader && leftFollower ? leftLeader : pollutionLeader;
+  const pollutionRatioSourceFollower = leftLeader && leftFollower ? leftFollower : pollutionFollower;
+
+  let pollutionRatio = NaN;
+  let pollutionRelation = null;
+
+  if (pollutionRatioSourceLeader && pollutionRatioSourceFollower) {
+    const leaderPollution = normalizeNumber(pollutionRatioSourceLeader.pollutantValue);
+    const followerPollution = normalizeNumber(pollutionRatioSourceFollower.pollutantValue);
+
+    if (Number.isFinite(leaderPollution) && Number.isFinite(followerPollution)) {
+      if (leaderPollution < followerPollution) {
+        pollutionRatio = safeRatio(followerPollution, leaderPollution);
+        pollutionRelation = 'lower';
+      } else {
+        pollutionRatio = safeRatio(leaderPollution, followerPollution);
+        pollutionRelation = 'higher';
+      }
+    }
+  }
+
+  const energyRatio = (energyLeader && energyFollower)
+    ? safeRatio(energyLeader.actDataValue, energyFollower.actDataValue)
+    : NaN;
+
+  const warningPolluter = energyFollower;
+  const warningBaseline = energyLeader;
+  const warningFallback = leftFollower || pollutionFollower;
+
+  let replacementDetails = null;
+  let replacementPollution = null;
+  let replacementInclusion = null;
+
+  if (warningPolluter && warningBaseline) {
+    replacementInclusion = await buildReplacementInclusionNote(warningPolluter, warningBaseline);
+    const baselineOnlyEnergy = normalizeNumber(warningBaseline?.actDataValue);
+    const polluterEmissionFactor = Number.isFinite(warningPolluter?.emissionFactor)
+      ? warningPolluter.emissionFactor
+      : calculateEmissionFactor(warningPolluter);
+
+    if (replacementInclusion && Number.isFinite(baselineOnlyEnergy) && baselineOnlyEnergy > 0 && Number.isFinite(polluterEmissionFactor)) {
+      replacementPollution = polluterEmissionFactor * baselineOnlyEnergy;
+      replacementDetails = {
+        polluter: warningPolluter,
+        baseline: warningBaseline,
+        emissionFactor: polluterEmissionFactor,
+        totalActivity: baselineOnlyEnergy,
+        calcSource: 'baseline-only'
+      };
+    }
+
+    if (!replacementPollution) {
+      const estimate = estimateReplacementPollution(warningPolluter, warningBaseline);
+      if (estimate) {
+        replacementDetails = {
+          polluter: warningPolluter,
+          baseline: warningBaseline,
+          emissionFactor: estimate.emissionFactor,
+          totalActivity: estimate.totalActivity,
+          calcSource: 'ef'
+        };
+        replacementPollution = estimate.value;
+      } else {
+        const fallbackTotalEnergy = sumActivityValues(
+          warningPolluter?.actDataValue,
+          warningBaseline?.actDataValue
+        );
+
+        if (Number.isFinite(polluterEmissionFactor) && fallbackTotalEnergy > 0) {
+          replacementPollution = polluterEmissionFactor * fallbackTotalEnergy;
+          replacementDetails = {
+            polluter: warningPolluter,
+            baseline: warningBaseline,
+            emissionFactor: polluterEmissionFactor,
+            totalActivity: fallbackTotalEnergy,
+            calcSource: 'fallback-energy'
+          };
+        } else if (warningFallback) {
+          const ratioFallback = safeRatio(warningPolluter?.pollutantValue, warningFallback?.pollutantValue);
+          const fallbackValue = Number.isFinite(ratioFallback)
+            ? ratioFallback * warningFallback.pollutantValue
+            : null;
+          if (Number.isFinite(fallbackValue)) {
+            replacementPollution = fallbackValue;
+            replacementDetails = {
+              polluter: warningPolluter,
+              baseline: warningBaseline,
+              emissionFactor: polluterEmissionFactor || null,
+              totalActivity: fallbackTotalEnergy || null,
+              calcSource: 'ratio-fallback'
+            };
+          }
+        }
+      }
+    }
+  }
+
+  if (leftLeader && leftFollower && energyLeader && energyFollower) {
+    const statement = {
+      pollutantName,
+      pollutantUnit,
+      activityUnit,
+      pollutionLeaderName: leftLeader.displayName,
+      pollutionFollowerName: leftFollower.displayName,
+      energyLeaderName: energyLeader.displayName,
+      energyFollowerName: energyFollower.displayName,
+      pollutionRatio,
+      pollutionRelation,
+      energyRatio,
+      replacementPollution,
+      pollutionColor: leftLeader.color,
+      energyColor: energyLeader.color,
+      comparisonData: {
+        leftPrimary: leftLeader,
+        leftSecondary: leftFollower,
+        energyPrimary: energyLeader,
+        energySecondary: energyFollower
+      },
+      warningDetails: {
+        polluter: warningPolluter,
+        baseline: warningBaseline,
+        totalActivity: replacementDetails?.totalActivity || sumActivityValues(
+          warningPolluter?.actDataValue,
+          warningBaseline?.actDataValue
+        ) || null,
+        emissionFactor: replacementDetails?.emissionFactor
+          ?? (Number.isFinite(warningPolluter?.emissionFactor)
+            ? warningPolluter.emissionFactor
+            : calculateEmissionFactor(warningPolluter)),
+        calcSource: replacementDetails?.calcSource || null,
+        inclusion: replacementInclusion || null
+      }
+    };
+
+    updateComparisonStatement(statement);
+  } else {
+    hideComparisonStatement();
+  }
 }
 
 function safeRatio(numerator, denominator) {
@@ -2364,7 +2797,8 @@ function setupCategorySelector() {
 /**
  * Update chart when selections change
  */
-function updateChart() {
+function updateChart(options = {}) {
+  const { skipHeightUpdate = false } = options || {};
   // This will be called automatically when categories change
 
   // Reset the color system to ensure consistent color assignments
@@ -2375,7 +2809,7 @@ function updateChart() {
   const colors = selectedCategoryNames.map(categoryName => window.Colors.getColorForCategory(categoryName));
 
   // Redraw the chart to reflect the new selections
-  drawChart();
+  drawChart(skipHeightUpdate);
 }
 
 /**
@@ -2450,6 +2884,13 @@ function setupEventListeners() {
 
   if (layoutHeightManager) {
     layoutHeightManager.observeWrapper(() => {
+      if (shouldIgnoreWrapperObserverTick()) {
+        return;
+      }
+        comparisonDebugLog('wrapper observer tick triggered redraw', {
+          pendingComparisonChromeHeight,
+          comparisonStatementVisible
+        });
       drawChart(true);
       sendContentHeightToParent(true);
     });
@@ -2501,6 +2942,11 @@ function publishBubbleChartViewMeta(meta) {
  * @param {boolean} skipHeightUpdate - If true, don't send height update to parent (for resize events)
  */
 async function drawChart(skipHeightUpdate = false) {
+  comparisonDebugLog('drawChart start', {
+    skipHeightUpdate,
+    pendingComparisonChromeHeight,
+    comparisonStatementVisible
+  });
   if (!chartRenderingUnlocked) {
     pendingDrawRequest = { skipHeightUpdate };
     return;
@@ -2546,231 +2992,33 @@ async function drawChart(skipHeightUpdate = false) {
     return;
   }
 
+  await syncComparisonStatement({
+    selectedCategoryIds,
+    allCategories
+  });
+
   const estimateContext = skipHeightUpdate ? 'drawChart-resume' : 'drawChart';
   const latestEstimate = updateChartWrapperHeight(estimateContext);
   if (Number.isFinite(latestEstimate)) {
     window.__BUBBLE_PRE_LEGEND_ESTIMATE = latestEstimate;
   }
+  setPendingComparisonChromeHeight(false);
+  comparisonDebugLog('drawChart height estimate complete', {
+    estimateContext,
+    latestEstimate,
+    skipHeightUpdate
+  });
 
-  // Draw chart
   try {
     await window.ChartRenderer.drawBubbleChart(selectedYear, selectedPollutantId, selectedCategoryIds);
+    comparisonDebugLog('drawChart render complete', {
+      selectedYear,
+      selectedPollutantId,
+      categoryCount: selectedCategoryIds.length
+    });
   } catch (error) {
     console.error('Bubble chart render failed:', error);
     window.ChartRenderer.showMessage('Unable to render the chart right now. Please try again.', 'error');
-  }
-
-  // Update the comparison statement based on checked comparison checkboxes
-  const comparisonSelections = getComparisonSelections();
-  if (comparisonSelections.length >= 2) {
-    const dataPoints = window.supabaseModule.getScatterData(selectedYear, selectedPollutantId, selectedCategoryIds) || [];
-    const usedSelections = comparisonSelections.slice(0, 2);
-    const comparisonData = [];
-
-    usedSelections.forEach(name => {
-      const categoryMatch = allCategories.find(g => getCategoryDisplayTitle(g) === name);
-      if (!categoryMatch) {
-        return;
-      }
-
-      const dataPoint = dataPoints.find(dp => String(dp.categoryId) === String(categoryMatch.id));
-      if (dataPoint) {
-        const displayName = getCategoryDisplayTitle(categoryMatch);
-        const color = window.Colors?.getColorForCategory ? window.Colors.getColorForCategory(displayName) : null;
-        comparisonData.push({
-          ...dataPoint,
-          displayName,
-          color
-        });
-      }
-    });
-
-    if (comparisonData.length >= 2) {
-      const pollutantName = window.supabaseModule.getPollutantName(selectedPollutantId);
-      const pollutantUnit = window.supabaseModule.getPollutantUnit(selectedPollutantId) || 'kt';
-      const activityUnitId = window.supabaseModule.actDataPollutantId || window.supabaseModule.activityDataId;
-      const activityUnit = (activityUnitId && window.supabaseModule.getPollutantUnit(activityUnitId)) || 'TJ';
-
-      const enrichedComparisonData = comparisonData.map(dataPoint => ({
-        ...dataPoint,
-        emissionFactor: calculateEmissionFactor(dataPoint)
-      }));
-
-      const { leader: pollutionLeader, follower: pollutionFollower } = selectLeaderFollower(
-        enrichedComparisonData,
-        (dataPoint) => normalizeNumber(dataPoint?.pollutantValue)
-      );
-
-      const { leader: energyLeader, follower: energyFollower } = selectLeaderFollower(
-        enrichedComparisonData,
-        (dataPoint) => normalizeNumber(dataPoint?.actDataValue)
-      );
-
-      const { leader: efLeaderRaw, follower: efFollowerRaw } = selectLeaderFollower(
-        enrichedComparisonData,
-        (dataPoint) => Number(dataPoint?.emissionFactor)
-      );
-
-      /*
-       * Previous behaviour (kept for reference):
-       * let leftLeader = efLeaderRaw;
-       * let leftFollower = efFollowerRaw;
-       * ...fallback logic mixing pollution + EF leaders...
-       */
-
-      let leftLeader = energyFollower;
-      let leftFollower = energyLeader;
-
-      if (!leftLeader || !leftFollower) {
-        leftLeader = efLeaderRaw || pollutionLeader;
-        leftFollower = efFollowerRaw || pollutionFollower;
-      }
-
-      const pollutionRatioSourceLeader = leftLeader && leftFollower ? leftLeader : pollutionLeader;
-      const pollutionRatioSourceFollower = leftLeader && leftFollower ? leftFollower : pollutionFollower;
-
-      let pollutionRatio = NaN;
-      let pollutionRelation = null;
-
-      if (pollutionRatioSourceLeader && pollutionRatioSourceFollower) {
-        const leaderPollution = normalizeNumber(pollutionRatioSourceLeader.pollutantValue);
-        const followerPollution = normalizeNumber(pollutionRatioSourceFollower.pollutantValue);
-
-        if (Number.isFinite(leaderPollution) && Number.isFinite(followerPollution)) {
-          if (leaderPollution < followerPollution) {
-            pollutionRatio = safeRatio(followerPollution, leaderPollution);
-            pollutionRelation = 'lower';
-          } else {
-            pollutionRatio = safeRatio(leaderPollution, followerPollution);
-            pollutionRelation = 'higher';
-          }
-        }
-      }
-
-      const energyRatio = (energyLeader && energyFollower)
-        ? safeRatio(energyLeader.actDataValue, energyFollower.actDataValue)
-        : NaN;
-
-      const warningPolluter = energyFollower;
-      const warningBaseline = energyLeader;
-      const warningFallback = leftFollower || pollutionFollower;
-
-      let replacementDetails = null;
-      let replacementPollution = null;
-      let replacementInclusion = null;
-
-      if (warningPolluter && warningBaseline) {
-        replacementInclusion = await buildReplacementInclusionNote(warningPolluter, warningBaseline);
-        const baselineOnlyEnergy = normalizeNumber(warningBaseline?.actDataValue);
-        const polluterEmissionFactor = Number.isFinite(warningPolluter?.emissionFactor)
-          ? warningPolluter.emissionFactor
-          : calculateEmissionFactor(warningPolluter);
-
-        if (replacementInclusion && Number.isFinite(baselineOnlyEnergy) && baselineOnlyEnergy > 0 && Number.isFinite(polluterEmissionFactor)) {
-          replacementPollution = polluterEmissionFactor * baselineOnlyEnergy;
-          replacementDetails = {
-            polluter: warningPolluter,
-            baseline: warningBaseline,
-            emissionFactor: polluterEmissionFactor,
-            totalActivity: baselineOnlyEnergy,
-            calcSource: 'baseline-only'
-          };
-        }
-
-        if (!replacementPollution) {
-          const estimate = estimateReplacementPollution(warningPolluter, warningBaseline);
-          if (estimate) {
-            replacementDetails = {
-              polluter: warningPolluter,
-              baseline: warningBaseline,
-              emissionFactor: estimate.emissionFactor,
-              totalActivity: estimate.totalActivity,
-              calcSource: 'ef'
-            };
-            replacementPollution = estimate.value;
-          } else {
-            const fallbackTotalEnergy = sumActivityValues(
-              warningPolluter?.actDataValue,
-              warningBaseline?.actDataValue
-            );
-
-            if (Number.isFinite(polluterEmissionFactor) && fallbackTotalEnergy > 0) {
-              replacementPollution = polluterEmissionFactor * fallbackTotalEnergy;
-              replacementDetails = {
-                polluter: warningPolluter,
-                baseline: warningBaseline,
-                emissionFactor: polluterEmissionFactor,
-                totalActivity: fallbackTotalEnergy,
-                calcSource: 'fallback-energy'
-              };
-            } else if (warningFallback) {
-              const ratioFallback = safeRatio(warningPolluter?.pollutantValue, warningFallback?.pollutantValue);
-              const fallbackValue = Number.isFinite(ratioFallback)
-                ? ratioFallback * warningFallback.pollutantValue
-                : null;
-              if (Number.isFinite(fallbackValue)) {
-                replacementPollution = fallbackValue;
-                replacementDetails = {
-                  polluter: warningPolluter,
-                  baseline: warningBaseline,
-                  emissionFactor: polluterEmissionFactor || null,
-                  totalActivity: fallbackTotalEnergy || null,
-                  calcSource: 'ratio-fallback'
-                };
-              }
-            }
-          }
-        }
-      }
-
-      if (leftLeader && leftFollower && energyLeader && energyFollower) {
-        const statement = {
-          pollutantName,
-          pollutantUnit,
-          activityUnit,
-          pollutionLeaderName: leftLeader.displayName,
-          pollutionFollowerName: leftFollower.displayName,
-          energyLeaderName: energyLeader.displayName,
-          energyFollowerName: energyFollower.displayName,
-          pollutionRatio,
-          pollutionRelation,
-          energyRatio,
-          replacementPollution,
-          pollutionColor: leftLeader.color,
-          energyColor: energyLeader.color,
-          comparisonData: {
-            leftPrimary: leftLeader,
-            leftSecondary: leftFollower,
-            energyPrimary: energyLeader,
-            energySecondary: energyFollower
-          },
-          warningDetails: {
-            polluter: warningPolluter,
-            baseline: warningBaseline,
-            totalActivity: replacementDetails?.totalActivity || sumActivityValues(
-              warningPolluter?.actDataValue,
-              warningBaseline?.actDataValue
-            ) || null,
-            emissionFactor: replacementDetails?.emissionFactor
-              ?? (Number.isFinite(warningPolluter?.emissionFactor)
-                ? warningPolluter.emissionFactor
-                : calculateEmissionFactor(warningPolluter)),
-            calcSource: replacementDetails?.calcSource || null,
-            inclusion: replacementInclusion || null
-          }
-        };
-
-        updateComparisonStatement(statement);
-      } else {
-        hideComparisonStatement();
-      }
-    } else {
-      // Hide comparison statement when data is insufficient
-      hideComparisonStatement();
-    }
-  } else {
-    // Hide comparison statement when less than 2 checkboxes checked
-    hideComparisonStatement();
   }
   
   // Update URL
@@ -2805,6 +3053,87 @@ async function drawChart(skipHeightUpdate = false) {
   if (!skipHeightUpdate) {
     setTimeout(sendContentHeightToParent, 150);
   }
+}
+
+function scheduleComparisonRedraw(reason = 'comparison-toggle') {
+  const raf = (window.requestAnimationFrame && window.requestAnimationFrame.bind(window))
+    || (callback => setTimeout(callback, 16));
+  const caf = (window.cancelAnimationFrame && window.cancelAnimationFrame.bind(window))
+    || clearTimeout;
+    const hadPending = Boolean(pendingComparisonRedraw);
+  if (pendingComparisonRedraw) {
+    caf(pendingComparisonRedraw);
+  }
+    comparisonDebugLog('queue comparison redraw', {
+      reason,
+      hadPending,
+      pendingComparisonChromeHeight,
+      comparisonStatementVisible
+    });
+  pendingComparisonRedraw = raf(() => {
+    pendingComparisonRedraw = null;
+      comparisonDebugLog('run comparison redraw', {
+        reason,
+        skipHeightUpdate: true,
+        pendingComparisonChromeHeight,
+        comparisonStatementVisible
+      });
+    try {
+      updateChart({ skipHeightUpdate: true });
+    } catch (error) {
+      console.error('Comparison redraw failed:', error, reason);
+    }
+  });
+}
+
+function scheduleComparisonChromeRefresh(reason = 'comparison-toggle') {
+  const raf = (window.requestAnimationFrame && window.requestAnimationFrame.bind(window))
+    || (callback => setTimeout(callback, 16));
+  const caf = (window.cancelAnimationFrame && window.cancelAnimationFrame.bind(window))
+    || clearTimeout;
+    const hadPending = Boolean(pendingComparisonChromeRefresh);
+  if (pendingComparisonChromeRefresh) {
+    caf(pendingComparisonChromeRefresh);
+  }
+    comparisonDebugLog('queue comparison chrome refresh', {
+      reason,
+      hadPending,
+      pendingComparisonChromeHeight
+    });
+  pendingComparisonChromeRefresh = raf(() => {
+    pendingComparisonChromeRefresh = null;
+      comparisonDebugLog('run comparison chrome refresh', {
+        reason,
+        pendingComparisonChromeHeight
+      });
+    const latestEstimate = updateChartWrapperHeight(reason);
+    if (Number.isFinite(latestEstimate)) {
+      window.__BUBBLE_PRE_LEGEND_ESTIMATE = latestEstimate;
+    }
+      setPendingComparisonChromeHeight(false);
+      comparisonDebugLog('comparison chrome refresh complete', {
+        reason,
+        latestEstimate
+      });
+    if (typeof sendContentHeightToParent === 'function') {
+      setTimeout(() => sendContentHeightToParent(true), 80);
+    }
+  });
+}
+
+function setComparisonStatementVisibility(nextVisible, reason) {
+  if (comparisonStatementVisible === nextVisible) {
+    return;
+  }
+  comparisonStatementVisible = nextVisible;
+  setPendingComparisonChromeHeight(true);
+  suppressWrapperHeightObserver();
+    comparisonDebugLog('comparison visibility change', {
+      reason,
+      nextVisible,
+      pendingComparisonChromeHeight
+    });
+  scheduleComparisonChromeRefresh(reason);
 }
 
 function ensureComparisonDivExists() {
@@ -2849,6 +3178,7 @@ function getCategoryDisplayName(categoryName) {
 function updateComparisonStatement(statement) {
   const comparisonDiv = ensureComparisonDivExists();
   if (comparisonDiv) {
+    const wasVisible = comparisonStatementVisible;
     comparisonDiv.style.display = 'block';
 
     const {
@@ -3153,9 +3483,30 @@ function updateComparisonStatement(statement) {
         </div>
       </div>
     `;
-
+    const measuredChromeHeight = updateComparisonMeasurement(comparisonDivMarkup);
     comparisonDiv.innerHTML = comparisonDivMarkup;
     comparisonDiv.className = 'comparison-statement';
+    const visibleComparisonHeight = getElementHeight(comparisonDiv);
+    if (Number.isFinite(visibleComparisonHeight) && visibleComparisonHeight >= 0) {
+      persistComparisonChromeHeight(visibleComparisonHeight);
+    } else if (Number.isFinite(measuredChromeHeight)) {
+      persistComparisonChromeHeight(measuredChromeHeight);
+    }
+
+      if (wasVisible) {
+        setPendingComparisonChromeHeight(true);
+      suppressWrapperHeightObserver();
+      scheduleComparisonChromeRefresh('comparison-update');
+    }
+
+    setComparisonStatementVisibility(true, wasVisible ? 'comparison-update' : 'comparison-show');
+      comparisonDebugLog('comparison statement rendered', {
+        wasVisible,
+        pollutionLeader: comparisonData?.leftPrimary?.displayName || pollutionLeaderName,
+        energyLeader: comparisonData?.energyPrimary?.displayName || energyLeaderName,
+        pendingComparisonChromeHeight,
+        measuredChromeHeight
+      });
   }
 }
 
@@ -3166,6 +3517,9 @@ function hideComparisonStatement() {
   const comparisonDiv = document.getElementById('comparisonDiv');
   if (comparisonDiv) {
     comparisonDiv.style.display = 'none';
+    clearComparisonMeasurement();
+    setComparisonStatementVisibility(false, 'comparison-hide');
+      comparisonDebugLog('comparison statement hidden');
   } else {
   }
 }
