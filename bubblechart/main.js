@@ -211,6 +211,7 @@ let parentViewportHeight = DEFAULT_PARENT_VIEWPORT;
 let chartReadyNotified = false;
 let chartRenderingUnlocked = false;
 let pendingDrawRequest = null;
+let isChartDrawing = false;
 
 function applyCssFooterReserve(pixels) {
   if (layoutHeightManager) {
@@ -2501,13 +2502,18 @@ function publishBubbleChartViewMeta(meta) {
  * @param {boolean} skipHeightUpdate - If true, don't send height update to parent (for resize events)
  */
 async function drawChart(skipHeightUpdate = false) {
+  if (isChartDrawing) {
+    return;
+  }
   if (!chartRenderingUnlocked) {
     pendingDrawRequest = { skipHeightUpdate };
     return;
   }
-  window.ChartRenderer.clearMessage();
+  isChartDrawing = true;
+  try {
+    window.ChartRenderer.clearMessage();
 
-  // Ensure category colors follow UI order every draw
+    // Ensure category colors follow UI order every draw
   if (typeof window.Colors?.resetColorSystem === 'function') {
     window.Colors.resetColorSystem();
     const orderedNames = getSelectedCategories();
@@ -2804,6 +2810,10 @@ async function drawChart(skipHeightUpdate = false) {
   // Only send height update if not triggered by resize (prevents growing gap)
   if (!skipHeightUpdate) {
     setTimeout(sendContentHeightToParent, 150);
+  }
+}
+ finally {
+    isChartDrawing = false;
   }
 }
 
