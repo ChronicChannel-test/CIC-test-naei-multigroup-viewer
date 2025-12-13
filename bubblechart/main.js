@@ -2272,7 +2272,7 @@ function refreshCheckboxes(triggeredCheckbox = null, options = {}) {
   });
   
   if (scheduleRedraw) {
-    syncComparisonStatement();
+    scheduleComparisonRedraw(reason);
   }
 }
 
